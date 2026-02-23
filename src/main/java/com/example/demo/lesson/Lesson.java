@@ -1,11 +1,14 @@
 package com.example.demo.lesson;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.example.demo.concept.Concept;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.lesson.enums.LessonModerationStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -19,6 +22,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -51,6 +56,14 @@ public class Lesson {
     @ManyToOne(optional = false)
     @JoinColumn(name = "contributor_id", nullable = false)
     private Contributor contributor;
+
+    @ManyToMany
+    @JoinTable(
+            name = "lesson_concepts",
+            joinColumns = @JoinColumn(name = "lesson_id"),
+            inverseJoinColumns = @JoinColumn(name = "concept_id")
+    )
+    private Set<Concept> concepts = new HashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
