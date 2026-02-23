@@ -78,13 +78,6 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
             @Param("conceptCount") Integer conceptCount
     );
 
-    // Temporary: raw insert while lesson_concepts has display_order.
-    // Replace with @ManyToMany after display_order is removed in DB.
-    @Modifying
-    @Query(
-            value = "insert into lesson_concepts (lesson_id, concept_id) values (:lessonId, :conceptId)", nativeQuery = true)
-    void insertLessonConcept(Integer lessonId, Integer conceptId);
-
     @Modifying
     @Query(
             value = """
