@@ -1,11 +1,10 @@
 package com.example.demo.lesson.dto.request;
 
-import java.util.UUID;
+import java.util.List;
 
 public record CreateLessonRequest(
         String title,
         Object content,
-        Integer conceptId,
-        UUID contributorId,
+        List<Integer> conceptIds,
         Boolean submit
 ) {}

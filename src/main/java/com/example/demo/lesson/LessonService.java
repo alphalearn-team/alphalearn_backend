@@ -1,7 +1,9 @@
 package com.example.demo.lesson;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -43,6 +45,7 @@ public class LessonService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto>  findAllLessons() {
         List<Lesson> lessons = lessonRepository.findByLessonModerationStatusAndDeletedAtIsNull(LessonModerationStatus.APPROVED);
         return lessons.stream()
@@ -50,6 +53,7 @@ public class LessonService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getLessonsByContributor(
             UUID contributorId,
             List<Integer> conceptIds,
@@ -74,6 +78,7 @@ public class LessonService {
     }
 
     // lessons that match at least one of the given concepts
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto> getLessonsByConcepts(List<Integer> conceptIds) {
         if (conceptIds == null || conceptIds.isEmpty()) {
             return List.of();
@@ -86,6 +91,7 @@ public class LessonService {
     }
 
     // lessons that match all of the given concepts
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto> getLessonsByAllConcepts(List<Integer> conceptIds) {
         if (conceptIds == null || conceptIds.isEmpty()) {
             return List.of();
@@ -101,6 +107,7 @@ public class LessonService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public LessonDetailView getLessonDetailForUser(Integer lessonId, SupabaseAuthUser user) {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
@@ -125,23 +132,35 @@ public class LessonService {
 
         String title = trimToNull(request.title());
         Object content = request.content();
-        Integer conceptId = request.conceptId();
-        UUID contributorId = request.contributorId();
+        List<Integer> conceptIds = normalizeCreateConceptIds(request.conceptIds());
+        UUID contributorId = user.userId();
 
-        if (title == null || content == null || conceptId == null || contributorId == null) {
+        if (title == null || content == null || conceptIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title, content, conceptId, and contributorId are required"
+                    "title, content, and conceptId (number or array) are required"
             );
         }
-        if (!contributorId.equals(user.userId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot create lesson for another contributor");
+        if (contributorId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user id is required");
         }
 
         Contributor contributor = contributorRepository.findById(contributorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found"));
-        Concept concept = conceptRepository.findById(conceptId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found"));
+        List<Concept> concepts = conceptRepository.findAllById(conceptIds);
+        if (concepts.size() != conceptIds.size()) {
+            Set<Integer> foundConceptIds = concepts.stream()
+                    .map(Concept::getConceptId)
+                    .collect(java.util.stream.Collectors.toSet());
+            Integer missingConceptId = conceptIds.stream()
+                    .filter(id -> !foundConceptIds.contains(id))
+                    .findFirst()
+                    .orElse(null);
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Concept not found" + (missingConceptId == null ? "" : ": " + missingConceptId)
+            );
+        }
 
         boolean submit = Boolean.TRUE.equals(request.submit());
         Lesson lesson = new Lesson(
@@ -151,7 +170,7 @@ public class LessonService {
                 contributor,
                 OffsetDateTime.now()
         );
-        lesson.getConcepts().add(concept);
+        lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
 
@@ -239,10 +258,30 @@ public class LessonService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    private List<Integer> normalizeCreateConceptIds(Object rawConceptId) {
+        if (rawConceptId == null) {
+            return List.of();
+        }
+
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        if (rawConceptId instanceof List<?> rawList) {
+            for (Object value : rawList) {
+                if (value instanceof Number number) {
+                    ids.add(number.intValue());
+                }
+            }
+        } else if (rawConceptId instanceof Number number) {
+            ids.add(number.intValue());
+        }
+
+        return List.copyOf(ids);
+    }
+
     private LessonPublicSummaryDto toPublicSummaryDto(Lesson lesson) {
         return new LessonPublicSummaryDto(
                 lesson.getLessonId(),
                 lesson.getTitle(),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
@@ -253,6 +292,7 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
@@ -265,6 +305,7 @@ public class LessonService {
                 base.title(),
                 base.content(),
                 lesson.getLessonModerationStatus().name(),
+                base.conceptIds(),
                 base.contributorId(),
                 base.createdAt()
         );
@@ -276,6 +317,7 @@ public class LessonService {
                 base.lessonId(),
                 base.title(),
                 base.content(),
+                base.conceptIds(),
                 base.contributorId(),
                 base.createdAt()
         );
@@ -286,15 +328,27 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
+    }
+
+    private List<Integer> toConceptIds(Lesson lesson) {
+        if (lesson.getConcepts() == null || lesson.getConcepts().isEmpty()) {
+            return List.of();
+        }
+        return lesson.getConcepts().stream()
+                .map(Concept::getConceptId)
+                .sorted()
+                .toList();
     }
 
     private record LessonDetailBase(
             Integer lessonId,
             String title,
             Object content,
+            List<Integer> conceptIds,
             UUID contributorId,
             OffsetDateTime createdAt
     ) {}
