@@ -1,7 +1,9 @@
 package com.example.demo.lesson;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -130,23 +132,35 @@ public class LessonService {
 
         String title = trimToNull(request.title());
         Object content = request.content();
-        Integer conceptId = request.conceptId();
-        UUID contributorId = request.contributorId();
+        List<Integer> conceptIds = normalizeCreateConceptIds(request.conceptIds()x);
+        UUID contributorId = user.userId();
 
-        if (title == null || content == null || conceptId == null || contributorId == null) {
+        if (title == null || content == null || conceptIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title, content, conceptId, and contributorId are required"
+                    "title, content, and conceptId (number or array) are required"
             );
         }
-        if (!contributorId.equals(user.userId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot create lesson for another contributor");
+        if (contributorId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user id is required");
         }
 
         Contributor contributor = contributorRepository.findById(contributorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found"));
-        Concept concept = conceptRepository.findById(conceptId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found"));
+        List<Concept> concepts = conceptRepository.findAllById(conceptIds);
+        if (concepts.size() != conceptIds.size()) {
+            Set<Integer> foundConceptIds = concepts.stream()
+                    .map(Concept::getConceptId)
+                    .collect(java.util.stream.Collectors.toSet());
+            Integer missingConceptId = conceptIds.stream()
+                    .filter(id -> !foundConceptIds.contains(id))
+                    .findFirst()
+                    .orElse(null);
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Concept not found" + (missingConceptId == null ? "" : ": " + missingConceptId)
+            );
+        }
 
         boolean submit = Boolean.TRUE.equals(request.submit());
         Lesson lesson = new Lesson(
@@ -156,7 +170,7 @@ public class LessonService {
                 contributor,
                 OffsetDateTime.now()
         );
-        lesson.getConcepts().add(concept);
+        lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
 
@@ -242,6 +256,25 @@ public class LessonService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private List<Integer> normalizeCreateConceptIds(Object rawConceptId) {
+        if (rawConceptId == null) {
+            return List.of();
+        }
+
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        if (rawConceptId instanceof List<?> rawList) {
+            for (Object value : rawList) {
+                if (value instanceof Number number) {
+                    ids.add(number.intValue());
+                }
+            }
+        } else if (rawConceptId instanceof Number number) {
+            ids.add(number.intValue());
+        }
+
+        return List.copyOf(ids);
     }
 
     private LessonPublicSummaryDto toPublicSummaryDto(Lesson lesson) {
