@@ -43,6 +43,7 @@ public class LessonService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto>  findAllLessons() {
         List<Lesson> lessons = lessonRepository.findByLessonModerationStatusAndDeletedAtIsNull(LessonModerationStatus.APPROVED);
         return lessons.stream()
@@ -50,6 +51,7 @@ public class LessonService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getLessonsByContributor(
             UUID contributorId,
             List<Integer> conceptIds,
@@ -74,6 +76,7 @@ public class LessonService {
     }
 
     // lessons that match at least one of the given concepts
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto> getLessonsByConcepts(List<Integer> conceptIds) {
         if (conceptIds == null || conceptIds.isEmpty()) {
             return List.of();
@@ -86,6 +89,7 @@ public class LessonService {
     }
 
     // lessons that match all of the given concepts
+    @Transactional(readOnly = true)
     public List<LessonPublicSummaryDto> getLessonsByAllConcepts(List<Integer> conceptIds) {
         if (conceptIds == null || conceptIds.isEmpty()) {
             return List.of();
@@ -101,6 +105,7 @@ public class LessonService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public LessonDetailView getLessonDetailForUser(Integer lessonId, SupabaseAuthUser user) {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
@@ -243,6 +248,7 @@ public class LessonService {
         return new LessonPublicSummaryDto(
                 lesson.getLessonId(),
                 lesson.getTitle(),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
@@ -253,6 +259,7 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
@@ -265,6 +272,7 @@ public class LessonService {
                 base.title(),
                 base.content(),
                 lesson.getLessonModerationStatus().name(),
+                base.conceptIds(),
                 base.contributorId(),
                 base.createdAt()
         );
@@ -276,6 +284,7 @@ public class LessonService {
                 base.lessonId(),
                 base.title(),
                 base.content(),
+                base.conceptIds(),
                 base.contributorId(),
                 base.createdAt()
         );
@@ -286,15 +295,27 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
+                toConceptIds(lesson),
                 lesson.getContributor().getContributorId(),
                 lesson.getCreatedAt()
         );
+    }
+
+    private List<Integer> toConceptIds(Lesson lesson) {
+        if (lesson.getConcepts() == null || lesson.getConcepts().isEmpty()) {
+            return List.of();
+        }
+        return lesson.getConcepts().stream()
+                .map(Concept::getConceptId)
+                .sorted()
+                .toList();
     }
 
     private record LessonDetailBase(
             Integer lessonId,
             String title,
             Object content,
+            List<Integer> conceptIds,
             UUID contributorId,
             OffsetDateTime createdAt
     ) {}
