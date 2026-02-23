@@ -78,6 +78,9 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
             @Param("conceptCount") Integer conceptCount
     );
 
+    @Query("select count(distinct l.lessonId) from Lesson l join l.concepts c where c.conceptId = :conceptId")
+    long countLinkedLessonsByConceptId(@Param("conceptId") Integer conceptId);
+
     @Modifying
     @Query(
             value = """

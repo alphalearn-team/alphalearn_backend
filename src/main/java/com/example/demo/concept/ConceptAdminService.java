@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 import com.example.demo.concept.dto.ConceptCreateDTO;
 import com.example.demo.concept.dto.ConceptDTO;
-import com.example.demo.lessonconcept.LessonConceptRepository;
+import com.example.demo.lesson.LessonRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,16 +14,16 @@ import org.springframework.web.server.ResponseStatusException;
 public class ConceptAdminService {
 
     private final ConceptRepository conceptRepository;
-    private final LessonConceptRepository lessonConceptRepository;
+    private final LessonRepository lessonRepository;
     private final ConceptService conceptService;
 
     public ConceptAdminService(
             ConceptRepository conceptRepository,
-            LessonConceptRepository lessonConceptRepository,
+            LessonRepository lessonRepository,
             ConceptService conceptService
     ) {
         this.conceptRepository = conceptRepository;
-        this.lessonConceptRepository = lessonConceptRepository;
+        this.lessonRepository = lessonRepository;
         this.conceptService = conceptService;
     }
 
@@ -81,7 +81,7 @@ public class ConceptAdminService {
         Concept concept = conceptRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + id));
 
-        long linkedLessons = lessonConceptRepository.countByIdConceptId(id);
+        long linkedLessons = lessonRepository.countLinkedLessonsByConceptId(id);
         if (linkedLessons > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
