@@ -132,7 +132,7 @@ public class LessonService {
 
         String title = trimToNull(request.title());
         Object content = request.content();
-        List<Integer> conceptIds = normalizeCreateConceptIds(request.conceptIds()x);
+        List<Integer> conceptIds = normalizeCreateConceptIds(request.conceptIds());
         UUID contributorId = user.userId();
 
         if (title == null || content == null || conceptIds.isEmpty()) {
