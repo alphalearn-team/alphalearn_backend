@@ -8,7 +8,6 @@ public record ConceptDTO (
     Integer conceptId,
     String title,
     String description,
-    String moderationStatus,
     OffsetDateTime createdAt
     
 ) {}

@@ -42,7 +42,6 @@ public class ConceptAdminService {
         Concept concept = new Concept();
         concept.setTitle(title);
         concept.setDescription(description);
-        concept.setModerationStatus(ModerationStatus.PENDING);
         concept.setCreatedAt(OffsetDateTime.now());
 
         Concept saved = conceptRepository.save(concept);
@@ -60,17 +59,15 @@ public class ConceptAdminService {
 
         String title = trimToNull(updatedConcept.getTitle());
         String description = trimToNull(updatedConcept.getDescription());
-        ModerationStatus moderationStatus = updatedConcept.getModerationStatus();
-        if (title == null || description == null || moderationStatus == null) {
+        if (title == null || description == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title, description, and moderationStatus are required"
+                    "title and description are required"
             );
         }
 
         existing.setTitle(title);
         existing.setDescription(description);
-        existing.setModerationStatus(moderationStatus);
 
         Concept saved = conceptRepository.save(existing);
         return conceptService.toDto(saved);

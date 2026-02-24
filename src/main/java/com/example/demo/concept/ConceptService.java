@@ -34,7 +34,6 @@ public class ConceptService {
                 concept.getConceptId(),
                 concept.getTitle(),
                 concept.getDescription(),
-                concept.getModerationStatus().name(),
                 concept.getCreatedAt()
         );
     }

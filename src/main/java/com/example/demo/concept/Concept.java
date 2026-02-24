@@ -36,15 +36,6 @@ public class Concept {
     @Column(nullable = false, columnDefinition = "text")
     private String description;
 
-    // @Column(name = "moderation_status", nullable = false)
-    // private String moderationStatus;
-    // // mapped as String to avoid enum mismatch
-    // // Enums: PENDING, APPROVED, REJECTED
-
-    @Column(name = "moderation_status", nullable = false)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    private ModerationStatus moderationStatus;
-
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 }
