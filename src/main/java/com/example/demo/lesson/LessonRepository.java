@@ -9,9 +9,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LessonRepository extends JpaRepository<Lesson, Integer> {
+    List<Lesson> findByDeletedAtIsNull();
     List<Lesson> findByContributor_ContributorIdAndDeletedAtIsNull(UUID contributorId);
     boolean existsByContributor_ContributorId(UUID contributorId);
-    List<Lesson> findByLessonModerationStatusAndDeletedAtIsNull(com.example.demo.lesson.enums.LessonModerationStatus lessonModerationStatus);
+    List<Lesson> findByLessonModerationStatusAndDeletedAtIsNull(LessonModerationStatus lessonModerationStatus);
 
     @Query(
             value = """
@@ -25,6 +26,18 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
             nativeQuery = true
     )
     List<Lesson> findByConceptIds(@Param("conceptIds") List<Integer> conceptIds);
+
+    @Query(
+            value = """
+                select distinct l.*
+                from lessons l
+                join lesson_concepts lc on lc.lesson_id = l.lesson_id
+                where lc.concept_id in (:conceptIds)
+                  and l.deleted_at is null
+            """,
+            nativeQuery = true
+    )
+    List<Lesson> findAdminByConceptIds(@Param("conceptIds") List<Integer> conceptIds);
 
     @Query(
             value = """
@@ -42,6 +55,58 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
     List<Lesson> findByAllConceptIds(
             @Param("conceptIds") List<Integer> conceptIds,
             @Param("conceptCount")  Integer conceptCount);
+
+    @Query(
+            value = """
+                select l.*
+                from lessons l
+                join lesson_concepts lc on lc.lesson_id = l.lesson_id
+                where lc.concept_id in (:conceptIds)
+                  and l.deleted_at is null
+                group by l.lesson_id
+                having count(distinct lc.concept_id) = :conceptCount
+            """,
+            nativeQuery = true
+    )
+    List<Lesson> findAdminByAllConceptIds(
+            @Param("conceptIds") List<Integer> conceptIds,
+            @Param("conceptCount") Integer conceptCount
+    );
+
+    @Query(
+            value = """
+                select distinct l.*
+                from lessons l
+                join lesson_concepts lc on lc.lesson_id = l.lesson_id
+                where lc.concept_id in (:conceptIds)
+                  and l.moderation_status = cast(:status as lessons_moderation_status)
+                  and l.deleted_at is null
+            """,
+            nativeQuery = true
+    )
+    List<Lesson> findAdminByConceptIdsAndStatus(
+            @Param("conceptIds") List<Integer> conceptIds,
+            @Param("status") String status
+    );
+
+    @Query(
+            value = """
+                select l.*
+                from lessons l
+                join lesson_concepts lc on lc.lesson_id = l.lesson_id
+                where lc.concept_id in (:conceptIds)
+                  and l.moderation_status = cast(:status as lessons_moderation_status)
+                  and l.deleted_at is null
+                group by l.lesson_id
+                having count(distinct lc.concept_id) = :conceptCount
+            """,
+            nativeQuery = true
+    )
+    List<Lesson> findAdminByAllConceptIdsAndStatus(
+            @Param("conceptIds") List<Integer> conceptIds,
+            @Param("conceptCount") Integer conceptCount,
+            @Param("status") String status
+    );
 
     @Query(
             value = """

@@ -15,20 +15,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConceptController {
 
     // read only controller, create/update/delete endpoints are at AdminConceptController
-    private final ConceptService conceptService;
+    private final ConceptQueryService conceptQueryService;
 
-    public ConceptController(ConceptService conceptService) {
-        this.conceptService = conceptService;
+    public ConceptController(ConceptQueryService conceptQueryService) {
+        this.conceptQueryService = conceptQueryService;
     }
 
     @GetMapping
     public List<ConceptDTO> getConcepts() {
-        return conceptService.getAllConcepts();
+        return conceptQueryService.getAllConcepts();
     }
 
     @GetMapping("/{id}")
     public ConceptDTO getConceptById(@PathVariable Integer id) {
-        return conceptService.getConceptById(id);
+        return conceptQueryService.getConceptById(id);
     }
 
 }

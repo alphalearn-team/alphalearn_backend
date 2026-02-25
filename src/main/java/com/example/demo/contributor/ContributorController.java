@@ -3,7 +3,7 @@ package com.example.demo.contributor;
 
 import java.util.List;
 
-import com.example.demo.contributor.dto.response.ContributorDto;
+import com.example.demo.contributor.dto.ContributorDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/contributors")
 public class ContributorController {
     
-    private final ContributorService contributorService;
+    private final ContributorQueryService contributorQueryService;
 
-    public ContributorController(ContributorService contributorService) {
-        this.contributorService = contributorService;
+    public ContributorController(ContributorQueryService contributorQueryService) {
+        this.contributorQueryService = contributorQueryService;
     }
 
     @GetMapping
     public List<ContributorDto> getContributors() {
-        return contributorService.getAllContributors();
+        return contributorQueryService.getAllContributors();
     }
 }

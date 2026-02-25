@@ -15,12 +15,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.lesson.dto.request.CreateLessonRequest;
-import com.example.demo.lesson.dto.request.UpdateLessonRequest;
-import com.example.demo.lesson.dto.response.LessonContributorSummaryDto;
-import com.example.demo.lesson.dto.response.LessonDetailDto;
-import com.example.demo.lesson.dto.response.LessonDetailView;
-import com.example.demo.lesson.dto.response.LessonPublicSummaryDto;
+import com.example.demo.lesson.dto.CreateLessonRequest;
+import com.example.demo.lesson.dto.UpdateLessonRequest;
+import com.example.demo.lesson.dto.LessonContributorSummaryDto;
+import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.lesson.dto.LessonDetailView;
+import com.example.demo.lesson.dto.LessonPublicSummaryDto;
+import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.config.SupabaseAuthUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,15 +45,8 @@ public class LessonController {
             @RequestParam(required = false) List<Integer> conceptIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
-        if (conceptIds == null || conceptIds.isEmpty()) {
-            return lessonService.findAllLessons();
-        }
-
-        if (conceptsMatch.equals("any")) {
-            return lessonService.getLessonsByConcepts(conceptIds);
-        }
-
-        return lessonService.getLessonsByAllConcepts(conceptIds);
+        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
+        return lessonService.findPublicLessons(conceptIds, matchMode);
     }
 
     @GetMapping("/mine")
@@ -62,11 +56,12 @@ public class LessonController {
             @RequestParam(required = false) List<Integer> conceptIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
-        if (user == null || user.userId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
+        if (user == null || user.userId() == null || !user.isContributor()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contributor access required");
         }
         UUID contributorId = user.userId();
-        return lessonService.getLessonsByContributor(contributorId, conceptIds, conceptsMatch);
+        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
+        return lessonService.getLessonsByContributor(contributorId, conceptIds, matchMode);
     }
 
     @GetMapping("/{lessonId}")
