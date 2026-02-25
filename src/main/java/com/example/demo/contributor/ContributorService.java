@@ -9,22 +9,16 @@ import org.springframework.stereotype.Service;
 public class ContributorService {
 
     private final ContributorRepository contributorRepository;
+    private final ContributorMapper contributorMapper;
 
-    public ContributorService(ContributorRepository contributorRepository) {
+    public ContributorService(ContributorRepository contributorRepository, ContributorMapper contributorMapper) {
         this.contributorRepository = contributorRepository;
+        this.contributorMapper = contributorMapper;
     }
 
     public List<ContributorDto> getAllContributors() {
         return contributorRepository.findAll().stream()
-                .map(this::toDto)
+                .map(contributorMapper::toDto)
                 .toList();
-    }
-
-    ContributorDto toDto(Contributor contributor) {
-        return new ContributorDto(
-                contributor.getContributorId(),
-                contributor.getPromotedAt(),
-                contributor.getDemotedAt()
-        );
     }
 }
