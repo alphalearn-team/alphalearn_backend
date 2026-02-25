@@ -17,21 +17,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/contributors")
 public class ContributorAdminController {
 
-    private final ContributorAdminService contributorAdminService;
+    private final AdminContributorFacade contributorAdminFacade;
 
-    public ContributorAdminController(ContributorAdminService contributorAdminService) {
-        this.contributorAdminService = contributorAdminService;
+    public ContributorAdminController(AdminContributorFacade contributorAdminFacade) {
+        this.contributorAdminFacade = contributorAdminFacade;
     }
 
     @PostMapping("/promote")
     @ResponseStatus(HttpStatus.CREATED)
     public List<ContributorDto> promoteLearners(@RequestBody PromoteContributorsRequest request) {
-        return contributorAdminService.promoteLearners(request);
+        return contributorAdminFacade.promoteLearners(request);
     }
 
     @DeleteMapping("/demote")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void demoteContributors(@RequestBody DemoteContributorsRequest request) {
-        contributorAdminService.demoteContributors(request);
+        contributorAdminFacade.demoteContributors(request);
     }
 }

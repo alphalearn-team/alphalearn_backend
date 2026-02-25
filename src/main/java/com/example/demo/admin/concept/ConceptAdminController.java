@@ -17,16 +17,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/concepts")
 public class ConceptAdminController {
 
-    private final ConceptAdminService conceptAdminService;
+    private final AdminConceptFacade conceptAdminFacade;
 
-    public ConceptAdminController(ConceptAdminService conceptAdminService) {
-        this.conceptAdminService = conceptAdminService;
+    public ConceptAdminController(AdminConceptFacade conceptAdminFacade) {
+        this.conceptAdminFacade = conceptAdminFacade;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ConceptDTO createConcept(@RequestBody ConceptCreateDTO concept) {
-        return conceptAdminService.createConcept(concept);
+        return conceptAdminFacade.createConcept(concept);
     }
 
     @PutMapping("/{id}")
@@ -34,12 +34,12 @@ public class ConceptAdminController {
             @PathVariable Integer id,
             @RequestBody Concept updatedConcept
     ) {
-        return conceptAdminService.updateConcept(id, updatedConcept);
+        return conceptAdminFacade.updateConcept(id, updatedConcept);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConcept(@PathVariable Integer id) {
-        conceptAdminService.deleteConcept(id);
+        conceptAdminFacade.deleteConcept(id);
     }
 }

@@ -17,10 +17,10 @@ import com.example.demo.lesson.query.ConceptsMatchMode;
 @RestController()
 @RequestMapping("/api/admin/lessons")
 public class AdminLessonController {
-    private final AdminLessonService adminService;
+    private final AdminLessonFacade adminFacade;
 
-    public AdminLessonController(AdminLessonService adminService){
-        this.adminService = adminService;
+    public AdminLessonController(AdminLessonFacade adminFacade){
+        this.adminFacade = adminFacade;
     }
 
     @GetMapping
@@ -30,17 +30,17 @@ public class AdminLessonController {
             @RequestParam(required = false) LessonModerationStatus status
     ) {
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return adminService.getAllLessons(conceptIds, matchMode, status);
+        return adminFacade.getAllLessons(conceptIds, matchMode, status);
     }
 
     @PutMapping("/{id}/approve")
     public AdminLessonDetailDto approveLesson(@PathVariable Integer id){
-        return adminService.approveLesson(id);
+        return adminFacade.approveLesson(id);
     }
 
     @PutMapping("/{id}/reject")
     public AdminLessonDetailDto rejectLesson(@PathVariable Integer id){
-        return adminService.rejectLesson(id);
+        return adminFacade.rejectLesson(id);
     }
 
 }
