@@ -1,4 +1,4 @@
-package com.example.demo.contributor.dto.response;
+package com.example.demo.contributor.dto;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

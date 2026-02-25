@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonRepository;
-import com.example.demo.lesson.enums.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationStatus;
 
 @Service
 public class LessonListQueryService {

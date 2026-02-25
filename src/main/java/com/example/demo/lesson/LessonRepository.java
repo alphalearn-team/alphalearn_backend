@@ -12,7 +12,7 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
     List<Lesson> findByDeletedAtIsNull();
     List<Lesson> findByContributor_ContributorIdAndDeletedAtIsNull(UUID contributorId);
     boolean existsByContributor_ContributorId(UUID contributorId);
-    List<Lesson> findByLessonModerationStatusAndDeletedAtIsNull(com.example.demo.lesson.enums.LessonModerationStatus lessonModerationStatus);
+    List<Lesson> findByLessonModerationStatusAndDeletedAtIsNull(LessonModerationStatus lessonModerationStatus);
 
     @Query(
             value = """

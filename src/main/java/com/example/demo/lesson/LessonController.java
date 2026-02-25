@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.lesson.dto.request.CreateLessonRequest;
-import com.example.demo.lesson.dto.request.UpdateLessonRequest;
-import com.example.demo.lesson.dto.response.LessonContributorSummaryDto;
-import com.example.demo.lesson.dto.response.LessonDetailDto;
-import com.example.demo.lesson.dto.response.LessonDetailView;
-import com.example.demo.lesson.dto.response.LessonPublicSummaryDto;
+import com.example.demo.lesson.dto.CreateLessonRequest;
+import com.example.demo.lesson.dto.UpdateLessonRequest;
+import com.example.demo.lesson.dto.LessonContributorSummaryDto;
+import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.lesson.dto.LessonDetailView;
+import com.example.demo.lesson.dto.LessonPublicSummaryDto;
 import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.config.SupabaseAuthUser;
 import io.swagger.v3.oas.annotations.Operation;

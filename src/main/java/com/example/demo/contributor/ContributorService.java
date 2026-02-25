@@ -2,7 +2,7 @@ package com.example.demo.contributor;
 
 import java.util.List;
 
-import com.example.demo.contributor.dto.response.ContributorDto;
+import com.example.demo.contributor.dto.ContributorDto;
 import org.springframework.stereotype.Service;
 
 @Service

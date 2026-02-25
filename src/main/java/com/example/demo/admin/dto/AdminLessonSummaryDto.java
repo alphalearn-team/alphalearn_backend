@@ -1,10 +1,10 @@
-package com.example.demo.admin.dto.response;
+package com.example.demo.admin.dto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import com.example.demo.lesson.enums.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationStatus;
 
 public record AdminLessonSummaryDto(
         Integer lessonId,

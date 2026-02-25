@@ -3,15 +3,15 @@ package com.example.demo.admin;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import com.example.demo.admin.dto.AdminLessonDetailDto;
+import com.example.demo.admin.dto.AdminLessonSummaryDto;
 import org.springframework.stereotype.Service;
 
-import com.example.demo.admin.dto.response.AdminLessonDetailDto;
-import com.example.demo.admin.dto.response.AdminLessonSummaryDto;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonMappingSupport;
 import com.example.demo.lesson.LessonModerationWorkflowService;
-import com.example.demo.lesson.enums.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
