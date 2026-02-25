@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/contributors")
 public class ContributorController {
     
-    private final ContributorService contributorService;
+    private final ContributorQueryService contributorQueryService;
 
-    public ContributorController(ContributorService contributorService) {
-        this.contributorService = contributorService;
+    public ContributorController(ContributorQueryService contributorQueryService) {
+        this.contributorQueryService = contributorQueryService;
     }
 
     @GetMapping
     public List<ContributorDto> getContributors() {
-        return contributorService.getAllContributors();
+        return contributorQueryService.getAllContributors();
     }
 }

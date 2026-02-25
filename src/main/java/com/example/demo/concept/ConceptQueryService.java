@@ -8,12 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class ConceptService {
+public class ConceptQueryService {
 
     private final ConceptRepository conceptRepository;
     private final ConceptMapper conceptMapper;
 
-    public ConceptService(ConceptRepository conceptRepository, ConceptMapper conceptMapper) {
+    public ConceptQueryService(ConceptRepository conceptRepository, ConceptMapper conceptMapper) {
         this.conceptRepository = conceptRepository;
         this.conceptMapper = conceptMapper;
     }

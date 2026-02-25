@@ -11,15 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/learners")
 public class LearnerController {
     
-    private final LearnerService learnerService;
+    private final LearnerQueryService learnerQueryService;
 
-    public LearnerController(LearnerService learnerService) {
-        this.learnerService = learnerService;
+    public LearnerController(LearnerQueryService learnerQueryService) {
+        this.learnerQueryService = learnerQueryService;
     }
 
     @GetMapping
     public List<Learner> getLearners() {
-        return learnerService.getAllLearners();
+        return learnerQueryService.getAllLearners();
     }
     
 }
