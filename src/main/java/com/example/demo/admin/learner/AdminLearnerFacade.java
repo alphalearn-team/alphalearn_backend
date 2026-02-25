@@ -4,8 +4,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerQueryService;
+import com.example.demo.learner.dto.LearnerPublicDto;
 
 @Service
 public class AdminLearnerFacade {
@@ -16,7 +16,7 @@ public class AdminLearnerFacade {
         this.learnerQueryService = learnerQueryService;
     }
 
-    public List<Learner> getAllLearners() {
-        return learnerQueryService.getAllLearners();
+    public List<LearnerPublicDto> getAllLearners() {
+        return learnerQueryService.getAllPublicLearners();
     }
 }

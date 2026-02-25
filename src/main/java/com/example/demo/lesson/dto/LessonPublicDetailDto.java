@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.UUID;
 
 public record LessonPublicDetailDto(
-        Integer lessonId,
+        UUID lessonPublicId,
         String title,
         Object content,
-        List<Integer> conceptIds,
-        UUID contributorId,
+        List<UUID> conceptPublicIds,
+        LessonAuthorDto author,
         OffsetDateTime createdAt
 ) implements LessonDetailView {}

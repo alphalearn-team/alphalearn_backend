@@ -2,7 +2,7 @@ package com.example.demo.contributor;
 
 import java.util.List;
 
-import com.example.demo.contributor.dto.ContributorDto;
+import com.example.demo.contributor.dto.ContributorPublicDto;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,9 +16,9 @@ public class ContributorQueryService {
         this.contributorMapper = contributorMapper;
     }
 
-    public List<ContributorDto> getAllContributors() {
+    public List<ContributorPublicDto> getAllPublicContributors() {
         return contributorRepository.findAll().stream()
-                .map(contributorMapper::toDto)
+                .map(contributorMapper::toPublicDto)
                 .toList();
     }
 }

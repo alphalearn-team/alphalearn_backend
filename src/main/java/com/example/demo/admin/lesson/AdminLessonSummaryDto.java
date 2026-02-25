@@ -5,12 +5,13 @@ import java.util.List;
 import java.util.UUID;
 
 import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lesson.dto.LessonAuthorDto;
 
 public record AdminLessonSummaryDto(
-        Integer lessonId,
+        UUID lessonPublicId,
         String title,
-        List<Integer> conceptIds,
-        UUID contributorId,
+        List<UUID> conceptPublicIds,
+        LessonAuthorDto author,
         LessonModerationStatus lessonModerationStatus,
         OffsetDateTime createdAt,
         OffsetDateTime deletedAt

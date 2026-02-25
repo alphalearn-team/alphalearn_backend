@@ -3,7 +3,7 @@ package com.example.demo.admin.contributor;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
-import com.example.demo.contributor.dto.ContributorDto;
+import com.example.demo.contributor.dto.ContributorPublicDto;
 import com.example.demo.contributor.dto.DemoteContributorsRequest;
 import com.example.demo.contributor.dto.PromoteContributorsRequest;
 import org.springframework.http.HttpStatus;
@@ -25,13 +25,13 @@ public class AdminContributorController {
     }
 
     @GetMapping
-    public List<ContributorDto> getContributors() {
+    public List<ContributorPublicDto> getContributors() {
         return contributorAdminFacade.getAllContributors();
     }
 
     @PostMapping("/promote")
     @ResponseStatus(HttpStatus.CREATED)
-    public List<ContributorDto> promoteLearners(@RequestBody PromoteContributorsRequest request) {
+    public List<ContributorPublicDto> promoteLearners(@RequestBody PromoteContributorsRequest request) {
         return contributorAdminFacade.promoteLearners(request);
     }
 

@@ -1,10 +1,11 @@
 package com.example.demo.admin.concept;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.dto.ConceptCreateDTO;
-import com.example.demo.concept.dto.ConceptDTO;
+import com.example.demo.concept.dto.ConceptPublicDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,32 +28,32 @@ public class AdminConceptController {
     }
 
     @GetMapping
-    public List<ConceptDTO> getConcepts() {
+    public List<ConceptPublicDto> getConcepts() {
         return conceptAdminFacade.getAllConcepts();
     }
 
-    @GetMapping("/{id}")
-    public ConceptDTO getConceptById(@PathVariable Integer id) {
-        return conceptAdminFacade.getConceptById(id);
+    @GetMapping("/{conceptPublicId}")
+    public ConceptPublicDto getConceptByPublicId(@PathVariable UUID conceptPublicId) {
+        return conceptAdminFacade.getConceptByPublicId(conceptPublicId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ConceptDTO createConcept(@RequestBody ConceptCreateDTO concept) {
+    public ConceptPublicDto createConcept(@RequestBody ConceptCreateDTO concept) {
         return conceptAdminFacade.createConcept(concept);
     }
 
-    @PutMapping("/{id}")
-    public ConceptDTO updateConcept(
-            @PathVariable Integer id,
+    @PutMapping("/{conceptPublicId}")
+    public ConceptPublicDto updateConcept(
+            @PathVariable UUID conceptPublicId,
             @RequestBody Concept updatedConcept
     ) {
-        return conceptAdminFacade.updateConcept(id, updatedConcept);
+        return conceptAdminFacade.updateConcept(conceptPublicId, updatedConcept);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{conceptPublicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteConcept(@PathVariable Integer id) {
-        conceptAdminFacade.deleteConcept(id);
+    public void deleteConcept(@PathVariable UUID conceptPublicId) {
+        conceptAdminFacade.deleteConcept(conceptPublicId);
     }
 }

@@ -1,6 +1,7 @@
 package com.example.demo.admin.lesson;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,27 +24,27 @@ public class AdminLessonController {
 
     @GetMapping
     public List<AdminLessonSummaryDto> getAllLessonsForAdmin(
-            @RequestParam(required = false) List<Integer> conceptIds,
+            @RequestParam(required = false) List<UUID> conceptPublicIds,
             @RequestParam(defaultValue = "any") String conceptsMatch,
             @RequestParam(required = false) LessonModerationStatus status
     ) {
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return adminFacade.getAllLessons(conceptIds, matchMode, status);
+        return adminFacade.getAllLessons(conceptPublicIds, matchMode, status);
     }
 
-    @GetMapping("/{id}")
-    public AdminLessonReviewDto getLessonForAdmin(@PathVariable Integer id) {
-        return adminFacade.getLessonById(id);
+    @GetMapping("/{lessonPublicId}")
+    public AdminLessonReviewDto getLessonForAdmin(@PathVariable UUID lessonPublicId) {
+        return adminFacade.getLessonByPublicId(lessonPublicId);
     }
 
-    @PutMapping("/{id}/approve")
-    public AdminLessonDetailDto approveLesson(@PathVariable Integer id){
-        return adminFacade.approveLesson(id);
+    @PutMapping("/{lessonPublicId}/approve")
+    public AdminLessonDetailDto approveLesson(@PathVariable UUID lessonPublicId){
+        return adminFacade.approveLesson(lessonPublicId);
     }
 
-    @PutMapping("/{id}/reject")
-    public AdminLessonDetailDto rejectLesson(@PathVariable Integer id){
-        return adminFacade.rejectLesson(id);
+    @PutMapping("/{lessonPublicId}/reject")
+    public AdminLessonDetailDto rejectLesson(@PathVariable UUID lessonPublicId){
+        return adminFacade.rejectLesson(lessonPublicId);
     }
 
 }

@@ -1,5 +1,7 @@
 package com.example.demo.lesson;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,14 +17,14 @@ public class LessonLookupService {
     }
 
     @Transactional(readOnly = true)
-    public Lesson findByIdOrThrow(Integer lessonId) {
-        return lessonRepository.findById(lessonId)
+    public Lesson findByPublicIdOrThrow(UUID lessonPublicId) {
+        return lessonRepository.findByPublicId(lessonPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
     }
 
     @Transactional(readOnly = true)
-    public Lesson findPublicByIdOrThrow(Integer lessonId) {
-        return lessonRepository.findPublicById(lessonId)
+    public Lesson findPublicByPublicIdOrThrow(UUID lessonPublicId) {
+        return lessonRepository.findPublicByPublicId(lessonPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
     }
 }

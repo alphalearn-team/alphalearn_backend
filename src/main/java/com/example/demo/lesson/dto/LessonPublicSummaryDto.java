@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.UUID;
 
 public record LessonPublicSummaryDto(
-        Integer lessonId,
+        UUID lessonPublicId,
         String title,
-        List<Integer> conceptIds,
-        UUID contributorId,
+        List<UUID> conceptPublicIds,
+        LessonAuthorDto author,
         OffsetDateTime createdAt
 ) {}

@@ -1,6 +1,7 @@
 package com.example.demo.concept;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -10,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -30,6 +32,10 @@ public class Concept {
     @Setter(lombok.AccessLevel.NONE)
     private Integer conceptId;
 
+    @Column(name = "public_id", columnDefinition = "uuid", nullable = false, unique = true)
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID publicId;
+
     @Column(nullable = false)
     private String title;
 
@@ -38,4 +44,11 @@ public class Concept {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @PrePersist
+    void assignPublicIdIfMissing() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID();
+        }
+    }
 }

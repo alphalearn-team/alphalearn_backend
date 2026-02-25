@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.UUID;
 
 public record LessonContributorSummaryDto(
-        Integer lessonId,
+        UUID lessonPublicId,
         String title,
         String moderationStatus,
-        List<Integer> conceptIds,
-        UUID contributorId,
+        List<UUID> conceptPublicIds,
+        LessonAuthorDto author,
         OffsetDateTime createdAt
 ) {}

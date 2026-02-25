@@ -24,6 +24,10 @@ public class Learner {
     private UUID id;
 
     @Setter
+    @Column(name = "public_id", columnDefinition = "uuid", nullable = false, unique = true)
+    private UUID publicId;
+
+    @Setter
     @Column(unique= true)
     private String username;
 
