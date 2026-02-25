@@ -32,16 +32,25 @@ public class LessonService {
     private final LessonRepository lessonRepository;
     private final ContributorRepository contributorRepository;
     private final ConceptRepository conceptRepository;
+    private final LessonLookupService lessonLookupService;
+    private final LessonModerationWorkflowService lessonModerationWorkflowService;
+    private final LessonMappingSupport lessonMappingSupport;
     private final ObjectMapper objectMapper;
     public LessonService(
             LessonRepository lessonRepository,
             ContributorRepository contributorRepository,
             ConceptRepository conceptRepository,
+            LessonLookupService lessonLookupService,
+            LessonModerationWorkflowService lessonModerationWorkflowService,
+            LessonMappingSupport lessonMappingSupport,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
         this.contributorRepository = contributorRepository;
         this.conceptRepository = conceptRepository;
+        this.lessonLookupService = lessonLookupService;
+        this.lessonModerationWorkflowService = lessonModerationWorkflowService;
+        this.lessonMappingSupport = lessonMappingSupport;
         this.objectMapper = objectMapper;
     }
 
@@ -109,8 +118,7 @@ public class LessonService {
 
     @Transactional(readOnly = true)
     public LessonDetailView getLessonDetailForUser(Integer lessonId, SupabaseAuthUser user) {
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
         if (user != null && user.userId() != null
                 && lesson.getContributor() != null
                 && lesson.getContributor().getContributorId().equals(user.userId())
@@ -118,8 +126,7 @@ public class LessonService {
             return toDetailDto(lesson);
         }
 
-        Lesson publicLesson = lessonRepository.findPublicById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson publicLesson = lessonLookupService.findPublicByIdOrThrow(lessonId);
         return toPublicDetailDto(publicLesson);
     }
 
@@ -193,8 +200,7 @@ public class LessonService {
             );
         }
 
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         lesson.setTitle(title);
@@ -206,23 +212,19 @@ public class LessonService {
 
     public LessonDetailDto submitLesson(Integer lessonId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
-        lesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
-        Lesson saved = lessonRepository.save(lesson);
+        Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);
     }
 
     public LessonDetailDto unpublishLesson(Integer lessonId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
-        lesson.setLessonModerationStatus(LessonModerationStatus.UNPUBLISHED);
-        Lesson saved = lessonRepository.save(lesson);
+        Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
         return toDetailDto(saved);
     }
 
@@ -232,8 +234,7 @@ public class LessonService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
 
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         if (lesson.getDeletedAt() != null) {
@@ -281,8 +282,8 @@ public class LessonService {
         return new LessonPublicSummaryDto(
                 lesson.getLessonId(),
                 lesson.getTitle(),
-                toConceptIds(lesson),
-                lesson.getContributor().getContributorId(),
+                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.contributorId(lesson),
                 lesson.getCreatedAt()
         );
     }
@@ -292,8 +293,8 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
-                toConceptIds(lesson),
-                lesson.getContributor().getContributorId(),
+                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.contributorId(lesson),
                 lesson.getCreatedAt()
         );
     }
@@ -328,20 +329,10 @@ public class LessonService {
                 lesson.getLessonId(),
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
-                toConceptIds(lesson),
-                lesson.getContributor().getContributorId(),
+                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.contributorId(lesson),
                 lesson.getCreatedAt()
         );
-    }
-
-    private List<Integer> toConceptIds(Lesson lesson) {
-        if (lesson.getConcepts() == null || lesson.getConcepts().isEmpty()) {
-            return List.of();
-        }
-        return lesson.getConcepts().stream()
-                .map(Concept::getConceptId)
-                .sorted()
-                .toList();
     }
 
     private record LessonDetailBase(
