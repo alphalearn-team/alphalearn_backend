@@ -3,7 +3,7 @@ package com.example.demo.contributor;
 
 import java.util.List;
 
-import com.example.demo.contributor.dto.ContributorDto;
+import com.example.demo.contributor.dto.ContributorPublicDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,7 +19,7 @@ public class ContributorController {
     }
 
     @GetMapping
-    public List<ContributorDto> getContributors() {
-        return contributorQueryService.getAllContributors();
+    public List<ContributorPublicDto> getContributors() {
+        return contributorQueryService.getAllPublicContributors();
     }
 }
