@@ -1,4 +1,4 @@
-package com.example.demo.admin;
+package com.example.demo.admin.me;
 
 import java.util.UUID;
 

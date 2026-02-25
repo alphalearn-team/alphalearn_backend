@@ -1,13 +1,16 @@
-package com.example.demo.contributor;
+package com.example.demo.admin.contributor;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.example.demo.contributor.Contributor;
+import com.example.demo.contributor.ContributorMapper;
+import com.example.demo.contributor.ContributorRepository;
+import com.example.demo.contributor.dto.ContributorDto;
 import com.example.demo.contributor.dto.DemoteContributorsRequest;
 import com.example.demo.contributor.dto.PromoteContributorsRequest;
-import com.example.demo.contributor.dto.ContributorDto;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.lesson.LessonRepository;

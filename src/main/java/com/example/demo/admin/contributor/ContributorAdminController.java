@@ -1,10 +1,10 @@
-package com.example.demo.contributor;
+package com.example.demo.admin.contributor;
 
 import java.util.List;
 
+import com.example.demo.contributor.dto.ContributorDto;
 import com.example.demo.contributor.dto.DemoteContributorsRequest;
 import com.example.demo.contributor.dto.PromoteContributorsRequest;
-import com.example.demo.contributor.dto.ContributorDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;

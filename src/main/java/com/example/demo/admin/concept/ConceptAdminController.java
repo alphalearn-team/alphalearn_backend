@@ -1,5 +1,6 @@
-package com.example.demo.concept;
+package com.example.demo.admin.concept;
 
+import com.example.demo.concept.Concept;
 import com.example.demo.concept.dto.ConceptCreateDTO;
 import com.example.demo.concept.dto.ConceptDTO;
 import org.springframework.http.HttpStatus;

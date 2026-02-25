@@ -1,7 +1,10 @@
-package com.example.demo.concept;
+package com.example.demo.admin.concept;
 
 import java.time.OffsetDateTime;
 
+import com.example.demo.concept.Concept;
+import com.example.demo.concept.ConceptMapper;
+import com.example.demo.concept.ConceptRepository;
 import com.example.demo.concept.dto.ConceptCreateDTO;
 import com.example.demo.concept.dto.ConceptDTO;
 import com.example.demo.lesson.LessonRepository;
