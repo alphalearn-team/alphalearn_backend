@@ -42,18 +42,18 @@ public class LessonController {
     @GetMapping
     @Operation(summary = "List lessons", description = "Optionally filter by conceptId")
     public List<LessonPublicSummaryDto> getAllLessons(
-            @RequestParam(required = false) List<Integer> conceptIds,
+            @RequestParam(required = false) List<UUID> conceptPublicIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return lessonService.findPublicLessons(conceptIds, matchMode);
+        return lessonService.findPublicLessons(conceptPublicIds, matchMode);
     }
 
     @GetMapping("/mine")
     @Operation(summary = "List my lessons", description = "Authenticated owner-only; optional concept filter")
     public List<LessonContributorSummaryDto> getMyLessons(
             @AuthenticationPrincipal SupabaseAuthUser user,
-            @RequestParam(required = false) List<Integer> conceptIds,
+            @RequestParam(required = false) List<UUID> conceptPublicIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
         if (user == null || user.userId() == null || !user.isContributor()) {
@@ -61,13 +61,13 @@ public class LessonController {
         }
         UUID contributorId = user.userId();
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return lessonService.getLessonsByContributor(contributorId, conceptIds, matchMode);
+        return lessonService.getLessonsByContributor(contributorId, conceptPublicIds, matchMode);
     }
 
     @GetMapping("/{lessonId}")
     @Operation(summary = "Get lesson by ID")
     public LessonDetailView getLesson(
-            @PathVariable Integer lessonId,
+            @PathVariable UUID lessonId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         return lessonService.getLessonDetailForUser(lessonId, user);
@@ -86,7 +86,7 @@ public class LessonController {
     @PutMapping("/{lessonId}")
     @Operation(summary = "Update lesson content")
     public LessonDetailDto updateLesson(
-            @PathVariable Integer lessonId,
+            @PathVariable UUID lessonId,
             @RequestBody UpdateLessonRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
@@ -96,7 +96,7 @@ public class LessonController {
     @PostMapping("/{lessonId}/submit")
     @Operation(summary = "Submit lesson for review")
     public LessonDetailDto submitLesson(
-            @PathVariable Integer lessonId,
+            @PathVariable UUID lessonId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         return lessonService.submitLesson(lessonId, user);
@@ -105,7 +105,7 @@ public class LessonController {
     @PostMapping("/{lessonId}/unpublish")
     @Operation(summary = "Unpublish lesson")
     public LessonDetailDto unpublishLesson(
-            @PathVariable Integer lessonId,
+            @PathVariable UUID lessonId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         return lessonService.unpublishLesson(lessonId, user);
@@ -115,7 +115,7 @@ public class LessonController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft delete lesson", description = "Owner-only; lesson must be unpublished")
     public void softDeleteLesson(
-            @PathVariable Integer lessonId,
+            @PathVariable UUID lessonId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         lessonService.softDeleteLesson(lessonId, user);

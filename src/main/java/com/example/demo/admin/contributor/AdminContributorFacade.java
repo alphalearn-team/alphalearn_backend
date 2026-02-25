@@ -9,7 +9,7 @@ import com.example.demo.contributor.Contributor;
 import com.example.demo.contributor.ContributorMapper;
 import com.example.demo.contributor.ContributorQueryService;
 import com.example.demo.contributor.ContributorRepository;
-import com.example.demo.contributor.dto.ContributorDto;
+import com.example.demo.contributor.dto.ContributorPublicDto;
 import com.example.demo.contributor.dto.DemoteContributorsRequest;
 import com.example.demo.contributor.dto.PromoteContributorsRequest;
 import com.example.demo.learner.Learner;
@@ -44,33 +44,34 @@ public class AdminContributorFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<ContributorDto> getAllContributors() {
-        return contributorQueryService.getAllContributors();
+    public List<ContributorPublicDto> getAllContributors() {
+        return contributorQueryService.getAllPublicContributors();
     }
 
     @Transactional
-    public List<ContributorDto> promoteLearners(PromoteContributorsRequest request) {
-        if (request == null || request.learnerIds() == null || request.learnerIds().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "learnerIds are required");
+    public List<ContributorPublicDto> promoteLearners(PromoteContributorsRequest request) {
+        if (request == null || request.learnerPublicIds() == null || request.learnerPublicIds().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "learnerPublicIds are required");
         }
 
         List<Contributor> created = new ArrayList<>();
-        for (UUID learnerId : request.learnerIds()) {
-            if (learnerId == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "learnerIds cannot contain null");
+        for (UUID learnerPublicId : request.learnerPublicIds()) {
+            if (learnerPublicId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "learnerPublicIds cannot contain null");
             }
 
-            Learner learner = learnerRepository.findById(learnerId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learner not found: " + learnerId));
+            Learner learner = learnerRepository.findByPublicId(learnerPublicId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learner not found: " + learnerPublicId));
+            UUID learnerId = learner.getId();
 
             if (learner.getId() == null) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Learner id is null: " + learnerId);
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Learner id is null for publicId: " + learnerPublicId);
             }
 
             Contributor contributor = contributorRepository.findById(learnerId).orElse(null);
             if (contributor != null) {
                 if (contributor.isCurrentContributor()) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Already a contributor: " + learnerId);
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Already a contributor: " + learnerPublicId);
                 }
 
                 contributor.setPromotedAt(OffsetDateTime.now());
@@ -89,27 +90,29 @@ public class AdminContributorFacade {
         }
 
         return created.stream()
-                .map(contributorMapper::toDto)
+                .map(contributorMapper::toPublicDto)
                 .toList();
     }
 
     @Transactional
     public void demoteContributors(DemoteContributorsRequest request) {
-        if (request == null || request.contributorIds() == null || request.contributorIds().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contributorIds are required");
+        if (request == null || request.contributorPublicIds() == null || request.contributorPublicIds().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contributorPublicIds are required");
         }
 
-        for (UUID contributorId : request.contributorIds()) {
-            if (contributorId == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contributorIds cannot contain null");
+        for (UUID contributorPublicId : request.contributorPublicIds()) {
+            if (contributorPublicId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contributorPublicIds cannot contain null");
             }
-            if (!contributorRepository.existsById(contributorId)) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found: " + contributorId);
+            if (!contributorRepository.existsByLearner_PublicId(contributorPublicId)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found: " + contributorPublicId);
             }
         }
 
-        for (UUID contributorId : request.contributorIds()) {
-            Contributor contributor = contributorRepository.findById(contributorId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found " + contributorId));
+        for (UUID contributorPublicId : request.contributorPublicIds()) {
+            Contributor contributor = contributorRepository.findByLearner_PublicId(contributorPublicId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found " + contributorPublicId));
+            UUID contributorId = contributor.getContributorId();
             contributor.setDemotedAt(OffsetDateTime.now());
             lessonRepository.unpublishByContributorId(contributorId);
         }

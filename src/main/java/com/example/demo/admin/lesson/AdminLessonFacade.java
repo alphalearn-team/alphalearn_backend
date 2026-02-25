@@ -2,7 +2,11 @@ package com.example.demo.admin.lesson;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
+import com.example.demo.concept.Concept;
+import com.example.demo.concept.ConceptRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +27,7 @@ public class AdminLessonFacade {
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
+    private final ConceptRepository conceptRepository;
     private final ObjectMapper objectMapper;
 
     public AdminLessonFacade(
@@ -30,21 +35,24 @@ public class AdminLessonFacade {
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
             LessonListQueryService lessonListQueryService,
+            ConceptRepository conceptRepository,
             ObjectMapper objectMapper
     ){
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
+        this.conceptRepository = conceptRepository;
         this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
     public List<AdminLessonSummaryDto> getAllLessons(
-            List<Integer> conceptIds,
+            List<UUID> conceptPublicIds,
             ConceptsMatchMode conceptsMatch,
             LessonModerationStatus status
     ) {
+        List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
                 conceptsMatch,
@@ -59,36 +67,36 @@ public class AdminLessonFacade {
     }
 
     @Transactional(readOnly = true)
-    public AdminLessonReviewDto getLessonById(Integer id) {
-        Lesson lesson = lessonLookupService.findByIdOrThrow(id);
+    public AdminLessonReviewDto getLessonById(UUID lessonPublicId) {
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         return new AdminLessonReviewDto(
-                lesson.getLessonId(),
+                lesson.getPublicId(),
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
-                lessonMappingSupport.conceptIds(lesson),
-                lessonMappingSupport.contributorId(lesson),
+                lessonMappingSupport.conceptPublicIds(lesson),
+                lessonMappingSupport.author(lesson),
                 lesson.getLessonModerationStatus(),
                 lesson.getCreatedAt(),
                 lesson.getDeletedAt()
         );
     }
 
-    public AdminLessonDetailDto approveLesson(Integer id){
-        Lesson lesson = lessonLookupService.findByIdOrThrow(id);
+    public AdminLessonDetailDto approveLesson(UUID lessonPublicId){
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         Lesson saved = lessonModerationWorkflowService.approve(lesson);
         return toAdminLessonDetailDto(saved);
     }
 
-    public AdminLessonDetailDto rejectLesson(Integer id){
-        Lesson lesson = lessonLookupService.findByIdOrThrow(id);
+    public AdminLessonDetailDto rejectLesson(UUID lessonPublicId){
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         Lesson saved = lessonModerationWorkflowService.reject(lesson);
         return toAdminLessonDetailDto(saved);
     }
 
     private AdminLessonDetailDto toAdminLessonDetailDto(Lesson lesson) {
         return new AdminLessonDetailDto(
-                lessonMappingSupport.contributorId(lesson),
-                lesson.getLessonId(),
+                lessonMappingSupport.author(lesson),
+                lesson.getPublicId(),
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus()
         );
@@ -97,13 +105,46 @@ public class AdminLessonFacade {
     private AdminLessonSummaryDto toAdminLessonSummaryDto(Lesson lesson) {
         OffsetDateTime deletedAt = lesson.getDeletedAt();
         return new AdminLessonSummaryDto(
-                lesson.getLessonId(),
+                lesson.getPublicId(),
                 lesson.getTitle(),
-                lessonMappingSupport.conceptIds(lesson),
-                lessonMappingSupport.contributorId(lesson),
+                lessonMappingSupport.conceptPublicIds(lesson),
+                lessonMappingSupport.author(lesson),
                 lesson.getLessonModerationStatus(),
                 lesson.getCreatedAt(),
                 deletedAt
         );
+    }
+
+    private List<Integer> resolveConceptIdsByPublicIds(List<UUID> conceptPublicIds) {
+        if (conceptPublicIds == null || conceptPublicIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> normalizedPublicIds = conceptPublicIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedPublicIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Concept> concepts = conceptRepository.findAllByPublicIdIn(normalizedPublicIds);
+        if (concepts.size() != normalizedPublicIds.size()) {
+            Set<UUID> foundPublicIds = concepts.stream()
+                    .map(Concept::getPublicId)
+                    .collect(java.util.stream.Collectors.toSet());
+            UUID missingPublicId = normalizedPublicIds.stream()
+                    .filter(id -> !foundPublicIds.contains(id))
+                    .findFirst()
+                    .orElse(null);
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND,
+                    "Concept not found" + (missingPublicId == null ? "" : ": " + missingPublicId)
+            );
+        }
+
+        return concepts.stream()
+                .map(Concept::getConceptId)
+                .toList();
     }
 }

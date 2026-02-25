@@ -4,5 +4,5 @@ import java.util.List;
 import java.util.UUID;
 
 public record DemoteContributorsRequest(
-        List<UUID> contributorIds
+        List<UUID> contributorPublicIds
 ) {}

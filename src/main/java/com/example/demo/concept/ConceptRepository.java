@@ -9,5 +9,7 @@ public interface ConceptRepository extends JpaRepository<Concept, Integer>{
 
     Optional<Concept> findByPublicId(UUID publicId);
 
+    java.util.List<Concept> findAllByPublicIdIn(java.util.Collection<UUID> publicIds);
+
     boolean existsByPublicId(UUID publicId);
 }

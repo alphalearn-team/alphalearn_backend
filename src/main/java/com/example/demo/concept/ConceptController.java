@@ -1,8 +1,10 @@
 package com.example.demo.concept;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.example.demo.concept.dto.ConceptDTO;
+import com.example.demo.concept.dto.ConceptPublicDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,13 +24,13 @@ public class ConceptController {
     }
 
     @GetMapping
-    public List<ConceptDTO> getConcepts() {
-        return conceptQueryService.getAllConcepts();
+    public List<ConceptPublicDto> getConcepts() {
+        return conceptQueryService.getAllPublicConcepts();
     }
 
-    @GetMapping("/{id}")
-    public ConceptDTO getConceptById(@PathVariable Integer id) {
-        return conceptQueryService.getConceptById(id);
+    @GetMapping("/{publicId}")
+    public ConceptPublicDto getConceptByPublicId(@PathVariable UUID publicId) {
+        return conceptQueryService.getConceptByPublicId(publicId);
     }
 
 }

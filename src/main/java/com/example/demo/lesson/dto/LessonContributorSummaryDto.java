@@ -2,12 +2,13 @@ package com.example.demo.lesson.dto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public record LessonContributorSummaryDto(
-        Integer lessonId,
+        UUID lessonPublicId,
         String title,
         String moderationStatus,
-        List<Integer> conceptIds,
+        List<UUID> conceptPublicIds,
         LessonAuthorDto author,
         OffsetDateTime createdAt
 ) {}

@@ -171,4 +171,16 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
             nativeQuery = true
     )
     java.util.Optional<Lesson> findPublicById(@Param("lessonId") Integer lessonId);
+
+    @Query(
+            value = """
+                    select l.*
+                    from lessons l
+                    where l.public_id = :publicId
+                      and l.moderation_status = 'APPROVED'
+                      and l.deleted_at is null
+                    """,
+            nativeQuery = true
+    )
+    java.util.Optional<Lesson> findPublicByPublicId(@Param("publicId") UUID publicId);
 }

@@ -64,9 +64,10 @@ public class LessonService {
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getLessonsByContributor(
             UUID contributorId,
-            List<Integer> conceptIds,
+            List<UUID> conceptPublicIds,
             ConceptsMatchMode conceptsMatch
     ) {
+        List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
                 conceptsMatch,
@@ -81,7 +82,8 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> findPublicLessons(List<Integer> conceptIds, ConceptsMatchMode conceptsMatch) {
+    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds, ConceptsMatchMode conceptsMatch) {
+        List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
                 conceptsMatch,
@@ -95,8 +97,8 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public LessonDetailView getLessonDetailForUser(Integer lessonId, SupabaseAuthUser user) {
-        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
+    public LessonDetailView getLessonDetailForUser(UUID lessonId, SupabaseAuthUser user) {
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
         if (user != null && user.userId() != null
                 && lesson.getContributor() != null
                 && lesson.getContributor().getContributorId().equals(user.userId())
@@ -104,7 +106,7 @@ public class LessonService {
             return toDetailDto(lesson);
         }
 
-        Lesson publicLesson = lessonLookupService.findPublicByIdOrThrow(lessonId);
+        Lesson publicLesson = lessonLookupService.findPublicByPublicIdOrThrow(lessonId);
         return toPublicDetailDto(publicLesson);
     }
 
@@ -117,13 +119,13 @@ public class LessonService {
 
         String title = trimToNull(request.title());
         Object content = request.content();
-        List<Integer> conceptIds = normalizeCreateConceptIds(request.conceptIds());
+        List<UUID> conceptPublicIds = normalizeCreateConceptPublicIds(request.conceptPublicIds());
         UUID contributorId = user.userId();
 
-        if (title == null || content == null || conceptIds.isEmpty()) {
+        if (title == null || content == null || conceptPublicIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title, content, and conceptId (number or array) are required"
+                    "title, content, and conceptPublicIds are required"
             );
         }
         if (contributorId == null) {
@@ -132,12 +134,12 @@ public class LessonService {
 
         Contributor contributor = contributorRepository.findById(contributorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found"));
-        List<Concept> concepts = conceptRepository.findAllById(conceptIds);
-        if (concepts.size() != conceptIds.size()) {
-            Set<Integer> foundConceptIds = concepts.stream()
-                    .map(Concept::getConceptId)
+        List<Concept> concepts = conceptRepository.findAllByPublicIdIn(conceptPublicIds);
+        if (concepts.size() != conceptPublicIds.size()) {
+            Set<UUID> foundConceptIds = concepts.stream()
+                    .map(Concept::getPublicId)
                     .collect(java.util.stream.Collectors.toSet());
-            Integer missingConceptId = conceptIds.stream()
+            UUID missingConceptId = conceptPublicIds.stream()
                     .filter(id -> !foundConceptIds.contains(id))
                     .findFirst()
                     .orElse(null);
@@ -162,7 +164,7 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto updateLesson(Integer lessonId, UpdateLessonRequest request, SupabaseAuthUser user) {
+    public LessonDetailDto updateLesson(UUID lessonId, UpdateLessonRequest request, SupabaseAuthUser user) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
@@ -178,7 +180,7 @@ public class LessonService {
             );
         }
 
-        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         lesson.setTitle(title);
@@ -188,18 +190,18 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto submitLesson(Integer lessonId, SupabaseAuthUser user) {
+    public LessonDetailDto submitLesson(UUID lessonId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto unpublishLesson(Integer lessonId, SupabaseAuthUser user) {
+    public LessonDetailDto unpublishLesson(UUID lessonId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
@@ -207,12 +209,12 @@ public class LessonService {
     }
 
     @Transactional
-    public void softDeleteLesson(Integer lessonId, SupabaseAuthUser user) {
+    public void softDeleteLesson(UUID lessonId, SupabaseAuthUser user) {
         if (user == null || user.userId() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
 
-        Lesson lesson = lessonLookupService.findByIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
         requireOwner(lesson, user);
 
         if (lesson.getDeletedAt() != null) {
@@ -237,30 +239,59 @@ public class LessonService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private List<Integer> normalizeCreateConceptIds(Object rawConceptId) {
-        if (rawConceptId == null) {
+    private List<UUID> normalizeCreateConceptPublicIds(List<UUID> rawConceptPublicIds) {
+        if (rawConceptPublicIds == null) {
             return List.of();
         }
 
-        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
-        if (rawConceptId instanceof List<?> rawList) {
-            for (Object value : rawList) {
-                if (value instanceof Number number) {
-                    ids.add(number.intValue());
-                }
+        LinkedHashSet<UUID> ids = new LinkedHashSet<>();
+        for (UUID value : rawConceptPublicIds) {
+            if (value != null) {
+                ids.add(value);
             }
-        } else if (rawConceptId instanceof Number number) {
-            ids.add(number.intValue());
         }
 
         return List.copyOf(ids);
     }
 
+    private List<Integer> resolveConceptIdsByPublicIds(List<UUID> conceptPublicIds) {
+        if (conceptPublicIds == null || conceptPublicIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> normalizedPublicIds = conceptPublicIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedPublicIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Concept> concepts = conceptRepository.findAllByPublicIdIn(normalizedPublicIds);
+        if (concepts.size() != normalizedPublicIds.size()) {
+            Set<UUID> foundPublicIds = concepts.stream()
+                    .map(Concept::getPublicId)
+                    .collect(java.util.stream.Collectors.toSet());
+            UUID missingPublicId = normalizedPublicIds.stream()
+                    .filter(id -> !foundPublicIds.contains(id))
+                    .findFirst()
+                    .orElse(null);
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Concept not found" + (missingPublicId == null ? "" : ": " + missingPublicId)
+            );
+        }
+
+        return concepts.stream()
+                .map(Concept::getConceptId)
+                .toList();
+    }
+
     private LessonPublicSummaryDto toPublicSummaryDto(Lesson lesson) {
         return new LessonPublicSummaryDto(
-                lesson.getLessonId(),
+                lesson.getPublicId(),
                 lesson.getTitle(),
-                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
@@ -268,10 +299,10 @@ public class LessonService {
 
     private LessonContributorSummaryDto toContributorSummaryDto(Lesson lesson) {
         return new LessonContributorSummaryDto(
-                lesson.getLessonId(),
+                lesson.getPublicId(),
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
-                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
@@ -280,11 +311,11 @@ public class LessonService {
     private LessonDetailDto toDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
         return new LessonDetailDto(
-                base.lessonId(),
+                base.lessonPublicId(),
                 base.title(),
                 base.content(),
                 lesson.getLessonModerationStatus().name(),
-                base.conceptIds(),
+                base.conceptPublicIds(),
                 base.author(),
                 base.createdAt()
         );
@@ -293,10 +324,10 @@ public class LessonService {
     private LessonPublicDetailDto toPublicDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
         return new LessonPublicDetailDto(
-                base.lessonId(),
+                base.lessonPublicId(),
                 base.title(),
                 base.content(),
-                base.conceptIds(),
+                base.conceptPublicIds(),
                 base.author(),
                 base.createdAt()
         );
@@ -304,20 +335,20 @@ public class LessonService {
 
     private LessonDetailBase toDetailBase(Lesson lesson) {
         return new LessonDetailBase(
-                lesson.getLessonId(),
+                lesson.getPublicId(),
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
-                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
     }
 
     private record LessonDetailBase(
-            Integer lessonId,
+            UUID lessonPublicId,
             String title,
             Object content,
-            List<Integer> conceptIds,
+            List<UUID> conceptPublicIds,
             LessonAuthorDto author,
             OffsetDateTime createdAt
     ) {}

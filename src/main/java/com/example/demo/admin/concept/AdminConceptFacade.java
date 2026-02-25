@@ -1,13 +1,14 @@
 package com.example.demo.admin.concept;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptMapper;
 import com.example.demo.concept.ConceptQueryService;
 import com.example.demo.concept.ConceptRepository;
 import com.example.demo.concept.dto.ConceptCreateDTO;
-import com.example.demo.concept.dto.ConceptDTO;
+import com.example.demo.concept.dto.ConceptPublicDto;
 import com.example.demo.lesson.LessonRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,17 +36,17 @@ public class AdminConceptFacade {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<ConceptDTO> getAllConcepts() {
-        return conceptQueryService.getAllConcepts();
+    public java.util.List<ConceptPublicDto> getAllConcepts() {
+        return conceptQueryService.getAllPublicConcepts();
     }
 
     @Transactional(readOnly = true)
-    public ConceptDTO getConceptById(Integer id) {
-        return conceptQueryService.getConceptById(id);
+    public ConceptPublicDto getConceptById(UUID publicId) {
+        return conceptQueryService.getConceptByPublicId(publicId);
     }
 
     @Transactional
-    public ConceptDTO createConcept(ConceptCreateDTO request) {
+    public ConceptPublicDto createConcept(ConceptCreateDTO request) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
@@ -62,17 +63,17 @@ public class AdminConceptFacade {
         concept.setCreatedAt(OffsetDateTime.now());
 
         Concept saved = conceptRepository.save(concept);
-        return conceptMapper.toDto(saved);
+        return conceptMapper.toPublicDto(saved);
     }
 
     @Transactional
-    public ConceptDTO updateConcept(Integer id, Concept updatedConcept) {
+    public ConceptPublicDto updateConcept(UUID publicId, Concept updatedConcept) {
         if (updatedConcept == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
 
-        Concept existing = conceptRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + id));
+        Concept existing = conceptRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + publicId));
 
         String title = trimToNull(updatedConcept.getTitle());
         String description = trimToNull(updatedConcept.getDescription());
@@ -87,19 +88,20 @@ public class AdminConceptFacade {
         existing.setDescription(description);
 
         Concept saved = conceptRepository.save(existing);
-        return conceptMapper.toDto(saved);
+        return conceptMapper.toPublicDto(saved);
     }
 
     @Transactional
-    public void deleteConcept(Integer id) {
-        Concept concept = conceptRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + id));
+    public void deleteConcept(UUID publicId) {
+        Concept concept = conceptRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + publicId));
+        Integer conceptId = concept.getConceptId();
 
-        long linkedLessons = lessonRepository.countLinkedLessonsByConceptId(id);
+        long linkedLessons = lessonRepository.countLinkedLessonsByConceptId(conceptId);
         if (linkedLessons > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Cannot delete concept " + id + " because it is used by " + linkedLessons
+                    "Cannot delete concept " + publicId + " because it is used by " + linkedLessons
                             + " lesson(s). Remove the concept from those lessons first."
             );
         }

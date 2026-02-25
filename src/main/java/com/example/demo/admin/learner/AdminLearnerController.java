@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.learner.Learner;
+import com.example.demo.learner.dto.LearnerPublicDto;
 
 @RestController
 @RequestMapping("/api/admin/learners")
@@ -19,7 +19,7 @@ public class AdminLearnerController {
     }
 
     @GetMapping
-    public List<Learner> getLearners() {
+    public List<LearnerPublicDto> getLearners() {
         return adminLearnerFacade.getAllLearners();
     }
 }

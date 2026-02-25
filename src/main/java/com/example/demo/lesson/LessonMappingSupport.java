@@ -36,4 +36,15 @@ public class LessonMappingSupport {
                 .sorted()
                 .toList();
     }
+
+    public List<UUID> conceptPublicIds(Lesson lesson) {
+        if (lesson.getConcepts() == null || lesson.getConcepts().isEmpty()) {
+            return List.of();
+        }
+
+        return lesson.getConcepts().stream()
+                .map(Concept::getPublicId)
+                .sorted()
+                .toList();
+    }
 }
