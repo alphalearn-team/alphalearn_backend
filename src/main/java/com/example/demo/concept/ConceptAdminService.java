@@ -15,16 +15,16 @@ public class ConceptAdminService {
 
     private final ConceptRepository conceptRepository;
     private final LessonRepository lessonRepository;
-    private final ConceptService conceptService;
+    private final ConceptMapper conceptMapper;
 
     public ConceptAdminService(
             ConceptRepository conceptRepository,
             LessonRepository lessonRepository,
-            ConceptService conceptService
+            ConceptMapper conceptMapper
     ) {
         this.conceptRepository = conceptRepository;
         this.lessonRepository = lessonRepository;
-        this.conceptService = conceptService;
+        this.conceptMapper = conceptMapper;
     }
 
     @Transactional
@@ -45,7 +45,7 @@ public class ConceptAdminService {
         concept.setCreatedAt(OffsetDateTime.now());
 
         Concept saved = conceptRepository.save(concept);
-        return conceptService.toDto(saved);
+        return conceptMapper.toDto(saved);
     }
 
     @Transactional
@@ -70,7 +70,7 @@ public class ConceptAdminService {
         existing.setDescription(description);
 
         Concept saved = conceptRepository.save(existing);
-        return conceptService.toDto(saved);
+        return conceptMapper.toDto(saved);
     }
 
     @Transactional
