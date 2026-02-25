@@ -30,7 +30,7 @@ public class LessonListQueryService {
         return switch (criteria.audience()) {
             case PUBLIC -> findPublicLessons(criteria);
             case CONTRIBUTOR -> findContributorLessons(criteria);
-            case ADMIN -> throw new IllegalArgumentException("ADMIN audience not supported yet");
+            case ADMIN -> findAdminLessons(criteria);
         };
     }
 
@@ -61,6 +61,32 @@ public class LessonListQueryService {
                     contributorId,
                     criteria.conceptIds(),
                     criteria.conceptIds().size()
+            );
+        };
+    }
+
+    private List<Lesson> findAdminLessons(LessonListCriteria criteria) {
+        if (!hasConceptFilter(criteria.conceptIds())) {
+            if (criteria.status() == null) {
+                return lessonRepository.findByDeletedAtIsNull();
+            }
+            return lessonRepository.findByLessonModerationStatusAndDeletedAtIsNull(criteria.status());
+        }
+
+        if (criteria.status() == null) {
+            return switch (criteria.conceptsMatch()) {
+                case ANY -> lessonRepository.findAdminByConceptIds(criteria.conceptIds());
+                case ALL -> lessonRepository.findAdminByAllConceptIds(criteria.conceptIds(), criteria.conceptIds().size());
+            };
+        }
+
+        String statusValue = criteria.status().name();
+        return switch (criteria.conceptsMatch()) {
+            case ANY -> lessonRepository.findAdminByConceptIdsAndStatus(criteria.conceptIds(), statusValue);
+            case ALL -> lessonRepository.findAdminByAllConceptIdsAndStatus(
+                    criteria.conceptIds(),
+                    criteria.conceptIds().size(),
+                    statusValue
             );
         };
     }
