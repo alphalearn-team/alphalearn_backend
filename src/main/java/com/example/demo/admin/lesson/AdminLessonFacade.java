@@ -3,8 +3,6 @@ package com.example.demo.admin.lesson;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-import com.example.demo.admin.lesson.dto.AdminLessonDetailDto;
-import com.example.demo.admin.lesson.dto.AdminLessonSummaryDto;
 import org.springframework.stereotype.Service;
 
 import com.example.demo.lesson.Lesson;
