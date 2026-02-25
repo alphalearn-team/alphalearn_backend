@@ -6,12 +6,12 @@ import com.example.demo.contributor.dto.ContributorDto;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ContributorService {
+public class ContributorQueryService {
 
     private final ContributorRepository contributorRepository;
     private final ContributorMapper contributorMapper;
 
-    public ContributorService(ContributorRepository contributorRepository, ContributorMapper contributorMapper) {
+    public ContributorQueryService(ContributorRepository contributorRepository, ContributorMapper contributorMapper) {
         this.contributorRepository = contributorRepository;
         this.contributorMapper = contributorMapper;
     }

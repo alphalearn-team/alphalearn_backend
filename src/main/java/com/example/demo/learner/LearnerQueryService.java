@@ -5,11 +5,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
-public class LearnerService {
+public class LearnerQueryService {
     
     private final LearnerRepository learnerRepository;
 
-    public LearnerService(LearnerRepository learnerRepository) {
+    public LearnerQueryService(LearnerRepository learnerRepository) {
         this.learnerRepository = learnerRepository;
     }
 
