@@ -24,6 +24,10 @@ import com.example.demo.lesson.dto.response.LessonDetailView;
 import com.example.demo.lesson.dto.response.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.response.LessonPublicSummaryDto;
 import com.example.demo.lesson.enums.LessonModerationStatus;
+import com.example.demo.lesson.query.ConceptsMatchMode;
+import com.example.demo.lesson.query.LessonListAudience;
+import com.example.demo.lesson.query.LessonListCriteria;
+import com.example.demo.lesson.query.LessonListQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -35,6 +39,7 @@ public class LessonService {
     private final LessonLookupService lessonLookupService;
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
+    private final LessonListQueryService lessonListQueryService;
     private final ObjectMapper objectMapper;
     public LessonService(
             LessonRepository lessonRepository,
@@ -43,6 +48,7 @@ public class LessonService {
             LessonLookupService lessonLookupService,
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
+            LessonListQueryService lessonListQueryService,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
@@ -51,66 +57,38 @@ public class LessonService {
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.lessonMappingSupport = lessonMappingSupport;
+        this.lessonListQueryService = lessonListQueryService;
         this.objectMapper = objectMapper;
-    }
-
-    @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto>  findAllLessons() {
-        List<Lesson> lessons = lessonRepository.findByLessonModerationStatusAndDeletedAtIsNull(LessonModerationStatus.APPROVED);
-        return lessons.stream()
-                .map(this::toPublicSummaryDto)
-                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getLessonsByContributor(
             UUID contributorId,
             List<Integer> conceptIds,
-            String conceptsMatch
+            ConceptsMatchMode conceptsMatch
     ) {
-        if (!contributorRepository.existsById(contributorId)) {
-            return List.of();
-        }
-
-        List<Lesson> lessons;
-        if (conceptIds == null || conceptIds.isEmpty()) {
-            lessons = lessonRepository.findByContributor_ContributorIdAndDeletedAtIsNull(contributorId);
-        } else if ("any".equals(conceptsMatch)) {
-            lessons = lessonRepository.findByContributorAndConceptIds(contributorId, conceptIds);
-        } else {
-            lessons = lessonRepository.findByContributorAndAllConceptIds(contributorId, conceptIds, conceptIds.size());
-        }
+        List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
+                conceptIds,
+                conceptsMatch,
+                contributorId,
+                null,
+                LessonListAudience.CONTRIBUTOR
+        ));
 
         return lessons.stream()
                 .map(this::toContributorSummaryDto)
                 .toList();
     }
 
-    // lessons that match at least one of the given concepts
     @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> getLessonsByConcepts(List<Integer> conceptIds) {
-        if (conceptIds == null || conceptIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<Lesson> lessons = lessonRepository.findByConceptIds(conceptIds);
-        return lessons.stream()
-                .map(this::toPublicSummaryDto)
-                .toList();
-    }
-
-    // lessons that match all of the given concepts
-    @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> getLessonsByAllConcepts(List<Integer> conceptIds) {
-        if (conceptIds == null || conceptIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<Lesson> lessons = lessonRepository.findByAllConceptIds(
+    public List<LessonPublicSummaryDto> findPublicLessons(List<Integer> conceptIds, ConceptsMatchMode conceptsMatch) {
+        List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                (int) conceptIds.size()
-        );
-
+                conceptsMatch,
+                null,
+                null,
+                LessonListAudience.PUBLIC
+        ));
         return lessons.stream()
                 .map(this::toPublicSummaryDto)
                 .toList();

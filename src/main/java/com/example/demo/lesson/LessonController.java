@@ -21,6 +21,7 @@ import com.example.demo.lesson.dto.response.LessonContributorSummaryDto;
 import com.example.demo.lesson.dto.response.LessonDetailDto;
 import com.example.demo.lesson.dto.response.LessonDetailView;
 import com.example.demo.lesson.dto.response.LessonPublicSummaryDto;
+import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.config.SupabaseAuthUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,15 +45,8 @@ public class LessonController {
             @RequestParam(required = false) List<Integer> conceptIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
-        if (conceptIds == null || conceptIds.isEmpty()) {
-            return lessonService.findAllLessons();
-        }
-
-        if (conceptsMatch.equals("any")) {
-            return lessonService.getLessonsByConcepts(conceptIds);
-        }
-
-        return lessonService.getLessonsByAllConcepts(conceptIds);
+        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
+        return lessonService.findPublicLessons(conceptIds, matchMode);
     }
 
     @GetMapping("/mine")
@@ -66,7 +60,8 @@ public class LessonController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
         UUID contributorId = user.userId();
-        return lessonService.getLessonsByContributor(contributorId, conceptIds, conceptsMatch);
+        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
+        return lessonService.getLessonsByContributor(contributorId, conceptIds, matchMode);
     }
 
     @GetMapping("/{lessonId}")
