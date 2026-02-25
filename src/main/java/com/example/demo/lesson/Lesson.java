@@ -3,6 +3,7 @@ package com.example.demo.lesson;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -24,6 +25,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 @JsonIgnoreProperties({"profile"}) //temporary fix to prevent loop, to review in the future
@@ -39,6 +41,10 @@ public class Lesson {
     @Column(name = "lesson_id")
     @Setter(lombok.AccessLevel.NONE)
     private Integer lessonId;
+
+    @Column(name = "public_id", columnDefinition = "uuid", nullable = false, unique = true)
+    @Setter(lombok.AccessLevel.NONE)
+    private UUID publicId;
 
     @Column(nullable = false)
     private String title;
@@ -82,5 +88,12 @@ public class Lesson {
         this.lessonModerationStatus = lessonModerationStatus;
         this.contributor = contributor;
         this.createdAt = createdAt;
+    }
+
+    @PrePersist
+    void assignPublicIdIfMissing() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID();
+        }
     }
 }
