@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptMapper;
+import com.example.demo.concept.ConceptQueryService;
 import com.example.demo.concept.ConceptRepository;
 import com.example.demo.concept.dto.ConceptCreateDTO;
 import com.example.demo.concept.dto.ConceptDTO;
@@ -19,15 +20,28 @@ public class AdminConceptFacade {
     private final ConceptRepository conceptRepository;
     private final LessonRepository lessonRepository;
     private final ConceptMapper conceptMapper;
+    private final ConceptQueryService conceptQueryService;
 
     public AdminConceptFacade(
             ConceptRepository conceptRepository,
             LessonRepository lessonRepository,
-            ConceptMapper conceptMapper
+            ConceptMapper conceptMapper,
+            ConceptQueryService conceptQueryService
     ) {
         this.conceptRepository = conceptRepository;
         this.lessonRepository = lessonRepository;
         this.conceptMapper = conceptMapper;
+        this.conceptQueryService = conceptQueryService;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<ConceptDTO> getAllConcepts() {
+        return conceptQueryService.getAllConcepts();
+    }
+
+    @Transactional(readOnly = true)
+    public ConceptDTO getConceptById(Integer id) {
+        return conceptQueryService.getConceptById(id);
     }
 
     @Transactional

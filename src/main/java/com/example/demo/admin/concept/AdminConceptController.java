@@ -1,9 +1,12 @@
 package com.example.demo.admin.concept;
 
+import java.util.List;
+
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.dto.ConceptCreateDTO;
 import com.example.demo.concept.dto.ConceptDTO;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +24,16 @@ public class AdminConceptController {
 
     public AdminConceptController(AdminConceptFacade conceptAdminFacade) {
         this.conceptAdminFacade = conceptAdminFacade;
+    }
+
+    @GetMapping
+    public List<ConceptDTO> getConcepts() {
+        return conceptAdminFacade.getAllConcepts();
+    }
+
+    @GetMapping("/{id}")
+    public ConceptDTO getConceptById(@PathVariable Integer id) {
+        return conceptAdminFacade.getConceptById(id);
     }
 
     @PostMapping
