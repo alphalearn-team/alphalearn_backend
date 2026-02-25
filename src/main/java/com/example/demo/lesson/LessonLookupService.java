@@ -17,20 +17,8 @@ public class LessonLookupService {
     }
 
     @Transactional(readOnly = true)
-    public Lesson findByIdOrThrow(Integer lessonId) {
-        return lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
-    }
-
-    @Transactional(readOnly = true)
     public Lesson findByPublicIdOrThrow(UUID lessonPublicId) {
         return lessonRepository.findByPublicId(lessonPublicId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
-    }
-
-    @Transactional(readOnly = true)
-    public Lesson findPublicByIdOrThrow(Integer lessonId) {
-        return lessonRepository.findPublicById(lessonId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
     }
 
