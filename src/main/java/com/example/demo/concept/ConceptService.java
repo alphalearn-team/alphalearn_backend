@@ -11,30 +11,23 @@ import org.springframework.web.server.ResponseStatusException;
 public class ConceptService {
 
     private final ConceptRepository conceptRepository;
+    private final ConceptMapper conceptMapper;
 
-    public ConceptService(ConceptRepository conceptRepository) {
+    public ConceptService(ConceptRepository conceptRepository, ConceptMapper conceptMapper) {
         this.conceptRepository = conceptRepository;
+        this.conceptMapper = conceptMapper;
     }
 
     public List<ConceptDTO> getAllConcepts() {
         return conceptRepository.findAll()
                 .stream()
-                .map(this::toDto)
+                .map(conceptMapper::toDto)
                 .toList();
     }
 
     public ConceptDTO getConceptById(Integer id) {
         Concept concept = conceptRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + id));
-        return toDto(concept);
-    }
-
-    ConceptDTO toDto(Concept concept) {
-        return new ConceptDTO(
-                concept.getConceptId(),
-                concept.getTitle(),
-                concept.getDescription(),
-                concept.getCreatedAt()
-        );
+        return conceptMapper.toDto(concept);
     }
 }
