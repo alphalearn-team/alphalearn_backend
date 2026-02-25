@@ -22,18 +22,18 @@ public class ContributorAdminService {
     private final ContributorRepository contributorRepository;
     private final LearnerRepository learnerRepository;
     private final LessonRepository lessonRepository;
-    private final ContributorService contributorService;
+    private final ContributorMapper contributorMapper;
 
     public ContributorAdminService(
             ContributorRepository contributorRepository,
             LearnerRepository learnerRepository,
             LessonRepository lessonRepository,
-            ContributorService contributorService
+            ContributorMapper contributorMapper
     ) {
         this.contributorRepository = contributorRepository;
         this.learnerRepository = learnerRepository;
         this.lessonRepository = lessonRepository;
-        this.contributorService = contributorService;
+        this.contributorMapper = contributorMapper;
     }
 
     @Transactional
@@ -77,7 +77,7 @@ public class ContributorAdminService {
         }
 
         return created.stream()
-                .map(contributorService::toDto)
+                .map(contributorMapper::toDto)
                 .toList();
     }
 
