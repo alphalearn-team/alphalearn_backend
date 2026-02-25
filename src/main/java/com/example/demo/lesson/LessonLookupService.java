@@ -23,8 +23,8 @@ public class LessonLookupService {
     }
 
     @Transactional(readOnly = true)
-    public Lesson findByPublicIdOrThrow(UUID publicId) {
-        return lessonRepository.findByPublicId(publicId)
+    public Lesson findByPublicIdOrThrow(UUID lessonPublicId) {
+        return lessonRepository.findByPublicId(lessonPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
     }
 
@@ -35,8 +35,8 @@ public class LessonLookupService {
     }
 
     @Transactional(readOnly = true)
-    public Lesson findPublicByPublicIdOrThrow(UUID publicId) {
-        return lessonRepository.findPublicByPublicId(publicId)
+    public Lesson findPublicByPublicIdOrThrow(UUID lessonPublicId) {
+        return lessonRepository.findPublicByPublicId(lessonPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
     }
 }

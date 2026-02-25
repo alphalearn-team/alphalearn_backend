@@ -32,9 +32,9 @@ public class AdminConceptController {
         return conceptAdminFacade.getAllConcepts();
     }
 
-    @GetMapping("/{publicId}")
-    public ConceptPublicDto getConceptById(@PathVariable UUID publicId) {
-        return conceptAdminFacade.getConceptById(publicId);
+    @GetMapping("/{conceptPublicId}")
+    public ConceptPublicDto getConceptByPublicId(@PathVariable UUID conceptPublicId) {
+        return conceptAdminFacade.getConceptByPublicId(conceptPublicId);
     }
 
     @PostMapping
@@ -43,17 +43,17 @@ public class AdminConceptController {
         return conceptAdminFacade.createConcept(concept);
     }
 
-    @PutMapping("/{publicId}")
+    @PutMapping("/{conceptPublicId}")
     public ConceptPublicDto updateConcept(
-            @PathVariable UUID publicId,
+            @PathVariable UUID conceptPublicId,
             @RequestBody Concept updatedConcept
     ) {
-        return conceptAdminFacade.updateConcept(publicId, updatedConcept);
+        return conceptAdminFacade.updateConcept(conceptPublicId, updatedConcept);
     }
 
-    @DeleteMapping("/{publicId}")
+    @DeleteMapping("/{conceptPublicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteConcept(@PathVariable UUID publicId) {
-        conceptAdminFacade.deleteConcept(publicId);
+    public void deleteConcept(@PathVariable UUID conceptPublicId) {
+        conceptAdminFacade.deleteConcept(conceptPublicId);
     }
 }

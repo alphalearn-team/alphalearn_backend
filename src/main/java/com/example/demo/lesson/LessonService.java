@@ -97,8 +97,8 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public LessonDetailView getLessonDetailForUser(UUID lessonId, SupabaseAuthUser user) {
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
+    public LessonDetailView getLessonDetailForUser(UUID lessonPublicId, SupabaseAuthUser user) {
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         if (user != null && user.userId() != null
                 && lesson.getContributor() != null
                 && lesson.getContributor().getContributorId().equals(user.userId())
@@ -106,7 +106,7 @@ public class LessonService {
             return toDetailDto(lesson);
         }
 
-        Lesson publicLesson = lessonLookupService.findPublicByPublicIdOrThrow(lessonId);
+        Lesson publicLesson = lessonLookupService.findPublicByPublicIdOrThrow(lessonPublicId);
         return toPublicDetailDto(publicLesson);
     }
 
@@ -136,16 +136,16 @@ public class LessonService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found"));
         List<Concept> concepts = conceptRepository.findAllByPublicIdIn(conceptPublicIds);
         if (concepts.size() != conceptPublicIds.size()) {
-            Set<UUID> foundConceptIds = concepts.stream()
+            Set<UUID> foundConceptPublicIds = concepts.stream()
                     .map(Concept::getPublicId)
                     .collect(java.util.stream.Collectors.toSet());
-            UUID missingConceptId = conceptPublicIds.stream()
-                    .filter(id -> !foundConceptIds.contains(id))
+            UUID missingConceptPublicId = conceptPublicIds.stream()
+                    .filter(id -> !foundConceptPublicIds.contains(id))
                     .findFirst()
                     .orElse(null);
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "Concept not found" + (missingConceptId == null ? "" : ": " + missingConceptId)
+                    "Concept not found" + (missingConceptPublicId == null ? "" : ": " + missingConceptPublicId)
             );
         }
 
@@ -164,7 +164,7 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto updateLesson(UUID lessonId, UpdateLessonRequest request, SupabaseAuthUser user) {
+    public LessonDetailDto updateLesson(UUID lessonPublicId, UpdateLessonRequest request, SupabaseAuthUser user) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
@@ -180,7 +180,7 @@ public class LessonService {
             );
         }
 
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
 
         lesson.setTitle(title);
@@ -190,18 +190,18 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto submitLesson(UUID lessonId, SupabaseAuthUser user) {
+    public LessonDetailDto submitLesson(UUID lessonPublicId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);
     }
 
-    public LessonDetailDto unpublishLesson(UUID lessonId, SupabaseAuthUser user) {
+    public LessonDetailDto unpublishLesson(UUID lessonPublicId, SupabaseAuthUser user) {
         requireContributorUser(user);
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
 
         Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
@@ -209,12 +209,12 @@ public class LessonService {
     }
 
     @Transactional
-    public void softDeleteLesson(UUID lessonId, SupabaseAuthUser user) {
+    public void softDeleteLesson(UUID lessonPublicId, SupabaseAuthUser user) {
         if (user == null || user.userId() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
 
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonId);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
 
         if (lesson.getDeletedAt() != null) {

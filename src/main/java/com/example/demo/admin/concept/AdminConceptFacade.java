@@ -41,8 +41,8 @@ public class AdminConceptFacade {
     }
 
     @Transactional(readOnly = true)
-    public ConceptPublicDto getConceptById(UUID publicId) {
-        return conceptQueryService.getConceptByPublicId(publicId);
+    public ConceptPublicDto getConceptByPublicId(UUID conceptPublicId) {
+        return conceptQueryService.getConceptByPublicId(conceptPublicId);
     }
 
     @Transactional
@@ -67,13 +67,13 @@ public class AdminConceptFacade {
     }
 
     @Transactional
-    public ConceptPublicDto updateConcept(UUID publicId, Concept updatedConcept) {
+    public ConceptPublicDto updateConcept(UUID conceptPublicId, Concept updatedConcept) {
         if (updatedConcept == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
 
-        Concept existing = conceptRepository.findByPublicId(publicId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + publicId));
+        Concept existing = conceptRepository.findByPublicId(conceptPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + conceptPublicId));
 
         String title = trimToNull(updatedConcept.getTitle());
         String description = trimToNull(updatedConcept.getDescription());
@@ -92,16 +92,16 @@ public class AdminConceptFacade {
     }
 
     @Transactional
-    public void deleteConcept(UUID publicId) {
-        Concept concept = conceptRepository.findByPublicId(publicId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + publicId));
+    public void deleteConcept(UUID conceptPublicId) {
+        Concept concept = conceptRepository.findByPublicId(conceptPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + conceptPublicId));
         Integer conceptId = concept.getConceptId();
 
         long linkedLessons = lessonRepository.countLinkedLessonsByConceptId(conceptId);
         if (linkedLessons > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Cannot delete concept " + publicId + " because it is used by " + linkedLessons
+                    "Cannot delete concept " + conceptPublicId + " because it is used by " + linkedLessons
                             + " lesson(s). Remove the concept from those lessons first."
             );
         }

@@ -34,7 +34,7 @@ public class AdminLessonController {
 
     @GetMapping("/{lessonPublicId}")
     public AdminLessonReviewDto getLessonForAdmin(@PathVariable UUID lessonPublicId) {
-        return adminFacade.getLessonById(lessonPublicId);
+        return adminFacade.getLessonByPublicId(lessonPublicId);
     }
 
     @PutMapping("/{lessonPublicId}/approve")

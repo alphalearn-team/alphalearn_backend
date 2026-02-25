@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ContributorRepository extends JpaRepository<Contributor, UUID> {
 
-    Optional<Contributor> findByLearner_PublicId(UUID publicId);
+    Optional<Contributor> findByLearner_PublicId(UUID learnerPublicId);
 
-    boolean existsByLearner_PublicId(UUID publicId);
+    boolean existsByLearner_PublicId(UUID learnerPublicId);
 }

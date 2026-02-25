@@ -9,8 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LessonRepository extends JpaRepository<Lesson, Integer> {
-    java.util.Optional<Lesson> findByPublicId(UUID publicId);
-    boolean existsByPublicId(UUID publicId);
+    java.util.Optional<Lesson> findByPublicId(UUID lessonPublicId);
+    boolean existsByPublicId(UUID lessonPublicId);
     List<Lesson> findByDeletedAtIsNull();
     List<Lesson> findByContributor_ContributorIdAndDeletedAtIsNull(UUID contributorId);
     boolean existsByContributor_ContributorId(UUID contributorId);
@@ -182,5 +182,5 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
                     """,
             nativeQuery = true
     )
-    java.util.Optional<Lesson> findPublicByPublicId(@Param("publicId") UUID publicId);
+    java.util.Optional<Lesson> findPublicByPublicId(@Param("publicId") UUID lessonPublicId);
 }

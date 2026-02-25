@@ -67,7 +67,7 @@ public class AdminLessonFacade {
     }
 
     @Transactional(readOnly = true)
-    public AdminLessonReviewDto getLessonById(UUID lessonPublicId) {
+    public AdminLessonReviewDto getLessonByPublicId(UUID lessonPublicId) {
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         return new AdminLessonReviewDto(
                 lesson.getPublicId(),

@@ -28,9 +28,9 @@ public class ConceptController {
         return conceptQueryService.getAllPublicConcepts();
     }
 
-    @GetMapping("/{publicId}")
-    public ConceptPublicDto getConceptByPublicId(@PathVariable UUID publicId) {
-        return conceptQueryService.getConceptByPublicId(publicId);
+    @GetMapping("/{conceptPublicId}")
+    public ConceptPublicDto getConceptByPublicId(@PathVariable UUID conceptPublicId) {
+        return conceptQueryService.getConceptByPublicId(conceptPublicId);
     }
 
 }

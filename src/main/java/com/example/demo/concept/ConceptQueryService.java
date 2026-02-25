@@ -40,9 +40,9 @@ public class ConceptQueryService {
         return conceptMapper.toDto(concept);
     }
 
-    public ConceptPublicDto getConceptByPublicId(UUID publicId) {
-        Concept concept = conceptRepository.findByPublicId(publicId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + publicId));
+    public ConceptPublicDto getConceptByPublicId(UUID conceptPublicId) {
+        Concept concept = conceptRepository.findByPublicId(conceptPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + conceptPublicId));
         return conceptMapper.toPublicDto(concept);
     }
 }
