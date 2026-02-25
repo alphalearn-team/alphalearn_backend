@@ -31,6 +31,11 @@ public class AdminLessonController {
         return adminFacade.getAllLessons(conceptIds, matchMode, status);
     }
 
+    @GetMapping("/{id}")
+    public AdminLessonReviewDto getLessonForAdmin(@PathVariable Integer id) {
+        return adminFacade.getLessonById(id);
+    }
+
     @PutMapping("/{id}/approve")
     public AdminLessonDetailDto approveLesson(@PathVariable Integer id){
         return adminFacade.approveLesson(id);

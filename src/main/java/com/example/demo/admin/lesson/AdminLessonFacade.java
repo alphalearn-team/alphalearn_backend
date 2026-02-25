@@ -3,7 +3,9 @@ package com.example.demo.admin.lesson;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
@@ -21,19 +23,23 @@ public class AdminLessonFacade {
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
+    private final ObjectMapper objectMapper;
 
     public AdminLessonFacade(
             LessonLookupService lessonLookupService,
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
-            LessonListQueryService lessonListQueryService
+            LessonListQueryService lessonListQueryService,
+            ObjectMapper objectMapper
     ){
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true)
     public List<AdminLessonSummaryDto> getAllLessons(
             List<Integer> conceptIds,
             ConceptsMatchMode conceptsMatch,
@@ -50,6 +56,21 @@ public class AdminLessonFacade {
         return lessons.stream()
                 .map(this::toAdminLessonSummaryDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminLessonReviewDto getLessonById(Integer id) {
+        Lesson lesson = lessonLookupService.findByIdOrThrow(id);
+        return new AdminLessonReviewDto(
+                lesson.getLessonId(),
+                lesson.getTitle(),
+                objectMapper.convertValue(lesson.getContent(), Object.class),
+                lessonMappingSupport.conceptIds(lesson),
+                lessonMappingSupport.contributorId(lesson),
+                lesson.getLessonModerationStatus(),
+                lesson.getCreatedAt(),
+                lesson.getDeletedAt()
+        );
     }
 
     public AdminLessonDetailDto approveLesson(Integer id){
