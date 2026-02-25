@@ -56,8 +56,8 @@ public class LessonController {
             @RequestParam(required = false) List<Integer> conceptIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
-        if (user == null || user.userId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
+        if (user == null || user.userId() == null || !user.isContributor()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contributor access required");
         }
         UUID contributorId = user.userId();
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);

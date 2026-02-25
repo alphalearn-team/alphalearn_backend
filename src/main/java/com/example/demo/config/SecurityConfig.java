@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -25,18 +26,26 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/api/lessons/**").authenticated()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/me/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/lessons/mine").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("CONTRIBUTOR")
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("CONTRIBUTOR")
+                        .requestMatchers("/api/**")
+                        .access(authenticatedNonAdmin())
+                        .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(supabaseJwtAuthenticationConverter))
                 );
 
         return http.build();
+    }
+
+    private WebExpressionAuthorizationManager authenticatedNonAdmin() {
+        return new WebExpressionAuthorizationManager("isAuthenticated() and !hasRole('ADMIN')");
     }
 
     @Bean
