@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.admin.dto.response.UserRoleDto;
 import com.example.demo.config.SupabaseAuthUser;
 
 @RestController

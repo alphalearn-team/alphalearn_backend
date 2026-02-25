@@ -2,7 +2,7 @@ package com.example.demo.contributor;
 
 import org.springframework.stereotype.Component;
 
-import com.example.demo.contributor.dto.response.ContributorDto;
+import com.example.demo.contributor.dto.ContributorDto;
 
 @Component
 public class ContributorMapper {

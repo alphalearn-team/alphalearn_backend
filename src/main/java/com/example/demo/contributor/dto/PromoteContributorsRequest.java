@@ -1,4 +1,4 @@
-package com.example.demo.contributor.dto.request;
+package com.example.demo.contributor.dto;
 
 import java.util.List;
 import java.util.UUID;

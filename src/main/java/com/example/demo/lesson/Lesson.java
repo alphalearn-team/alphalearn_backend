@@ -10,7 +10,6 @@ import org.hibernate.type.SqlTypes;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.contributor.Contributor;
-import com.example.demo.lesson.enums.LessonModerationStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 

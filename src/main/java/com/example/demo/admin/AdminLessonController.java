@@ -2,6 +2,8 @@ package com.example.demo.admin;
 
 import java.util.List;
 
+import com.example.demo.admin.dto.AdminLessonDetailDto;
+import com.example.demo.admin.dto.AdminLessonSummaryDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -9,9 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.admin.dto.response.AdminLessonDetailDto;
-import com.example.demo.admin.dto.response.AdminLessonSummaryDto;
-import com.example.demo.lesson.enums.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.query.ConceptsMatchMode;
 
 @RestController()

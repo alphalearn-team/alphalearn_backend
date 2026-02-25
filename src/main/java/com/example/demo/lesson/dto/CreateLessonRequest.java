@@ -1,4 +1,4 @@
-package com.example.demo.lesson.dto.request;
+package com.example.demo.lesson.dto;
 
 import java.util.List;
 

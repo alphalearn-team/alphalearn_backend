@@ -5,8 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.demo.lesson.enums.LessonModerationStatus;
-
 @Service
 public class LessonModerationWorkflowService {
 

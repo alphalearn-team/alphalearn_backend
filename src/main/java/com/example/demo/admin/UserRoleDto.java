@@ -1,4 +1,4 @@
-package com.example.demo.admin.dto.response;
+package com.example.demo.admin;
 
 import java.util.UUID;
 

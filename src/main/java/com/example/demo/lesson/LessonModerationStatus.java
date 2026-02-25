@@ -1,4 +1,4 @@
-package com.example.demo.lesson.enums;
+package com.example.demo.lesson;
 
 public enum LessonModerationStatus {
     PENDING,

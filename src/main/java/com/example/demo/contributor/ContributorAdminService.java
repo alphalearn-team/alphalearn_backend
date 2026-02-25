@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import com.example.demo.contributor.dto.request.DemoteContributorsRequest;
-import com.example.demo.contributor.dto.request.PromoteContributorsRequest;
-import com.example.demo.contributor.dto.response.ContributorDto;
+import com.example.demo.contributor.dto.DemoteContributorsRequest;
+import com.example.demo.contributor.dto.PromoteContributorsRequest;
+import com.example.demo.contributor.dto.ContributorDto;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.lesson.LessonRepository;
