@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/contributors")
-public class ContributorAdminController {
+public class AdminContributorController {
 
     private final AdminContributorFacade contributorAdminFacade;
 
-    public ContributorAdminController(AdminContributorFacade contributorAdminFacade) {
+    public AdminContributorController(AdminContributorFacade contributorAdminFacade) {
         this.contributorAdminFacade = contributorAdminFacade;
     }
 

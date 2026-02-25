@@ -1,4 +1,4 @@
-package com.example.demo.admin.lesson.dto;
+package com.example.demo.admin.lesson;
 
 import java.time.OffsetDateTime;
 import java.util.List;

@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/concepts")
-public class ConceptAdminController {
+public class AdminConceptController {
 
     private final AdminConceptFacade conceptAdminFacade;
 
-    public ConceptAdminController(AdminConceptFacade conceptAdminFacade) {
+    public AdminConceptController(AdminConceptFacade conceptAdminFacade) {
         this.conceptAdminFacade = conceptAdminFacade;
     }
 
