@@ -101,8 +101,7 @@ public class AdminConceptFacade {
         if (linkedLessons > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Cannot delete concept " + conceptPublicId + " because it is used by " + linkedLessons
-                            + " lesson(s). Remove the concept from those lessons first."
+                    "Cannot delete concept: lessons are attached"
             );
         }
 
