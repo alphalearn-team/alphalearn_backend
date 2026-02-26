@@ -62,8 +62,8 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public List<LessonContributorSummaryDto> getLessonsByContributor(
-            UUID contributorId,
+    public List<LessonContributorSummaryDto> getMyAuthoredLessons(
+            UUID ownerUserId,
             List<UUID> conceptPublicIds,
             ConceptsMatchMode conceptsMatch
     ) {
@@ -71,7 +71,7 @@ public class LessonService {
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
                 conceptsMatch,
-                contributorId,
+                ownerUserId,
                 null,
                 LessonListAudience.CONTRIBUTOR
         ));
