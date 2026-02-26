@@ -27,14 +27,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/me/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/lessons/mine").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("CONTRIBUTOR")
-                        .requestMatchers("/api/**")
-                        .access(authenticatedNonAdmin())
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
