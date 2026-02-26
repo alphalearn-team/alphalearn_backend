@@ -53,7 +53,16 @@ public class AdminConceptController {
 
     @DeleteMapping("/{conceptPublicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteConcept(@PathVariable UUID conceptPublicId) {
+    public void deleteConcept(
+            @PathVariable UUID conceptPublicId,
+            org.springframework.security.core.Authentication authentication
+    ) {
+        System.out.println("=== DELETE CONCEPT DEBUG ===");
+        System.out.println("conceptPublicId: " + conceptPublicId);
+        System.out.println("Authentication: " + authentication);
+        System.out.println("Principal: " + (authentication != null ? authentication.getPrincipal() : "null"));
+        System.out.println("Authorities: " + (authentication != null ? authentication.getAuthorities() : "null"));
+        System.out.println("===========================");
         conceptAdminFacade.deleteConcept(conceptPublicId);
     }
 }
