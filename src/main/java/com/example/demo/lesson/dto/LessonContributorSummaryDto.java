@@ -9,6 +9,7 @@ public record LessonContributorSummaryDto(
         String title,
         String moderationStatus,
         List<UUID> conceptPublicIds,
+        List<LessonConceptSummaryDto> concepts,
         LessonAuthorDto author,
         OffsetDateTime createdAt
 ) {}

@@ -9,6 +9,7 @@ public record LessonPublicDetailDto(
         String title,
         Object content,
         List<UUID> conceptPublicIds,
+        List<LessonConceptSummaryDto> concepts,
         LessonAuthorDto author,
         OffsetDateTime createdAt
 ) implements LessonDetailView {}
