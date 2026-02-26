@@ -6,7 +6,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonRepository;
 import com.example.demo.lesson.LessonModerationStatus;
@@ -15,14 +14,11 @@ import com.example.demo.lesson.LessonModerationStatus;
 public class LessonListQueryService {
 
     private final LessonRepository lessonRepository;
-    private final ContributorRepository contributorRepository;
 
     public LessonListQueryService(
-            LessonRepository lessonRepository,
-            ContributorRepository contributorRepository
+            LessonRepository lessonRepository
     ) {
         this.lessonRepository = lessonRepository;
-        this.contributorRepository = contributorRepository;
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +43,7 @@ public class LessonListQueryService {
 
     private List<Lesson> findContributorLessons(LessonListCriteria criteria) {
         UUID contributorId = criteria.contributorId();
-        if (contributorId == null || !contributorRepository.existsById(contributorId)) {
+        if (contributorId == null) {
             return List.of();
         }
 

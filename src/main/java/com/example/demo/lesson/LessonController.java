@@ -56,12 +56,12 @@ public class LessonController {
             @RequestParam(required = false) List<UUID> conceptPublicIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
     ) {
-        if (user == null || user.userId() == null || !user.isContributor()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contributor access required");
+        if (user == null || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
-        UUID contributorId = user.userId();
+        UUID ownerUserId = user.userId();
         ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return lessonService.getLessonsByContributor(contributorId, conceptPublicIds, matchMode);
+        return lessonService.getMyAuthoredLessons(ownerUserId, conceptPublicIds, matchMode);
     }
 
     @GetMapping("/{lessonPublicId}")
