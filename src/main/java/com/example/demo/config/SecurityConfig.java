@@ -32,7 +32,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/lessons/mine").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/lessons/**").hasRole("CONTRIBUTOR")
                         .requestMatchers(HttpMethod.PUT, "/api/lessons/**").hasRole("CONTRIBUTOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").hasRole("CONTRIBUTOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/lessons/**").authenticated()
                         .requestMatchers("/api/**")
                         .access(authenticatedNonAdmin())
                         .anyRequest().denyAll()
