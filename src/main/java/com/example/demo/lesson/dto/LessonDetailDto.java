@@ -10,6 +10,7 @@ public record LessonDetailDto(
         Object content,
         String moderationStatus,
         List<UUID> conceptPublicIds,
+        List<LessonConceptSummaryDto> concepts,
         LessonAuthorDto author,
         OffsetDateTime createdAt
 ) implements LessonDetailView {}

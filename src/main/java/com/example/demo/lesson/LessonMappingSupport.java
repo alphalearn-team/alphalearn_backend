@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.lesson.dto.LessonAuthorDto;
+import com.example.demo.lesson.dto.LessonConceptSummaryDto;
 
 @Component
 public class LessonMappingSupport {
@@ -45,6 +46,17 @@ public class LessonMappingSupport {
         return lesson.getConcepts().stream()
                 .map(Concept::getPublicId)
                 .sorted()
+                .toList();
+    }
+
+    public List<LessonConceptSummaryDto> conceptSummaries(Lesson lesson) {
+        if (lesson.getConcepts() == null || lesson.getConcepts().isEmpty()) {
+            return List.of();
+        }
+
+        return lesson.getConcepts().stream()
+                .sorted(java.util.Comparator.comparing(Concept::getPublicId))
+                .map(concept -> new LessonConceptSummaryDto(concept.getPublicId(), concept.getTitle()))
                 .toList();
     }
 }

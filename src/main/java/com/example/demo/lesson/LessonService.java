@@ -19,6 +19,7 @@ import com.example.demo.lesson.dto.CreateLessonRequest;
 import com.example.demo.lesson.dto.UpdateLessonRequest;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lesson.dto.LessonContributorSummaryDto;
+import com.example.demo.lesson.dto.LessonConceptSummaryDto;
 import com.example.demo.lesson.dto.LessonDetailDto;
 import com.example.demo.lesson.dto.LessonDetailView;
 import com.example.demo.lesson.dto.LessonAuthorDto;
@@ -292,6 +293,7 @@ public class LessonService {
                 lesson.getPublicId(),
                 lesson.getTitle(),
                 lessonMappingSupport.conceptPublicIds(lesson),
+                lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
@@ -303,6 +305,7 @@ public class LessonService {
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
                 lessonMappingSupport.conceptPublicIds(lesson),
+                lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
@@ -316,6 +319,7 @@ public class LessonService {
                 base.content(),
                 lesson.getLessonModerationStatus().name(),
                 base.conceptPublicIds(),
+                base.concepts(),
                 base.author(),
                 base.createdAt()
         );
@@ -328,6 +332,7 @@ public class LessonService {
                 base.title(),
                 base.content(),
                 base.conceptPublicIds(),
+                base.concepts(),
                 base.author(),
                 base.createdAt()
         );
@@ -339,6 +344,7 @@ public class LessonService {
                 lesson.getTitle(),
                 objectMapper.convertValue(lesson.getContent(), Object.class),
                 lessonMappingSupport.conceptPublicIds(lesson),
+                lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
@@ -349,6 +355,7 @@ public class LessonService {
             String title,
             Object content,
             List<UUID> conceptPublicIds,
+            List<LessonConceptSummaryDto> concepts,
             LessonAuthorDto author,
             OffsetDateTime createdAt
     ) {}

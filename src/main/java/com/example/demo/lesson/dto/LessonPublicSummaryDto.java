@@ -8,6 +8,7 @@ public record LessonPublicSummaryDto(
         UUID lessonPublicId,
         String title,
         List<UUID> conceptPublicIds,
+        List<LessonConceptSummaryDto> concepts,
         LessonAuthorDto author,
         OffsetDateTime createdAt
 ) {}
