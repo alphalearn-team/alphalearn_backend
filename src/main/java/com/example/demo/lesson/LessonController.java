@@ -30,7 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/lessons")
-@Tag(name = "Lessons", description = "Lesson creation and moderation endpoints")
+@Tag(name = "Lessons", description = "Lesson browsing and contributor lesson management endpoints")
 public class LessonController {
 
     private final LessonService lessonService;
@@ -40,7 +40,7 @@ public class LessonController {
     }
 
     @GetMapping
-    @Operation(summary = "List lessons", description = "Optionally filter by conceptId")
+    @Operation(summary = "List public lessons", description = "Returns approved, non-deleted lessons. Optional filter by concept public IDs with any/all match mode")
     public List<LessonPublicSummaryDto> getAllLessons(
             @RequestParam(required = false) List<UUID> conceptPublicIds,
             @RequestParam(defaultValue = "any") String conceptsMatch
@@ -50,7 +50,7 @@ public class LessonController {
     }
 
     @GetMapping("/mine")
-    @Operation(summary = "List my lessons", description = "Authenticated owner-only; optional concept filter")
+    @Operation(summary = "List my authored lessons", description = "Returns non-deleted lessons authored by the authenticated contributor")
     public List<LessonContributorSummaryDto> getMyLessons(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @RequestParam(required = false) List<UUID> conceptPublicIds,
@@ -65,7 +65,7 @@ public class LessonController {
     }
 
     @GetMapping("/{lessonPublicId}")
-    @Operation(summary = "Get lesson by ID")
+    @Operation(summary = "Get lesson detail", description = "Owner gets full contributor view; others get public-approved lesson view")
     public LessonDetailView getLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
@@ -75,7 +75,7 @@ public class LessonController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create lesson")
+    @Operation(summary = "Create lesson", description = "Creates a lesson in UNPUBLISHED or PENDING status depending on submit flag")
     public LessonDetailDto createLesson(
             @RequestBody CreateLessonRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
@@ -84,7 +84,7 @@ public class LessonController {
     }
 
     @PutMapping("/{lessonPublicId}")
-    @Operation(summary = "Update lesson content")
+    @Operation(summary = "Update lesson content", description = "Contributor owner updates title and content")
     public LessonDetailDto updateLesson(
             @PathVariable UUID lessonPublicId,
             @RequestBody UpdateLessonRequest request,
@@ -94,7 +94,7 @@ public class LessonController {
     }
 
     @PostMapping("/{lessonPublicId}/submit")
-    @Operation(summary = "Submit lesson for review")
+    @Operation(summary = "Submit lesson for review", description = "Sets moderation status to PENDING")
     public LessonDetailDto submitLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
@@ -103,7 +103,7 @@ public class LessonController {
     }
 
     @PostMapping("/{lessonPublicId}/unpublish")
-    @Operation(summary = "Unpublish lesson")
+    @Operation(summary = "Unpublish lesson", description = "Sets moderation status to UNPUBLISHED")
     public LessonDetailDto unpublishLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user

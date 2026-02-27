@@ -2,6 +2,8 @@ package com.example.demo.me;
 
 import java.util.UUID;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,9 +14,11 @@ import com.example.demo.config.SupabaseAuthUser;
 
 @RestController
 @RequestMapping("/api/me")
+@Tag(name = "Me", description = "Authenticated utility endpoints for current user context")
 public class MeController {
 
     @GetMapping("/role")
+    @Operation(summary = "Get my role", description = "Resolves effective role from JWT and role tables (admins/contributors/learners)")
     public UserRoleDto getRole(
             Authentication authentication,
             @AuthenticationPrincipal SupabaseAuthUser user
