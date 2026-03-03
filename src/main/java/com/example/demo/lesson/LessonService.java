@@ -154,13 +154,16 @@ public class LessonService {
         Lesson lesson = new Lesson(
                 title,
                 objectMapper.valueToTree(content),
-                submit ? LessonModerationStatus.PENDING : LessonModerationStatus.UNPUBLISHED,
+                LessonModerationStatus.UNPUBLISHED,
                 contributor,
                 OffsetDateTime.now()
         );
         lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
+        if (submit) {
+            saved = lessonModerationWorkflowService.submitForReview(saved);
+        }
 
         return toDetailDto(saved);
     }

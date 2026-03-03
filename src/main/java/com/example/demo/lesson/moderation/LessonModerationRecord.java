@@ -51,6 +51,7 @@ public class LessonModerationRecord {
     private LessonModerationDecisionSource decisionSource;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "resulting_status", nullable = false, columnDefinition = "lessons_moderation_status")
     private LessonModerationStatus resultingStatus;
 
