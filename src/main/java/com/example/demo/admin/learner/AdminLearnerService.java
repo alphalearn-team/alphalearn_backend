@@ -8,11 +8,11 @@ import com.example.demo.learner.LearnerQueryService;
 import com.example.demo.learner.dto.LearnerPublicDto;
 
 @Service
-public class AdminLearnerFacade {
+public class AdminLearnerService {
 
     private final LearnerQueryService learnerQueryService;
 
-    public AdminLearnerFacade(LearnerQueryService learnerQueryService) {
+    public AdminLearnerService(LearnerQueryService learnerQueryService) {
         this.learnerQueryService = learnerQueryService;
     }
 

@@ -26,11 +26,15 @@ import com.example.demo.lesson.dto.LessonEnrolledDetailDTO;
 import com.example.demo.lesson.dto.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
 import com.example.demo.lesson.dto.UpdateLessonRequest;
-import com.example.demo.lesson.query.ConceptsMatchMode;
+import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
+import com.example.demo.lesson.moderation.LessonModerationEventType;
+import com.example.demo.lesson.moderation.LessonModerationRecord;
+import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
 import com.example.demo.lessonenrollment.LessonEnrollmentRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -44,6 +48,7 @@ public class LessonService {
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
+    private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
     public LessonService(
             LessonEnrollmentRepository lessonEnrollmentRepository,
@@ -54,6 +59,7 @@ public class LessonService {
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
             LessonListQueryService lessonListQueryService,
+            LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper
     ) {
         this.lessonEnrollmentRepository = lessonEnrollmentRepository;
@@ -64,19 +70,18 @@ public class LessonService {
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
+        this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getMyAuthoredLessons(
             UUID ownerUserId,
-            List<UUID> conceptPublicIds,
-            ConceptsMatchMode conceptsMatch
+            List<UUID> conceptPublicIds
     ) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 ownerUserId,
                 null,
                 LessonListAudience.CONTRIBUTOR
@@ -88,11 +93,10 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds, ConceptsMatchMode conceptsMatch) {
+    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 null,
                 null,
                 LessonListAudience.PUBLIC
@@ -159,17 +163,21 @@ public class LessonService {
         Lesson lesson = new Lesson(
                 title,
                 objectMapper.valueToTree(content),
-                submit ? LessonModerationStatus.PENDING : LessonModerationStatus.UNPUBLISHED,
+                LessonModerationStatus.UNPUBLISHED,
                 contributor,
                 OffsetDateTime.now()
         );
         lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
+        if (submit) {
+            saved = lessonModerationWorkflowService.submitForReview(saved);
+        }
 
         return toDetailDto(saved);
     }
 
+    @Transactional
     public LessonDetailDto updateLesson(UUID lessonPublicId, UpdateLessonRequest request, SupabaseAuthUser user) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
@@ -188,11 +196,14 @@ public class LessonService {
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus previousStatus = lesson.getLessonModerationStatus();
 
         lesson.setTitle(title);
         lesson.setContent(objectMapper.valueToTree(content));
 
-        Lesson saved = lessonRepository.save(lesson);
+        Lesson saved = previousStatus == LessonModerationStatus.APPROVED
+                ? lessonModerationWorkflowService.submitForReview(lesson)
+                : lessonRepository.save(lesson);
         return toDetailDto(saved);
     }
 
@@ -200,6 +211,14 @@ public class LessonService {
         requireContributorUser(user);
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus status = lesson.getLessonModerationStatus();
+
+        if (status != LessonModerationStatus.UNPUBLISHED && status != LessonModerationStatus.REJECTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
+            );
+        }
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);
@@ -318,6 +337,12 @@ public class LessonService {
 
     private LessonDetailDto toDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
+        LessonModerationRecord latestRecord = lessonModerationRecordRepository
+                .findTopByLessonOrderByRecordedAtDesc(lesson)
+                .orElse(null);
+        LessonModerationRecord latestAdminRecord = lessonModerationRecordRepository
+                .findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(lesson, LessonModerationDecisionSource.ADMIN)
+                .orElse(null);
         return new LessonDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -326,7 +351,11 @@ public class LessonService {
                 base.conceptPublicIds(),
                 base.concepts(),
                 base.author(),
-                base.createdAt()
+                base.createdAt(),
+                latestModerationReasons(latestRecord),
+                latestModerationEventType(latestRecord),
+                latestModeratedAt(latestRecord),
+                adminRejectionReason(latestAdminRecord)
         );
     }
 
@@ -352,6 +381,31 @@ public class LessonService {
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
+    }
+
+    private List<String> latestModerationReasons(LessonModerationRecord latestRecord) {
+        if (latestRecord == null || latestRecord.getReasons() == null || latestRecord.getReasons().isNull()) {
+            return List.of();
+        }
+        return objectMapper.convertValue(latestRecord.getReasons(), new TypeReference<List<String>>() {});
+    }
+
+    private String latestModerationEventType(LessonModerationRecord latestRecord) {
+        return latestRecord == null || latestRecord.getEventType() == null
+                ? null
+                : latestRecord.getEventType().name();
+    }
+
+    private OffsetDateTime latestModeratedAt(LessonModerationRecord latestRecord) {
+        return latestRecord == null ? null : latestRecord.getRecordedAt();
+    }
+
+    private String adminRejectionReason(LessonModerationRecord latestAdminRecord) {
+        if (latestAdminRecord == null || latestAdminRecord.getEventType() != LessonModerationEventType.ADMIN_REJECTED) {
+            return null;
+        }
+
+        return latestAdminRecord.getReviewNote();
     }
 
     private record LessonDetailBase(

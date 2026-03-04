@@ -25,7 +25,6 @@ import com.example.demo.lesson.dto.LessonDetailView;
 import com.example.demo.lesson.dto.LessonEnrolledDetailDTO;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
 import com.example.demo.lesson.dto.UpdateLessonRequest;
-import com.example.demo.lesson.query.ConceptsMatchMode;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,28 +41,24 @@ public class LessonController {
     }
 
     @GetMapping
-    @Operation(summary = "List public lessons", description = "Returns approved, non-deleted lessons. Optional filter by concept public IDs with any/all match mode")
+    @Operation(summary = "List public lessons", description = "Returns approved, non-deleted lessons. Optional filter by concept public IDs.")
     public List<LessonPublicSummaryDto> getAllLessons(
-            @RequestParam(required = false) List<UUID> conceptPublicIds,
-            @RequestParam(defaultValue = "any") String conceptsMatch
+            @RequestParam(required = false) List<UUID> conceptPublicIds
     ) {
-        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return lessonService.findPublicLessons(conceptPublicIds, matchMode);
+        return lessonService.findPublicLessons(conceptPublicIds);
     }
 
     @GetMapping("/mine")
     @Operation(summary = "List my authored lessons", description = "Returns non-deleted lessons authored by the authenticated contributor")
     public List<LessonContributorSummaryDto> getMyLessons(
             @AuthenticationPrincipal SupabaseAuthUser user,
-            @RequestParam(required = false) List<UUID> conceptPublicIds,
-            @RequestParam(defaultValue = "any") String conceptsMatch
+            @RequestParam(required = false) List<UUID> conceptPublicIds
     ) {
         if (user == null || user.userId() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
         }
         UUID ownerUserId = user.userId();
-        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return lessonService.getMyAuthoredLessons(ownerUserId, conceptPublicIds, matchMode);
+        return lessonService.getMyAuthoredLessons(ownerUserId, conceptPublicIds);
     }
 
     @GetMapping("/{lessonPublicId}")
@@ -96,7 +91,10 @@ public class LessonController {
     }
 
     @PostMapping("/{lessonPublicId}/submit")
-    @Operation(summary = "Submit lesson for review", description = "Sets moderation status to PENDING")
+    @Operation(
+            summary = "Submit lesson for review",
+            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may approve or reject immediately; otherwise the lesson remains in PENDING for manual admin review."
+    )
     public LessonDetailDto submitLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user

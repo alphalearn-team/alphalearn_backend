@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Alphalearn API",
         version = "v1",
-        description = "API for learning content and role-based moderation workflows.",
+        description = "API for learning content, concept suggestion drafts, and role-based moderation workflows.",
         contact = @Contact(
             name = "Alphalearn Team",
             email = "team@alphalearn.com"
@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
     tags = {
         @Tag(name = "Lessons", description = "Public and contributor lesson endpoints"),
         @Tag(name = "Concepts (Public)", description = "Public concept read endpoints"),
+        @Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion draft endpoints"),
         @Tag(name = "Contributors (Public)", description = "Public contributor read endpoints"),
         @Tag(name = "Learners (Public)", description = "Public learner read endpoints"),
         @Tag(name = "Lesson Enrollments", description = "Enrollment progress endpoints"),

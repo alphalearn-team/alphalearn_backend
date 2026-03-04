@@ -23,5 +23,13 @@ public record LessonDetailDto(
         @Schema(description = "Lesson author")
         LessonAuthorDto author,
         @Schema(description = "Lesson creation timestamp")
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        @Schema(description = "Latest moderation reasons for the lesson owner")
+        List<String> latestModerationReasons,
+        @Schema(description = "Latest moderation event type")
+        String latestModerationEventType,
+        @Schema(description = "Timestamp of latest moderation event")
+        OffsetDateTime latestModeratedAt,
+        @Schema(description = "Latest admin rejection reason for the lesson owner, if the most recent admin moderation action was a rejection")
+        String adminRejectionReason
 ) implements LessonDetailView {}
