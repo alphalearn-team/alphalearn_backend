@@ -25,10 +25,13 @@ import com.example.demo.lesson.dto.LessonDetailView;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import com.example.demo.lesson.dto.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
+import com.example.demo.lesson.moderation.LessonModerationRecord;
+import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -41,6 +44,7 @@ public class LessonService {
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
+    private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
     public LessonService(
             LessonRepository lessonRepository,
@@ -50,6 +54,7 @@ public class LessonService {
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
             LessonListQueryService lessonListQueryService,
+            LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
@@ -59,6 +64,7 @@ public class LessonService {
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
+        this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -154,13 +160,16 @@ public class LessonService {
         Lesson lesson = new Lesson(
                 title,
                 objectMapper.valueToTree(content),
-                submit ? LessonModerationStatus.PENDING : LessonModerationStatus.UNPUBLISHED,
+                LessonModerationStatus.UNPUBLISHED,
                 contributor,
                 OffsetDateTime.now()
         );
         lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
+        if (submit) {
+            saved = lessonModerationWorkflowService.submitForReview(saved);
+        }
 
         return toDetailDto(saved);
     }
@@ -313,6 +322,9 @@ public class LessonService {
 
     private LessonDetailDto toDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
+        LessonModerationRecord latestRecord = lessonModerationRecordRepository
+                .findTopByLessonOrderByRecordedAtDesc(lesson)
+                .orElse(null);
         return new LessonDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -321,7 +333,10 @@ public class LessonService {
                 base.conceptPublicIds(),
                 base.concepts(),
                 base.author(),
-                base.createdAt()
+                base.createdAt(),
+                latestModerationReasons(latestRecord),
+                latestModerationEventType(latestRecord),
+                latestModeratedAt(latestRecord)
         );
     }
 
@@ -348,6 +363,23 @@ public class LessonService {
                 lessonMappingSupport.author(lesson),
                 lesson.getCreatedAt()
         );
+    }
+
+    private List<String> latestModerationReasons(LessonModerationRecord latestRecord) {
+        if (latestRecord == null || latestRecord.getReasons() == null || latestRecord.getReasons().isNull()) {
+            return List.of();
+        }
+        return objectMapper.convertValue(latestRecord.getReasons(), new TypeReference<List<String>>() {});
+    }
+
+    private String latestModerationEventType(LessonModerationRecord latestRecord) {
+        return latestRecord == null || latestRecord.getEventType() == null
+                ? null
+                : latestRecord.getEventType().name();
+    }
+
+    private OffsetDateTime latestModeratedAt(LessonModerationRecord latestRecord) {
+        return latestRecord == null ? null : latestRecord.getRecordedAt();
     }
 
     private record LessonDetailBase(
