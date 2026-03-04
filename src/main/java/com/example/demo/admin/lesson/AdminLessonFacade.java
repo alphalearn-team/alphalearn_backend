@@ -8,14 +8,17 @@ import java.util.UUID;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
@@ -94,15 +97,20 @@ public class AdminLessonFacade {
         );
     }
 
-    public AdminLessonDetailDto approveLesson(UUID lessonPublicId){
+    public AdminLessonDetailDto approveLesson(UUID lessonPublicId, SupabaseAuthUser user){
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        Lesson saved = lessonModerationWorkflowService.approve(lesson);
+        Lesson saved = lessonModerationWorkflowService.approve(lesson, requireActorUserId(user));
         return toAdminLessonDetailDto(saved);
     }
 
-    public AdminLessonDetailDto rejectLesson(UUID lessonPublicId){
+    public AdminLessonDetailDto rejectLesson(UUID lessonPublicId, AdminRejectLessonRequest request, SupabaseAuthUser user){
+        String reason = trimToNull(request == null ? null : request.reason());
+        if (reason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reject reason is required");
+        }
+
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        Lesson saved = lessonModerationWorkflowService.reject(lesson);
+        Lesson saved = lessonModerationWorkflowService.reject(lesson, reason, requireActorUserId(user));
         return toAdminLessonDetailDto(saved);
     }
 
@@ -156,6 +164,23 @@ public class AdminLessonFacade {
         }
 
         return adminRecord.getReviewNote();
+    }
+
+    private UUID requireActorUserId(SupabaseAuthUser user) {
+        if (user == null || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated admin user required");
+        }
+
+        return user.userId();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private List<Integer> resolveConceptIdsByPublicIds(List<UUID> conceptPublicIds) {
