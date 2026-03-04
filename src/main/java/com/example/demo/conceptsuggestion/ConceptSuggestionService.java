@@ -78,6 +78,12 @@ public class ConceptSuggestionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept suggestion not found"));
 
         requireOwner(suggestion, ownerId);
+        if (suggestion.getStatus() == ConceptSuggestionStatus.SUBMITTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Concept suggestion is under review and can no longer be edited"
+            );
+        }
         if (suggestion.getStatus() != ConceptSuggestionStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft concept suggestions can be edited");
         }

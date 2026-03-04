@@ -142,6 +142,29 @@ class ConceptSuggestionServiceTest {
         );
 
         assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Concept suggestion is under review and can no longer be edited");
+    }
+
+    @Test
+    void updateDraftRejectsApprovedSuggestionsWithGenericDraftMessage() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.updateDraft(
+                        suggestion.getPublicId(),
+                        new SaveConceptSuggestionRequest("Edited", "Edited"),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be edited");
     }
 
     @Test

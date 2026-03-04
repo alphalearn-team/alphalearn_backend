@@ -162,7 +162,7 @@ public class ConceptSuggestionController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Concept suggestion is no longer editable because it is not in DRAFT status",
+                    description = "Concept suggestion is under review or otherwise no longer editable because it is not in DRAFT status",
                     content = @Content(schema = @Schema(implementation = String.class))
             )
     })
