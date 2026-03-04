@@ -12,7 +12,7 @@ public record LessonPublicDetailDto(
         UUID lessonPublicId,
         @Schema(description = "Lesson title")
         String title,
-        @Schema(description = "Lesson content JSON")
+        @Schema(description = "Lesson content JSON (legacy field, may be null for section-based lessons)")
         Object content,
         @Schema(description = "Associated concept public UUIDs")
         List<UUID> conceptPublicIds,
@@ -21,5 +21,9 @@ public record LessonPublicDetailDto(
         @Schema(description = "Lesson author")
         LessonAuthorDto author,
         @Schema(description = "Lesson creation timestamp")
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        @Schema(description = "Lesson sections (ordered by orderIndex)")
+        List<LessonSectionDto> sections,
+        @Schema(description = "Total number of sections")
+        Integer totalSections
 ) implements LessonDetailView {}

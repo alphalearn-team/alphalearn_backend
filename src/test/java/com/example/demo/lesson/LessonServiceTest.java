@@ -61,6 +61,9 @@ class LessonServiceTest {
     @Mock
     private LessonModerationRecordRepository lessonModerationRecordRepository;
 
+    @Mock
+    private LessonSectionService lessonSectionService;
+
     private LessonService lessonService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -76,6 +79,7 @@ class LessonServiceTest {
                 lessonMappingSupport,
                 lessonListQueryService,
                 lessonModerationRecordRepository,
+                lessonSectionService,
                 objectMapper
         );
     }
@@ -94,7 +98,7 @@ class LessonServiceTest {
         when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(any())).thenReturn(Optional.empty());
 
         LessonDetailDto result = lessonService.createLesson(
-                new CreateLessonRequest("Draft lesson", java.util.Map.of("body", "hello"), List.of(conceptPublicId), false),
+                new CreateLessonRequest("Draft lesson", java.util.Map.of("body", "hello"), List.of(conceptPublicId), false, null),
                 user
         );
 
@@ -121,7 +125,7 @@ class LessonServiceTest {
         when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(any())).thenReturn(Optional.empty());
 
         LessonDetailDto result = lessonService.createLesson(
-                new CreateLessonRequest("Submitted lesson", java.util.Map.of("body", "hello"), List.of(conceptPublicId), true),
+                new CreateLessonRequest("Submitted lesson", java.util.Map.of("body", "hello"), List.of(conceptPublicId), true, null),
                 user
         );
 
@@ -400,4 +404,93 @@ class LessonServiceTest {
         when(lessonMappingSupport.conceptSummaries(lesson)).thenReturn(List.of());
         when(lessonMappingSupport.author(lesson)).thenReturn(null);
     }
+
+    @Test
+    void createLessonWithSectionsSucceeds() {
+        UUID contributorId = UUID.randomUUID();
+        UUID conceptPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = contributorUser(contributorId);
+        Contributor contributor = contributor(contributorId);
+        Concept concept = concept(conceptPublicId, 1);
+
+        when(contributorRepository.findById(contributorId)).thenReturn(Optional.of(contributor));
+        when(conceptRepository.findAllByPublicIdIn(List.of(conceptPublicId))).thenReturn(List.of(concept));
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(any())).thenReturn(Optional.empty());
+        when(lessonSectionService.getSectionsForLesson(any())).thenReturn(List.of());
+        when(lessonSectionService.toSectionDtos(any())).thenReturn(List.of());
+
+        List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
+                new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        "text",
+                        "Introduction",
+                        java.util.Map.of("html", "<p>Welcome to the lesson</p>")
+                )
+        );
+
+        LessonDetailDto result = lessonService.createLesson(
+                new com.example.demo.lesson.dto.CreateLessonRequest("Lesson with sections", null, List.of(conceptPublicId), false, sections),
+                user
+        );
+
+        assertThat(result.moderationStatus()).isEqualTo("UNPUBLISHED");
+        verify(lessonSectionService).createSectionsForLesson(any(Lesson.class), any());
+    }
+
+    @Test
+    void createLessonWithoutContentOrSectionsFails() {
+        UUID contributorId = UUID.randomUUID();
+        UUID conceptPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = contributorUser(contributorId);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.createLesson(
+                        new com.example.demo.lesson.dto.CreateLessonRequest("Lesson", null, List.of(conceptPublicId), false, List.of()),
+                        user
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).contains("Either content or sections must be provided");
+    }
+
+    @Test
+    void createLessonWithBothContentAndSectionsSucceeds() {
+        UUID contributorId = UUID.randomUUID();
+        UUID conceptPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = contributorUser(contributorId);
+        Contributor contributor = contributor(contributorId);
+        Concept concept = concept(conceptPublicId, 1);
+
+        when(contributorRepository.findById(contributorId)).thenReturn(Optional.of(contributor));
+        when(conceptRepository.findAllByPublicIdIn(List.of(conceptPublicId))).thenReturn(List.of(concept));
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(any())).thenReturn(Optional.empty());
+        when(lessonSectionService.getSectionsForLesson(any())).thenReturn(List.of());
+        when(lessonSectionService.toSectionDtos(any())).thenReturn(List.of());
+
+        List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
+                new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        "text",
+                        null,
+                        java.util.Map.of("html", "<p>Section content</p>")
+                )
+        );
+
+        LessonDetailDto result = lessonService.createLesson(
+                new com.example.demo.lesson.dto.CreateLessonRequest(
+                        "Hybrid lesson",
+                        java.util.Map.of("body", "legacy content"),
+                        List.of(conceptPublicId),
+                        false,
+                        sections
+                ),
+                user
+        );
+
+        assertThat(result.moderationStatus()).isEqualTo("UNPUBLISHED");
+        verify(lessonSectionService).createSectionsForLesson(any(Lesson.class), any());
+    }
 }
+
