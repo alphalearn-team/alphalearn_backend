@@ -210,6 +210,14 @@ public class LessonService {
         requireContributorUser(user);
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus status = lesson.getLessonModerationStatus();
+
+        if (status != LessonModerationStatus.UNPUBLISHED && status != LessonModerationStatus.REJECTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
+            );
+        }
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);

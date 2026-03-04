@@ -149,6 +149,82 @@ class LessonServiceTest {
     }
 
     @Test
+    void submitLessonAllowsUnpublished() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.UNPUBLISHED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationWorkflowService.submitForReview(lesson)).thenAnswer(invocation -> {
+            Lesson submittedLesson = invocation.getArgument(0);
+            submittedLesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
+            return submittedLesson;
+        });
+        stubDetailMappings(lesson);
+
+        LessonDetailDto result = lessonService.submitLesson(lessonPublicId, contributorUser(ownerId));
+
+        assertThat(result.moderationStatus()).isEqualTo("PENDING");
+        verify(lessonModerationWorkflowService).submitForReview(lesson);
+    }
+
+    @Test
+    void submitLessonAllowsRejected() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.REJECTED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationWorkflowService.submitForReview(lesson)).thenAnswer(invocation -> {
+            Lesson submittedLesson = invocation.getArgument(0);
+            submittedLesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+            return submittedLesson;
+        });
+        stubDetailMappings(lesson);
+
+        LessonDetailDto result = lessonService.submitLesson(lessonPublicId, contributorUser(ownerId));
+
+        assertThat(result.moderationStatus()).isEqualTo("APPROVED");
+        verify(lessonModerationWorkflowService).submitForReview(lesson);
+    }
+
+    @Test
+    void submitLessonRejectsPendingWithConflict() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.PENDING);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.submitLesson(lessonPublicId, contributorUser(ownerId))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only UNPUBLISHED or REJECTED lessons can be submitted for review.");
+        verify(lessonModerationWorkflowService, never()).submitForReview(any(Lesson.class));
+    }
+
+    @Test
+    void submitLessonRejectsApprovedWithConflict() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.submitLesson(lessonPublicId, contributorUser(ownerId))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only UNPUBLISHED or REJECTED lessons can be submitted for review.");
+        verify(lessonModerationWorkflowService, never()).submitForReview(any(Lesson.class));
+    }
+
+    @Test
     void updateLessonUnpublishedSavesDirectlyWithoutModeration() {
         UUID ownerId = UUID.randomUUID();
         UUID lessonPublicId = UUID.randomUUID();
