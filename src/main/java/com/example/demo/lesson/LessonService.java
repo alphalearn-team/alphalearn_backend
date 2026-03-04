@@ -176,6 +176,7 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
+    @Transactional
     public LessonDetailDto updateLesson(UUID lessonPublicId, UpdateLessonRequest request, SupabaseAuthUser user) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
@@ -194,11 +195,14 @@ public class LessonService {
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus previousStatus = lesson.getLessonModerationStatus();
 
         lesson.setTitle(title);
         lesson.setContent(objectMapper.valueToTree(content));
 
-        Lesson saved = lessonRepository.save(lesson);
+        Lesson saved = previousStatus == LessonModerationStatus.APPROVED
+                ? lessonModerationWorkflowService.submitForReview(lesson)
+                : lessonRepository.save(lesson);
         return toDetailDto(saved);
     }
 
