@@ -29,7 +29,6 @@ import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
-import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
@@ -73,13 +72,11 @@ public class LessonService {
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getMyAuthoredLessons(
             UUID ownerUserId,
-            List<UUID> conceptPublicIds,
-            ConceptsMatchMode conceptsMatch
+            List<UUID> conceptPublicIds
     ) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 ownerUserId,
                 null,
                 LessonListAudience.CONTRIBUTOR
@@ -91,11 +88,10 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds, ConceptsMatchMode conceptsMatch) {
+    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 null,
                 null,
                 LessonListAudience.PUBLIC

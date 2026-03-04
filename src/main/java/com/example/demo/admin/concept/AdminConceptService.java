@@ -16,14 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class AdminConceptFacade {
+public class AdminConceptService {
 
     private final ConceptRepository conceptRepository;
     private final LessonRepository lessonRepository;
     private final ConceptMapper conceptMapper;
     private final ConceptQueryService conceptQueryService;
 
-    public AdminConceptFacade(
+    public AdminConceptService(
             ConceptRepository conceptRepository,
             LessonRepository lessonRepository,
             ConceptMapper conceptMapper,

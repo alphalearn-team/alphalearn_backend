@@ -6,12 +6,7 @@ import java.util.UUID;
 import com.example.demo.learner.Learner;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +16,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "contributors")
 public class Contributor {
@@ -30,18 +24,22 @@ public class Contributor {
     @Column(name = "contributor_id", columnDefinition = "uuid")
     private UUID contributorId;
 
-    @OneToOne(optional = false)
-    @JoinColumn(name = "contributor_id", referencedColumnName = "id", insertable = false, updatable = false)
-    private Learner learner;
-    
-    // @Column(name = "total_points")
-    // private Short totalPoints;
+   @MapsId
+   @OneToOne(optional = false)
+   @JoinColumn(name = "contributor_id", referencedColumnName = "id")
+   private Learner learner;
 
     @Column(name = "promoted_at", nullable = false)
     private OffsetDateTime promotedAt;
 
     @Column(name = "demoted_at")
     private OffsetDateTime demotedAt;
+
+    public Contributor(Learner learner, OffsetDateTime promotedAt) {
+        this.learner = learner;
+        this.promotedAt = promotedAt;
+        this.demotedAt = null;
+    }
 
     public boolean isCurrentContributor() {
         return promotedAt != null && (demotedAt == null || promotedAt.isAfter(demotedAt));

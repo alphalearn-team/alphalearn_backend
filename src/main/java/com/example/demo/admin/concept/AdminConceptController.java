@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Admin Concepts", description = "Admin-only concept management endpoints")
 public class AdminConceptController {
 
-    private final AdminConceptFacade conceptAdminFacade;
+    private final AdminConceptService conceptAdminFacade;
 
-    public AdminConceptController(AdminConceptFacade conceptAdminFacade) {
+    public AdminConceptController(AdminConceptService conceptAdminFacade) {
         this.conceptAdminFacade = conceptAdminFacade;
     }
 

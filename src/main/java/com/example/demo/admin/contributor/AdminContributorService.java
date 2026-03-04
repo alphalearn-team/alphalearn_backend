@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class AdminContributorFacade {
+public class AdminContributorService {
 
     private final ContributorRepository contributorRepository;
     private final LearnerRepository learnerRepository;
@@ -29,7 +29,7 @@ public class AdminContributorFacade {
     private final ContributorMapper contributorMapper;
     private final ContributorQueryService contributorQueryService;
 
-    public AdminContributorFacade(
+    public AdminContributorService(
             ContributorRepository contributorRepository,
             LearnerRepository learnerRepository,
             LessonRepository lessonRepository,
@@ -62,13 +62,8 @@ public class AdminContributorFacade {
 
             Learner learner = learnerRepository.findByPublicId(learnerPublicId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Learner not found: " + learnerPublicId));
-            UUID learnerId = learner.getId();
 
-            if (learner.getId() == null) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Learner id is null for publicId: " + learnerPublicId);
-            }
-
-            Contributor contributor = contributorRepository.findById(learnerId).orElse(null);
+            Contributor contributor = contributorRepository.findByLearner_PublicId(learnerPublicId).orElse(null);
             if (contributor != null) {
                 if (contributor.isCurrentContributor()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Already a contributor: " + learnerPublicId);
@@ -81,10 +76,8 @@ public class AdminContributorFacade {
             }
 
             Contributor newContributor = new Contributor(
-                    learnerId,
-                    null,
-                    OffsetDateTime.now(),
-                    null
+                    learner,
+                    OffsetDateTime.now()
             );
             created.add(contributorRepository.save(newContributor));
         }
@@ -104,12 +97,7 @@ public class AdminContributorFacade {
             if (contributorPublicId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "contributorPublicIds cannot contain null");
             }
-            if (!contributorRepository.existsByLearner_PublicId(contributorPublicId)) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found: " + contributorPublicId);
-            }
-        }
 
-        for (UUID contributorPublicId : request.contributorPublicIds()) {
             Contributor contributor = contributorRepository.findByLearner_PublicId(contributorPublicId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found " + contributorPublicId));
             UUID contributorId = contributor.getContributorId();
