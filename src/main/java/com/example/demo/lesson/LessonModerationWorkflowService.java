@@ -2,6 +2,7 @@ package com.example.demo.lesson;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,17 +74,31 @@ public class LessonModerationWorkflowService {
     }
 
     @Transactional
-    public Lesson approve(Lesson lesson) {
+    public Lesson approve(Lesson lesson, UUID actorUserId) {
         requirePending(lesson, "approved");
         lesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
-        return lessonRepository.save(lesson);
+        Lesson savedLesson = lessonRepository.save(lesson);
+        lessonModerationRecordRepository.save(toAdminRecord(
+                savedLesson,
+                LessonModerationEventType.ADMIN_APPROVED,
+                actorUserId,
+                null
+        ));
+        return savedLesson;
     }
 
     @Transactional
-    public Lesson reject(Lesson lesson) {
+    public Lesson reject(Lesson lesson, String reviewNote, UUID actorUserId) {
         requirePending(lesson, "rejected");
         lesson.setLessonModerationStatus(LessonModerationStatus.REJECTED);
-        return lessonRepository.save(lesson);
+        Lesson savedLesson = lessonRepository.save(lesson);
+        lessonModerationRecordRepository.save(toAdminRecord(
+                savedLesson,
+                LessonModerationEventType.ADMIN_REJECTED,
+                actorUserId,
+                reviewNote
+        ));
+        return savedLesson;
     }
 
     private LessonModerationStatus toResultingStatus(LessonModerationDecision decision) {
@@ -136,6 +151,27 @@ public class LessonModerationWorkflowService {
             case REJECT -> LessonModerationEventType.AUTO_REJECTED;
             case FLAG -> LessonModerationEventType.AUTO_FLAGGED;
         };
+    }
+
+    private LessonModerationRecord toAdminRecord(
+            Lesson lesson,
+            LessonModerationEventType eventType,
+            UUID actorUserId,
+            String reviewNote
+    ) {
+        LessonModerationRecord record = new LessonModerationRecord();
+        record.setLesson(lesson);
+        record.setEventType(eventType);
+        record.setDecisionSource(LessonModerationDecisionSource.ADMIN);
+        record.setResultingStatus(lesson.getLessonModerationStatus());
+        record.setRecordedAt(OffsetDateTime.now());
+        record.setReasons(objectMapper.valueToTree(List.of()));
+        record.setFailureMessage(null);
+        record.setRawResponse(null);
+        record.setReviewNote(reviewNote);
+        record.setActorUserId(actorUserId);
+        record.setProviderName(null);
+        return record;
     }
 
     private void requirePending(Lesson lesson, String actionWord) {

@@ -94,7 +94,10 @@ public class LessonController {
     }
 
     @PostMapping("/{lessonPublicId}/submit")
-    @Operation(summary = "Submit lesson for review", description = "Sets moderation status to PENDING")
+    @Operation(
+            summary = "Submit lesson for review",
+            description = "Sends the lesson into moderation review. Automatic moderation may approve or reject immediately; otherwise the lesson remains in PENDING for manual admin review."
+    )
     public LessonDetailDto submitLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user

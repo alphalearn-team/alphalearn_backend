@@ -27,6 +27,9 @@ import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.dto.CreateLessonRequest;
 import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
+import com.example.demo.lesson.moderation.LessonModerationEventType;
+import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -142,6 +145,47 @@ class LessonServiceTest {
         );
 
         assertThat(ex.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void ownerLessonDetailIncludesLatestAdminRejectionReason() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = contributorUser(ownerId);
+        Lesson lesson = new Lesson();
+        lesson.setTitle("Lesson");
+        lesson.setContent(objectMapper.valueToTree(java.util.Map.of("body", "hello")));
+        lesson.setCreatedAt(OffsetDateTime.now());
+        lesson.setLessonModerationStatus(LessonModerationStatus.REJECTED);
+        lesson.setContributor(contributor(ownerId));
+
+        LessonModerationRecord latestRecord = new LessonModerationRecord();
+        latestRecord.setEventType(LessonModerationEventType.ADMIN_REJECTED);
+        latestRecord.setDecisionSource(LessonModerationDecisionSource.ADMIN);
+        latestRecord.setRecordedAt(OffsetDateTime.now());
+        latestRecord.setReviewNote("Needs revision before publication");
+        latestRecord.setReasons(objectMapper.valueToTree(List.of()));
+
+        LessonModerationRecord latestAdminRecord = new LessonModerationRecord();
+        latestAdminRecord.setEventType(LessonModerationEventType.ADMIN_REJECTED);
+        latestAdminRecord.setDecisionSource(LessonModerationDecisionSource.ADMIN);
+        latestAdminRecord.setRecordedAt(OffsetDateTime.now());
+        latestAdminRecord.setReviewNote("Needs revision before publication");
+        latestAdminRecord.setReasons(objectMapper.valueToTree(List.of()));
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(lesson)).thenReturn(Optional.of(latestRecord));
+        when(lessonModerationRecordRepository.findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(
+                lesson,
+                LessonModerationDecisionSource.ADMIN
+        )).thenReturn(Optional.of(latestAdminRecord));
+        when(lessonMappingSupport.conceptPublicIds(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.conceptSummaries(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.author(lesson)).thenReturn(null);
+
+        LessonDetailDto result = (LessonDetailDto) lessonService.getLessonDetailForUser(lessonPublicId, user);
+
+        assertThat(result.adminRejectionReason()).isEqualTo("Needs revision before publication");
     }
 
     private SupabaseAuthUser contributorUser(UUID contributorId) {

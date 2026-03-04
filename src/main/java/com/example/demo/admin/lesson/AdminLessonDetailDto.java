@@ -6,7 +6,7 @@ import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(name = "AdminLessonDetail", description = "Admin response after moderation action")
+@Schema(name = "AdminLessonDetail", description = "Admin response after a manual moderation action")
 public record AdminLessonDetailDto(
     @Schema(description = "Lesson author")
     LessonAuthorDto author,
@@ -14,6 +14,6 @@ public record AdminLessonDetailDto(
     UUID lessonPublicId,
     @Schema(description = "Lesson title")
     String lessonTitle,
-    @Schema(description = "Updated lesson moderation status")
+    @Schema(description = "Updated lesson moderation status after the admin action")
     LessonModerationStatus lessonModerationStatus
 ) {}

@@ -25,6 +25,8 @@ import com.example.demo.lesson.dto.LessonDetailView;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import com.example.demo.lesson.dto.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
+import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
+import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.ConceptsMatchMode;
@@ -325,6 +327,9 @@ public class LessonService {
         LessonModerationRecord latestRecord = lessonModerationRecordRepository
                 .findTopByLessonOrderByRecordedAtDesc(lesson)
                 .orElse(null);
+        LessonModerationRecord latestAdminRecord = lessonModerationRecordRepository
+                .findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(lesson, LessonModerationDecisionSource.ADMIN)
+                .orElse(null);
         return new LessonDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -336,7 +341,8 @@ public class LessonService {
                 base.createdAt(),
                 latestModerationReasons(latestRecord),
                 latestModerationEventType(latestRecord),
-                latestModeratedAt(latestRecord)
+                latestModeratedAt(latestRecord),
+                adminRejectionReason(latestAdminRecord)
         );
     }
 
@@ -380,6 +386,14 @@ public class LessonService {
 
     private OffsetDateTime latestModeratedAt(LessonModerationRecord latestRecord) {
         return latestRecord == null ? null : latestRecord.getRecordedAt();
+    }
+
+    private String adminRejectionReason(LessonModerationRecord latestAdminRecord) {
+        if (latestAdminRecord == null || latestAdminRecord.getEventType() != LessonModerationEventType.ADMIN_REJECTED) {
+            return null;
+        }
+
+        return latestAdminRecord.getReviewNote();
     }
 
     private record LessonDetailBase(

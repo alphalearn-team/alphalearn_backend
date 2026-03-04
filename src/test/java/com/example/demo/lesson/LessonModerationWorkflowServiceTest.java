@@ -135,11 +135,48 @@ class LessonModerationWorkflowServiceTest {
     }
 
     @Test
+    void approveWritesAdminApprovedRecord() {
+        Lesson lesson = lessonWithStatus(LessonModerationStatus.PENDING);
+        UUID actorUserId = UUID.randomUUID();
+        when(lessonRepository.save(lesson)).thenReturn(lesson);
+
+        Lesson saved = service.approve(lesson, actorUserId);
+
+        assertThat(saved.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.APPROVED);
+        ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
+        verify(lessonModerationRecordRepository).save(captor.capture());
+        LessonModerationRecord record = captor.getValue();
+        assertThat(record.getEventType()).isEqualTo(LessonModerationEventType.ADMIN_APPROVED);
+        assertThat(record.getDecisionSource()).isEqualTo(LessonModerationDecisionSource.ADMIN);
+        assertThat(record.getActorUserId()).isEqualTo(actorUserId);
+        assertThat(record.getReviewNote()).isNull();
+    }
+
+    @Test
+    void rejectWritesAdminRejectedRecord() {
+        Lesson lesson = lessonWithStatus(LessonModerationStatus.PENDING);
+        UUID actorUserId = UUID.randomUUID();
+        when(lessonRepository.save(lesson)).thenReturn(lesson);
+
+        Lesson saved = service.reject(lesson, "Needs revision", actorUserId);
+
+        assertThat(saved.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.REJECTED);
+        ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
+        verify(lessonModerationRecordRepository).save(captor.capture());
+        LessonModerationRecord record = captor.getValue();
+        assertThat(record.getEventType()).isEqualTo(LessonModerationEventType.ADMIN_REJECTED);
+        assertThat(record.getDecisionSource()).isEqualTo(LessonModerationDecisionSource.ADMIN);
+        assertThat(record.getActorUserId()).isEqualTo(actorUserId);
+        assertThat(record.getReviewNote()).isEqualTo("Needs revision");
+        assertThat(record.getResultingStatus()).isEqualTo(LessonModerationStatus.REJECTED);
+    }
+
+    @Test
     void approveRejectStillRequirePendingStatus() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
 
-        assertThrows(ResponseStatusException.class, () -> service.approve(lesson));
-        assertThrows(ResponseStatusException.class, () -> service.reject(lesson));
+        assertThrows(ResponseStatusException.class, () -> service.approve(lesson, UUID.randomUUID()));
+        assertThrows(ResponseStatusException.class, () -> service.reject(lesson, "Needs revision", UUID.randomUUID()));
     }
 
     private Lesson lessonWithStatus(LessonModerationStatus status) {
