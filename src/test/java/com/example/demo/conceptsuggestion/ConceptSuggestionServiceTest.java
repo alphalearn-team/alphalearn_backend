@@ -3,6 +3,7 @@ package com.example.demo.conceptsuggestion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,6 +142,194 @@ class ConceptSuggestionServiceTest {
         );
 
         assertThat(ex.getStatusCode().value()).isEqualTo(409);
+    }
+
+    @Test
+    void submitDraftTransitionsOwnedCompleteDraftToSubmitted() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+        when(conceptSuggestionRepository.save(any(ConceptSuggestion.class))).thenAnswer(invocation -> {
+            ConceptSuggestion saved = invocation.getArgument(0);
+            saved.touchUpdatedAt();
+            return saved;
+        });
+
+        ConceptSuggestionDto result = conceptSuggestionService.submitDraft(
+                suggestion.getPublicId(),
+                authUser(ownerId, learner)
+        );
+
+        ArgumentCaptor<ConceptSuggestion> captor = ArgumentCaptor.forClass(ConceptSuggestion.class);
+        verify(conceptSuggestionRepository).save(captor.capture());
+        ConceptSuggestion saved = captor.getValue();
+
+        assertThat(saved.getStatus()).isEqualTo(ConceptSuggestionStatus.SUBMITTED);
+        assertThat(result.status()).isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void submitDraftTrimsExistingTitleAndDescriptionBeforeSaving() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setTitle("  Number bonds  ");
+        suggestion.setDescription("  Help children decompose numbers.  ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+        when(conceptSuggestionRepository.save(any(ConceptSuggestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConceptSuggestionDto result = conceptSuggestionService.submitDraft(
+                suggestion.getPublicId(),
+                authUser(ownerId, learner)
+        );
+
+        assertThat(result.title()).isEqualTo("Number bonds");
+        assertThat(result.description()).isEqualTo("Help children decompose numbers.");
+    }
+
+    @Test
+    void submitDraftRejectsBlankTitle() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setTitle("   ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        verify(conceptSuggestionRepository, never()).save(any(ConceptSuggestion.class));
+    }
+
+    @Test
+    void submitDraftRejectsBlankDescription() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setDescription("   ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        verify(conceptSuggestionRepository, never()).save(any(ConceptSuggestion.class));
+    }
+
+    @Test
+    void submitDraftRejectsNonOwners() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Learner owner = learner(ownerId);
+        Learner otherLearner = learner(otherUserId);
+        ConceptSuggestion suggestion = draftSuggestion(owner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(otherUserId, otherLearner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void submitDraftRejectsMissingSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        UUID suggestionPublicId = UUID.randomUUID();
+
+        when(conceptSuggestionRepository.findByPublicId(suggestionPublicId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(suggestionPublicId, authUser(ownerId, learner))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void submitDraftRejectsAlreadySubmittedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Concept suggestion is already under review");
+    }
+
+    @Test
+    void submitDraftRejectsApprovedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be submitted");
+    }
+
+    @Test
+    void submitDraftRejectsRejectedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.REJECTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be submitted");
     }
 
     @Test

@@ -108,6 +108,39 @@ public class ConceptSuggestionController {
         return conceptSuggestionService.createDraft(request, user);
     }
 
+    @PostMapping("/{conceptSuggestionPublicId}/submit")
+    @Operation(summary = "Submit concept suggestion for review", description = "Submits the authenticated owner's draft for admin review and changes its status to SUBMITTED")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Concept suggestion submitted for review"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Draft title or description is missing",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user is not the draft owner",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Concept suggestion not found",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Concept suggestion is already submitted or otherwise not in DRAFT status",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public ConceptSuggestionDto submitDraft(
+            @Parameter(description = "Public UUID of the concept suggestion draft")
+            @PathVariable UUID conceptSuggestionPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return conceptSuggestionService.submitDraft(conceptSuggestionPublicId, user);
+    }
+
     @PutMapping("/{conceptSuggestionPublicId}")
     @Operation(summary = "Save concept suggestion draft", description = "Updates the authenticated owner's concept suggestion while it remains in DRAFT status")
     @ApiResponses({

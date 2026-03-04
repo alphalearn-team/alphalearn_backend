@@ -88,6 +88,36 @@ public class ConceptSuggestionService {
         return toDto(conceptSuggestionRepository.save(suggestion));
     }
 
+    @Transactional
+    public ConceptSuggestionDto submitDraft(UUID conceptSuggestionPublicId, SupabaseAuthUser user) {
+        UUID ownerId = requireAuthenticatedUserId(user);
+        ConceptSuggestion suggestion = conceptSuggestionRepository.findByPublicId(conceptSuggestionPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept suggestion not found"));
+
+        requireOwner(suggestion, ownerId);
+        if (suggestion.getStatus() == ConceptSuggestionStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Concept suggestion is already under review");
+        }
+        if (suggestion.getStatus() != ConceptSuggestionStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft concept suggestions can be submitted");
+        }
+
+        String title = trimToNull(suggestion.getTitle());
+        String description = trimToNull(suggestion.getDescription());
+        if (title == null || description == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Title and description are required before submitting for review"
+            );
+        }
+
+        suggestion.setTitle(title);
+        suggestion.setDescription(description);
+        suggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+
+        return toDto(conceptSuggestionRepository.save(suggestion));
+    }
+
     private Learner requireOwnerLearner(SupabaseAuthUser user) {
         UUID userId = requireAuthenticatedUserId(user);
         return learnerRepository.findById(userId)
