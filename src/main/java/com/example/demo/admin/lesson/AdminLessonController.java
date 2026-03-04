@@ -20,27 +20,24 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lesson.LessonModerationStatus;
-import com.example.demo.lesson.query.ConceptsMatchMode;
 
 @RestController()
 @RequestMapping("/api/admin/lessons")
 @Tag(name = "Admin Lessons", description = "Admin-only lesson moderation and review endpoints")
 public class AdminLessonController {
-    private final AdminLessonFacade adminFacade;
+    private final AdminLessonService adminLessonService;
 
-    public AdminLessonController(AdminLessonFacade adminFacade){
-        this.adminFacade = adminFacade;
+    public AdminLessonController(AdminLessonService adminLessonService){
+        this.adminLessonService = adminLessonService;
     }
 
     @GetMapping
-    @Operation(summary = "List lessons (admin)", description = "Returns lessons with optional filters: concept IDs, conceptsMatch mode, and moderation status")
+    @Operation(summary = "List lessons (admin)", description = "Returns lessons with optional filters: concept IDs and moderation status")
     public List<AdminLessonSummaryDto> getAllLessonsForAdmin(
             @RequestParam(required = false) List<UUID> conceptPublicIds,
-            @RequestParam(defaultValue = "any") String conceptsMatch,
             @RequestParam(required = false) LessonModerationStatus status
     ) {
-        ConceptsMatchMode matchMode = ConceptsMatchMode.fromRequest(conceptsMatch);
-        return adminFacade.getAllLessons(conceptPublicIds, matchMode, status);
+        return adminLessonService.getAllLessons(conceptPublicIds, status);
     }
 
     @GetMapping("/{lessonPublicId}")
@@ -49,7 +46,7 @@ public class AdminLessonController {
             description = "Returns lesson content together with current moderation status, latest automated moderation reasons, and the latest admin rejection reason when applicable."
     )
     public AdminLessonReviewDto getLessonForAdmin(@PathVariable UUID lessonPublicId) {
-        return adminFacade.getLessonByPublicId(lessonPublicId);
+        return adminLessonService.getLessonByPublicId(lessonPublicId);
     }
 
     @PutMapping("/{lessonPublicId}/approve")
@@ -64,7 +61,7 @@ public class AdminLessonController {
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ){
-        return adminFacade.approveLesson(lessonPublicId, user);
+        return adminLessonService.approveLesson(lessonPublicId, user);
     }
 
     @PutMapping("/{lessonPublicId}/reject")
@@ -89,7 +86,7 @@ public class AdminLessonController {
             @org.springframework.web.bind.annotation.RequestBody AdminRejectLessonRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ){
-        return adminFacade.rejectLesson(lessonPublicId, request, user);
+        return adminLessonService.rejectLesson(lessonPublicId, request, user);
     }
 
 }

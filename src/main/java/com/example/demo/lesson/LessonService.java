@@ -29,7 +29,6 @@ import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
-import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
@@ -73,13 +72,11 @@ public class LessonService {
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getMyAuthoredLessons(
             UUID ownerUserId,
-            List<UUID> conceptPublicIds,
-            ConceptsMatchMode conceptsMatch
+            List<UUID> conceptPublicIds
     ) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 ownerUserId,
                 null,
                 LessonListAudience.CONTRIBUTOR
@@ -91,11 +88,10 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds, ConceptsMatchMode conceptsMatch) {
+    public List<LessonPublicSummaryDto> findPublicLessons(List<UUID> conceptPublicIds) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 null,
                 null,
                 LessonListAudience.PUBLIC
@@ -176,6 +172,7 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
+    @Transactional
     public LessonDetailDto updateLesson(UUID lessonPublicId, UpdateLessonRequest request, SupabaseAuthUser user) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
@@ -194,11 +191,14 @@ public class LessonService {
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus previousStatus = lesson.getLessonModerationStatus();
 
         lesson.setTitle(title);
         lesson.setContent(objectMapper.valueToTree(content));
 
-        Lesson saved = lessonRepository.save(lesson);
+        Lesson saved = previousStatus == LessonModerationStatus.APPROVED
+                ? lessonModerationWorkflowService.submitForReview(lesson)
+                : lessonRepository.save(lesson);
         return toDetailDto(saved);
     }
 
@@ -206,6 +206,14 @@ public class LessonService {
         requireContributorUser(user);
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         requireOwner(lesson, user);
+        LessonModerationStatus status = lesson.getLessonModerationStatus();
+
+        if (status != LessonModerationStatus.UNPUBLISHED && status != LessonModerationStatus.REJECTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
+            );
+        }
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
         return toDetailDto(saved);

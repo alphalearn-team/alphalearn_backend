@@ -15,15 +15,15 @@ import com.example.demo.learner.dto.LearnerPublicDto;
 @Tag(name = "Admin Learners", description = "Admin-only learner listing endpoints")
 public class AdminLearnerController {
 
-    private final AdminLearnerFacade adminLearnerFacade;
+    private final AdminLearnerService adminLearnerService;
 
-    public AdminLearnerController(AdminLearnerFacade adminLearnerFacade) {
-        this.adminLearnerFacade = adminLearnerFacade;
+    public AdminLearnerController(AdminLearnerService adminLearnerService) {
+        this.adminLearnerService = adminLearnerService;
     }
 
     @GetMapping
     @Operation(summary = "List learners (admin)", description = "Returns all learner public profiles for administration")
     public List<LearnerPublicDto> getLearners() {
-        return adminLearnerFacade.getAllLearners();
+        return adminLearnerService.getAllLearners();
     }
 }

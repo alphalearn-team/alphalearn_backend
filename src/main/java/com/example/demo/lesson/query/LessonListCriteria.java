@@ -7,13 +7,11 @@ import com.example.demo.lesson.LessonModerationStatus;
 
 public record LessonListCriteria(
         List<Integer> conceptIds,
-        ConceptsMatchMode conceptsMatch,
         UUID contributorId,
         LessonModerationStatus status,
         LessonListAudience audience
 ) {
     public LessonListCriteria {
         conceptIds = conceptIds == null ? null : List.copyOf(conceptIds);
-        conceptsMatch = conceptsMatch == null ? ConceptsMatchMode.ANY : conceptsMatch;
     }
 }

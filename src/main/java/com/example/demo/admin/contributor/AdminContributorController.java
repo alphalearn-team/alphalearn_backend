@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Admin Contributors", description = "Admin-only contributor promotion and demotion endpoints")
 public class AdminContributorController {
 
-    private final AdminContributorFacade contributorAdminFacade;
+    private final AdminContributorService contributorAdminFacade;
 
-    public AdminContributorController(AdminContributorFacade contributorAdminFacade) {
+    public AdminContributorController(AdminContributorService contributorAdminFacade) {
         this.contributorAdminFacade = contributorAdminFacade;
     }
 

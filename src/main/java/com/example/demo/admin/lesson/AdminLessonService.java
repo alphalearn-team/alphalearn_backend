@@ -25,13 +25,12 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonMappingSupport;
 import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.lesson.LessonModerationStatus;
-import com.example.demo.lesson.query.ConceptsMatchMode;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
 
 @Service
-public class AdminLessonFacade {
+public class AdminLessonService {
     private final LessonLookupService lessonLookupService;
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final LessonMappingSupport lessonMappingSupport;
@@ -40,7 +39,7 @@ public class AdminLessonFacade {
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
 
-    public AdminLessonFacade(
+    public AdminLessonService(
             LessonLookupService lessonLookupService,
             LessonModerationWorkflowService lessonModerationWorkflowService,
             LessonMappingSupport lessonMappingSupport,
@@ -61,13 +60,11 @@ public class AdminLessonFacade {
     @Transactional(readOnly = true)
     public List<AdminLessonSummaryDto> getAllLessons(
             List<UUID> conceptPublicIds,
-            ConceptsMatchMode conceptsMatch,
             LessonModerationStatus status
     ) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
-                conceptsMatch,
                 null,
                 status,
                 LessonListAudience.ADMIN
