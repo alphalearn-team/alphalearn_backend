@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
     tags = {
         @Tag(name = "Lessons", description = "Public and contributor lesson endpoints"),
         @Tag(name = "Concepts (Public)", description = "Public concept read endpoints"),
+        @Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion draft endpoints"),
         @Tag(name = "Contributors (Public)", description = "Public contributor read endpoints"),
         @Tag(name = "Learners (Public)", description = "Public learner read endpoints"),
         @Tag(name = "Lesson Enrollments", description = "Enrollment progress endpoints"),
