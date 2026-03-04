@@ -129,6 +129,20 @@ public class ConceptSuggestionService {
         return toDto(conceptSuggestionRepository.save(suggestion));
     }
 
+    @Transactional
+    public void deleteDraft(UUID conceptSuggestionPublicId, SupabaseAuthUser user) {
+        UUID ownerId = requireAuthenticatedUserId(user);
+        ConceptSuggestion suggestion = conceptSuggestionRepository.findByPublicId(conceptSuggestionPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept suggestion not found"));
+
+        requireOwner(suggestion, ownerId);
+        if (suggestion.getStatus() != ConceptSuggestionStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft concept suggestions can be deleted");
+        }
+
+        conceptSuggestionRepository.delete(suggestion);
+    }
+
     private Learner requireOwnerLearner(SupabaseAuthUser user) {
         UUID userId = requireAuthenticatedUserId(user);
         return learnerRepository.findById(userId)

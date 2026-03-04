@@ -356,6 +356,119 @@ class ConceptSuggestionServiceTest {
     }
 
     @Test
+    void deleteDraftRemovesOwnedDraft() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        conceptSuggestionService.deleteDraft(suggestion.getPublicId(), authUser(ownerId, learner));
+
+        verify(conceptSuggestionRepository).delete(suggestion);
+    }
+
+    @Test
+    void deleteDraftRejectsNonOwner() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Learner owner = learner(ownerId);
+        Learner otherLearner = learner(otherUserId);
+        ConceptSuggestion suggestion = draftSuggestion(owner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(otherUserId, otherLearner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void deleteDraftRejectsMissingSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        UUID suggestionPublicId = UUID.randomUUID();
+
+        when(conceptSuggestionRepository.findByPublicId(suggestionPublicId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(suggestionPublicId, authUser(ownerId, learner))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void deleteDraftRejectsSubmittedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
+    void deleteDraftRejectsApprovedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
+    void deleteDraftRejectsRejectedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.REJECTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
     void getMySuggestionsReturnsAllOwnedSuggestionsByDefaultInRepositoryOrder() {
         UUID ownerId = UUID.randomUUID();
         Learner learner = learner(ownerId);

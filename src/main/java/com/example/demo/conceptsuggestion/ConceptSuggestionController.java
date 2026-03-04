@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -144,6 +145,35 @@ public class ConceptSuggestionController {
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         return conceptSuggestionService.submitDraft(conceptSuggestionPublicId, user);
+    }
+
+    @DeleteMapping("/{conceptSuggestionPublicId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete concept suggestion draft", description = "Deletes the authenticated owner's concept suggestion while it remains in DRAFT status")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Draft deleted"),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user is not the draft owner",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Concept suggestion not found",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Concept suggestion is no longer deletable because it is not in DRAFT status",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public void deleteDraft(
+            @Parameter(description = "Public UUID of the concept suggestion draft")
+            @PathVariable UUID conceptSuggestionPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        conceptSuggestionService.deleteDraft(conceptSuggestionPublicId, user);
     }
 
     @PutMapping("/{conceptSuggestionPublicId}")
