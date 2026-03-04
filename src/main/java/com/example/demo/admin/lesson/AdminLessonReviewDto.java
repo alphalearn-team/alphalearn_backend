@@ -22,6 +22,10 @@ public record AdminLessonReviewDto(
         LessonAuthorDto author,
         @Schema(description = "Lesson moderation status")
         LessonModerationStatus lessonModerationStatus,
+        @Schema(description = "Latest automated moderation reasons for this lesson")
+        List<String> automatedModerationReasons,
+        @Schema(description = "Latest admin rejection reason, if the latest admin moderation action was a rejection")
+        String adminRejectionReason,
         @Schema(description = "Lesson creation timestamp")
         OffsetDateTime createdAt,
         @Schema(description = "Soft-delete timestamp; null means active")

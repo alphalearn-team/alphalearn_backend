@@ -1,12 +1,18 @@
 package com.example.demo.admin.lesson;
 
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
+import com.example.demo.lesson.moderation.LessonModerationEventType;
+import com.example.demo.lesson.moderation.LessonModerationRecord;
+import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +34,7 @@ public class AdminLessonFacade {
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
     private final ConceptRepository conceptRepository;
+    private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
 
     public AdminLessonFacade(
@@ -36,6 +43,7 @@ public class AdminLessonFacade {
             LessonMappingSupport lessonMappingSupport,
             LessonListQueryService lessonListQueryService,
             ConceptRepository conceptRepository,
+            LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper
     ){
         this.lessonLookupService = lessonLookupService;
@@ -43,6 +51,7 @@ public class AdminLessonFacade {
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
         this.conceptRepository = conceptRepository;
+        this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -69,6 +78,8 @@ public class AdminLessonFacade {
     @Transactional(readOnly = true)
     public AdminLessonReviewDto getLessonByPublicId(UUID lessonPublicId) {
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+        LessonModerationRecord automatedRecord = latestAutomatedRecord(lesson);
+        LessonModerationRecord adminRecord = latestAdminRecord(lesson);
         return new AdminLessonReviewDto(
                 lesson.getPublicId(),
                 lesson.getTitle(),
@@ -76,6 +87,8 @@ public class AdminLessonFacade {
                 lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.author(lesson),
                 lesson.getLessonModerationStatus(),
+                toReasons(automatedRecord),
+                adminRejectionReason(adminRecord),
                 lesson.getCreatedAt(),
                 lesson.getDeletedAt()
         );
@@ -113,6 +126,36 @@ public class AdminLessonFacade {
                 lesson.getCreatedAt(),
                 deletedAt
         );
+    }
+
+    private LessonModerationRecord latestAutomatedRecord(Lesson lesson) {
+        return lessonModerationRecordRepository.findTopByLessonAndDecisionSourceInOrderByRecordedAtDesc(
+                lesson,
+                EnumSet.of(LessonModerationDecisionSource.AUTO, LessonModerationDecisionSource.AUTO_FALLBACK)
+        ).orElse(null);
+    }
+
+    private LessonModerationRecord latestAdminRecord(Lesson lesson) {
+        return lessonModerationRecordRepository.findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(
+                lesson,
+                LessonModerationDecisionSource.ADMIN
+        ).orElse(null);
+    }
+
+    private List<String> toReasons(LessonModerationRecord record) {
+        if (record == null || record.getReasons() == null || record.getReasons().isNull()) {
+            return List.of();
+        }
+
+        return objectMapper.convertValue(record.getReasons(), new TypeReference<List<String>>() {});
+    }
+
+    private String adminRejectionReason(LessonModerationRecord adminRecord) {
+        if (adminRecord == null || adminRecord.getEventType() != LessonModerationEventType.ADMIN_REJECTED) {
+            return null;
+        }
+
+        return adminRecord.getReviewNote();
     }
 
     private List<Integer> resolveConceptIdsByPublicIds(List<UUID> conceptPublicIds) {
