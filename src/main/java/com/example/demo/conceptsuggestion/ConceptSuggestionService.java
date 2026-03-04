@@ -1,5 +1,6 @@
 package com.example.demo.conceptsuggestion;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,25 @@ public class ConceptSuggestionService {
         suggestion.setDescription(trimToNull(request.description()));
 
         return toDto(conceptSuggestionRepository.save(suggestion));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConceptSuggestionDto> getMyDrafts(SupabaseAuthUser user) {
+        UUID ownerId = requireAuthenticatedUserId(user);
+        return conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId).stream()
+                .filter(suggestion -> suggestion.getStatus() == ConceptSuggestionStatus.DRAFT)
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ConceptSuggestionDto getSuggestion(UUID conceptSuggestionPublicId, SupabaseAuthUser user) {
+        UUID ownerId = requireAuthenticatedUserId(user);
+        ConceptSuggestion suggestion = conceptSuggestionRepository.findByPublicId(conceptSuggestionPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept suggestion not found"));
+
+        requireOwner(suggestion, ownerId);
+        return toDto(suggestion);
     }
 
     @Transactional

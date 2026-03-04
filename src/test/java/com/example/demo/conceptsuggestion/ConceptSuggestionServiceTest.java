@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -140,6 +141,68 @@ class ConceptSuggestionServiceTest {
         );
 
         assertThat(ex.getStatusCode().value()).isEqualTo(409);
+    }
+
+    @Test
+    void getMyDraftsReturnsOnlyOwnerDraftsInRepositoryOrder() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion newestDraft = draftSuggestion(learner);
+        newestDraft.setTitle("Newest");
+        ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
+        submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        ConceptSuggestion olderDraft = draftSuggestion(learner);
+        olderDraft.setTitle("Older");
+
+        when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
+                .thenReturn(List.of(newestDraft, submittedSuggestion, olderDraft));
+
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMyDrafts(authUser(ownerId, learner));
+
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::title)
+                .containsExactly("Newest", "Older");
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::status)
+                .containsOnly("DRAFT");
+    }
+
+    @Test
+    void getSuggestionReturnsOwnedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ConceptSuggestionDto result = conceptSuggestionService.getSuggestion(
+                suggestion.getPublicId(),
+                authUser(ownerId, learner)
+        );
+
+        assertThat(result.publicId()).isEqualTo(suggestion.getPublicId());
+        assertThat(result.title()).isEqualTo("Original title");
+    }
+
+    @Test
+    void getSuggestionRejectsNonOwner() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Learner owner = learner(ownerId);
+        Learner otherLearner = learner(otherUserId);
+        ConceptSuggestion suggestion = draftSuggestion(owner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.getSuggestion(
+                        suggestion.getPublicId(),
+                        authUser(otherUserId, otherLearner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
     }
 
     private SupabaseAuthUser authUser(UUID userId, Learner learner) {

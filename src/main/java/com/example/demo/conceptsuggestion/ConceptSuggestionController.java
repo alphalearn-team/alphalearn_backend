@@ -1,9 +1,11 @@
 package com.example.demo.conceptsuggestion;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,6 +35,45 @@ public class ConceptSuggestionController {
 
     public ConceptSuggestionController(ConceptSuggestionService conceptSuggestionService) {
         this.conceptSuggestionService = conceptSuggestionService;
+    }
+
+    @GetMapping("/mine")
+    @Operation(summary = "List my concept suggestion drafts", description = "Returns DRAFT concept suggestions owned by the authenticated user ordered by most recently updated")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Drafts returned"),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user required",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public List<ConceptSuggestionDto> getMyDrafts(
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return conceptSuggestionService.getMyDrafts(user);
+    }
+
+    @GetMapping("/{conceptSuggestionPublicId}")
+    @Operation(summary = "Get concept suggestion", description = "Returns a single concept suggestion owned by the authenticated user")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Concept suggestion returned"),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user is not the draft owner",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Concept suggestion not found",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public ConceptSuggestionDto getSuggestion(
+            @Parameter(description = "Public UUID of the concept suggestion")
+            @PathVariable UUID conceptSuggestionPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return conceptSuggestionService.getSuggestion(conceptSuggestionPublicId, user);
     }
 
     @PostMapping
