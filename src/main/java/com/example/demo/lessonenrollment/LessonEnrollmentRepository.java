@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LessonEnrollmentRepository extends JpaRepository<LessonEnrollment, Integer> {
 
-    // Uses JPA property navigation: enrollment.learner.publicId
     List<LessonEnrollment> findByLearner_PublicId(UUID learnerPublicId);
 
+    boolean existsByLearner_IdAndLesson_LessonId(UUID learnerId, Integer lessonId);
 }

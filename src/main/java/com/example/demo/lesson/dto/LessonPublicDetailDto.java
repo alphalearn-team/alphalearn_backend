@@ -12,8 +12,6 @@ public record LessonPublicDetailDto(
         UUID lessonPublicId,
         @Schema(description = "Lesson title")
         String title,
-        @Schema(description = "Lesson content JSON")
-        Object content,
         @Schema(description = "Associated concept public UUIDs")
         List<UUID> conceptPublicIds,
         @Schema(description = "Associated concept summaries")
