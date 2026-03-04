@@ -356,27 +356,82 @@ class ConceptSuggestionServiceTest {
     }
 
     @Test
-    void getMyDraftsReturnsOnlyOwnerDraftsInRepositoryOrder() {
+    void getMySuggestionsReturnsAllOwnedSuggestionsByDefaultInRepositoryOrder() {
         UUID ownerId = UUID.randomUUID();
         Learner learner = learner(ownerId);
         ConceptSuggestion newestDraft = draftSuggestion(learner);
         newestDraft.setTitle("Newest");
         ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
         submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
         ConceptSuggestion olderDraft = draftSuggestion(learner);
         olderDraft.setTitle("Older");
 
         when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
                 .thenReturn(List.of(newestDraft, submittedSuggestion, olderDraft));
 
-        List<ConceptSuggestionDto> result = conceptSuggestionService.getMyDrafts(authUser(ownerId, learner));
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(authUser(ownerId, learner), null);
 
         assertThat(result)
                 .extracting(ConceptSuggestionDto::title)
-                .containsExactly("Newest", "Older");
+                .containsExactly("Newest", "Submitted", "Older");
         assertThat(result)
                 .extracting(ConceptSuggestionDto::status)
-                .containsOnly("DRAFT");
+                .containsExactly("DRAFT", "SUBMITTED", "DRAFT");
+    }
+
+    @Test
+    void getMySuggestionsFiltersByRequestedStatuses() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion newestDraft = draftSuggestion(learner);
+        newestDraft.setTitle("Newest");
+        ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
+        submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
+        ConceptSuggestion approvedSuggestion = draftSuggestion(learner);
+        approvedSuggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+        approvedSuggestion.setTitle("Approved");
+
+        when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
+                .thenReturn(List.of(newestDraft, submittedSuggestion, approvedSuggestion));
+
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(
+                authUser(ownerId, learner),
+                List.of(ConceptSuggestionStatus.DRAFT, ConceptSuggestionStatus.SUBMITTED)
+        );
+
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::title)
+                .containsExactly("Newest", "Submitted");
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::status)
+                .containsExactly("DRAFT", "SUBMITTED");
+    }
+
+    @Test
+    void getMySuggestionsReturnsOnlySubmittedWhenRequested() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion draftSuggestion = draftSuggestion(learner);
+        ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
+        submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
+
+        when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
+                .thenReturn(List.of(draftSuggestion, submittedSuggestion));
+
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(
+                authUser(ownerId, learner),
+                List.of(ConceptSuggestionStatus.SUBMITTED)
+        );
+
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::title)
+                .containsExactly("Submitted");
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::status)
+                .containsExactly("SUBMITTED");
     }
 
     @Test

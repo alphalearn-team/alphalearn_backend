@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,7 +29,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/concept-suggestions")
-@Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion draft endpoints")
+@Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion endpoints")
 public class ConceptSuggestionController {
 
     private final ConceptSuggestionService conceptSuggestionService;
@@ -38,19 +39,23 @@ public class ConceptSuggestionController {
     }
 
     @GetMapping("/mine")
-    @Operation(summary = "List my concept suggestion drafts", description = "Returns DRAFT concept suggestions owned by the authenticated user ordered by most recently updated")
+    @Operation(summary = "List my concept suggestions", description = "Returns concept suggestions owned by the authenticated user ordered by most recently updated. Optionally filter by workflow status.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Drafts returned"),
+            @ApiResponse(responseCode = "200", description = "Owned concept suggestions returned"),
             @ApiResponse(
                     responseCode = "403",
                     description = "Authenticated user required",
                     content = @Content(schema = @Schema(implementation = String.class))
             )
     })
-    public List<ConceptSuggestionDto> getMyDrafts(
+    public List<ConceptSuggestionDto> getMySuggestions(
+            @Parameter(
+                    description = "Optional workflow status filter. Repeat or comma-separate values such as DRAFT or SUBMITTED."
+            )
+            @RequestParam(required = false) List<ConceptSuggestionStatus> status,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        return conceptSuggestionService.getMyDrafts(user);
+        return conceptSuggestionService.getMySuggestions(user, status);
     }
 
     @GetMapping("/{conceptSuggestionPublicId}")

@@ -2,6 +2,7 @@ package com.example.demo.conceptsuggestion;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,10 +46,14 @@ public class ConceptSuggestionService {
     }
 
     @Transactional(readOnly = true)
-    public List<ConceptSuggestionDto> getMyDrafts(SupabaseAuthUser user) {
+    public List<ConceptSuggestionDto> getMySuggestions(
+            SupabaseAuthUser user,
+            List<ConceptSuggestionStatus> statuses
+    ) {
         UUID ownerId = requireAuthenticatedUserId(user);
+        Set<ConceptSuggestionStatus> requestedStatuses = normalizeStatuses(statuses);
         return conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId).stream()
-                .filter(suggestion -> suggestion.getStatus() == ConceptSuggestionStatus.DRAFT)
+                .filter(suggestion -> requestedStatuses.isEmpty() || requestedStatuses.contains(suggestion.getStatus()))
                 .map(this::toDto)
                 .toList();
     }
@@ -150,6 +155,16 @@ public class ConceptSuggestionService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Set<ConceptSuggestionStatus> normalizeStatuses(List<ConceptSuggestionStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return Set.of();
+        }
+
+        return statuses.stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private ConceptSuggestionDto toDto(ConceptSuggestion suggestion) {
