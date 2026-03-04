@@ -8,7 +8,7 @@ import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(name = "AdminLessonReview", description = "Admin detail payload used during moderation review")
+@Schema(name = "AdminLessonReview", description = "Admin detail payload used during moderation review, including moderation outcomes from history.")
 public record AdminLessonReviewDto(
         @Schema(description = "Lesson public UUID")
         UUID lessonPublicId,
@@ -20,11 +20,11 @@ public record AdminLessonReviewDto(
         List<UUID> conceptPublicIds,
         @Schema(description = "Lesson author")
         LessonAuthorDto author,
-        @Schema(description = "Lesson moderation status")
+        @Schema(description = "Current lesson moderation status")
         LessonModerationStatus lessonModerationStatus,
-        @Schema(description = "Latest automated moderation reasons for this lesson")
+        @Schema(description = "Latest automated moderation reasons for this lesson; empty when none were recorded")
         List<String> automatedModerationReasons,
-        @Schema(description = "Latest admin rejection reason, if the latest admin moderation action was a rejection")
+        @Schema(description = "Latest admin rejection reason, present only when the latest admin moderation action was a rejection")
         String adminRejectionReason,
         @Schema(description = "Lesson creation timestamp")
         OffsetDateTime createdAt,
