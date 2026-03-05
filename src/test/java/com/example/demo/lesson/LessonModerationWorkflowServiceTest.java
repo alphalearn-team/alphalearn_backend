@@ -53,7 +53,7 @@ class LessonModerationWorkflowServiceTest {
     }
 
     @Test
-    void submitForReviewApprovesLessonAndWritesAutoApprovedRecord() {
+    void submitForReviewRoutesAutoApprovedLessonToPendingAndWritesAutoApprovedRecord() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
         when(lessonAutoModerationService.moderate(lesson)).thenReturn(new LessonModerationResult(
                 LessonModerationDecision.APPROVE,
@@ -66,13 +66,13 @@ class LessonModerationWorkflowServiceTest {
 
         Lesson saved = service.submitForReview(lesson);
 
-        assertThat(saved.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.APPROVED);
+        assertThat(saved.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.PENDING);
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
         verify(lessonModerationRecordRepository).save(captor.capture());
         LessonModerationRecord record = captor.getValue();
         assertThat(record.getEventType()).isEqualTo(LessonModerationEventType.AUTO_APPROVED);
         assertThat(record.getDecisionSource()).isEqualTo(LessonModerationDecisionSource.AUTO);
-        assertThat(record.getResultingStatus()).isEqualTo(LessonModerationStatus.APPROVED);
+        assertThat(record.getResultingStatus()).isEqualTo(LessonModerationStatus.PENDING);
         assertThat(record.getProviderName()).isEqualTo("TEST_PROVIDER");
         assertThat(record.getRecordedAt()).isEqualTo(OffsetDateTime.parse("2026-03-03T10:15:30Z"));
     }

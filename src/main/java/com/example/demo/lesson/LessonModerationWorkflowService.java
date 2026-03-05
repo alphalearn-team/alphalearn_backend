@@ -103,7 +103,7 @@ public class LessonModerationWorkflowService {
 
     private LessonModerationStatus toResultingStatus(LessonModerationDecision decision) {
         return switch (decision) {
-            case APPROVE -> LessonModerationStatus.APPROVED;
+            case APPROVE -> LessonModerationStatus.PENDING;
             case REJECT -> LessonModerationStatus.REJECTED;
             case FLAG -> LessonModerationStatus.PENDING;
         };
