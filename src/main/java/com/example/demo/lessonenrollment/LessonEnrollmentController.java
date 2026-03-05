@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
 
@@ -43,6 +44,23 @@ public class LessonEnrollmentController {
         return ResponseEntity.ok(
                 enrollmentService.getEnrollmentsByLearnerPublicId(learnerPublicId)
         );
+    }
+
+    @GetMapping("/me/enrollments")
+    public List<LessonEnrollmentPublicDTO> getMyEnrollments(
+        @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        if (user == null) {
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user required");
+        }
+        if (user.learner() == null) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
+        }
+
+        // Prefer internal learner id if you have it
+        UUID learnerId = user.learner().getId(); // <-- adjust if your getter is getLearnerId()
+
+        return enrollmentService.getEnrollmentsByLearnerId(learnerId);
     }
 
     @PostMapping

@@ -10,4 +10,6 @@ public interface LessonEnrollmentRepository extends JpaRepository<LessonEnrollme
     List<LessonEnrollment> findByLearner_PublicId(UUID learnerPublicId);
 
     boolean existsByLearner_IdAndLesson_LessonId(UUID learnerId, Integer lessonId);
+
+    List<LessonEnrollment> findByLearner_Id(UUID learnerId);
 }

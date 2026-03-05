@@ -55,6 +55,14 @@ public class LessonEnrollmentService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<LessonEnrollmentPublicDTO> getEnrollmentsByLearnerId(UUID learnerId) {
+        return enrollmentRepository.findByLearner_Id(learnerId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
  @Transactional
     public LessonEnrollmentPublicDTO enroll(LessonEnrollmentCreateDTO dto, SupabaseAuthUser user) {
         if (dto == null) {
