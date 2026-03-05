@@ -115,7 +115,7 @@ class LessonServiceTest {
         when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(lessonModerationWorkflowService.submitForReview(any(Lesson.class))).thenAnswer(invocation -> {
             Lesson lesson = invocation.getArgument(0);
-            lesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+            lesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
             return lesson;
         });
         when(lessonModerationRecordRepository.findTopByLessonOrderByRecordedAtDesc(any())).thenReturn(Optional.empty());
@@ -125,7 +125,7 @@ class LessonServiceTest {
                 user
         );
 
-        assertThat(result.moderationStatus()).isEqualTo("APPROVED");
+        assertThat(result.moderationStatus()).isEqualTo("PENDING");
         verify(lessonModerationWorkflowService).submitForReview(any(Lesson.class));
     }
 
@@ -177,14 +177,14 @@ class LessonServiceTest {
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
         when(lessonModerationWorkflowService.submitForReview(lesson)).thenAnswer(invocation -> {
             Lesson submittedLesson = invocation.getArgument(0);
-            submittedLesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+            submittedLesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
             return submittedLesson;
         });
         stubDetailMappings(lesson);
 
         LessonDetailDto result = lessonService.submitLesson(lessonPublicId, contributorUser(ownerId));
 
-        assertThat(result.moderationStatus()).isEqualTo("APPROVED");
+        assertThat(result.moderationStatus()).isEqualTo("PENDING");
         verify(lessonModerationWorkflowService).submitForReview(lesson);
     }
 
