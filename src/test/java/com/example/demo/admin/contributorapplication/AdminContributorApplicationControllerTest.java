@@ -70,6 +70,28 @@ class AdminContributorApplicationControllerTest {
     }
 
     @Test
+    void getPendingApplicationsReturnsPendingList() throws Exception {
+        SupabaseAuthUser user = adminUser();
+        setAuthentication(user);
+        UUID pendingApplicationId = UUID.randomUUID();
+
+        when(adminContributorApplicationService.getPendingApplications(user)).thenReturn(List.of(
+                new ContributorApplicationDto(
+                        pendingApplicationId,
+                        "PENDING",
+                        OffsetDateTime.parse("2026-03-05T10:00:00Z"),
+                        null,
+                        null
+                )
+        ));
+
+        mockMvc.perform(get("/api/admin/contributor-applications/pending"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].publicId").value(pendingApplicationId.toString()))
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+    }
+
+    @Test
     void getApplicationByPublicIdReturnsApplication() throws Exception {
         UUID applicationPublicId = UUID.randomUUID();
         SupabaseAuthUser user = adminUser();

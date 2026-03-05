@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +43,26 @@ class AdminContributorApplicationServiceTest {
     @BeforeEach
     void setUp() {
         service = new AdminContributorApplicationService(contributorApplicationRepository, contributorRepository);
+    }
+
+    @Test
+    void getPendingApplicationsReturnsPendingApplicationsInRepositoryOrder() {
+        Learner learner = learner(UUID.randomUUID());
+        ContributorApplication first = pendingApplication(learner);
+        ContributorApplication second = pendingApplication(learner);
+        second.setSubmittedAt(first.getSubmittedAt().plusHours(1));
+
+        when(contributorApplicationRepository.findAllByStatusOrderBySubmittedAtAsc(ContributorApplicationStatus.PENDING))
+                .thenReturn(List.of(first, second));
+
+        List<ContributorApplicationDto> result = service.getPendingApplications(adminUser());
+
+        assertThat(result)
+                .extracting(ContributorApplicationDto::status)
+                .containsExactly("PENDING", "PENDING");
+        assertThat(result)
+                .extracting(ContributorApplicationDto::submittedAt)
+                .containsExactly(first.getSubmittedAt(), second.getSubmittedAt());
     }
 
     @Test

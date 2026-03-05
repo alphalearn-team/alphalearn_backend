@@ -1,6 +1,7 @@
 package com.example.demo.admin.contributorapplication;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,17 @@ public class AdminContributorApplicationService {
     ) {
         this.contributorApplicationRepository = contributorApplicationRepository;
         this.contributorRepository = contributorRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContributorApplicationDto> getPendingApplications(SupabaseAuthUser user) {
+        requireActorUserId(user);
+
+        return contributorApplicationRepository
+                .findAllByStatusOrderBySubmittedAtAsc(ContributorApplicationStatus.PENDING)
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)

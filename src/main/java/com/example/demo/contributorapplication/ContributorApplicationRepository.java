@@ -13,4 +13,6 @@ public interface ContributorApplicationRepository extends JpaRepository<Contribu
     boolean existsByLearner_IdAndStatus(UUID learnerId, ContributorApplicationStatus status);
 
     List<ContributorApplication> findAllByLearner_IdOrderBySubmittedAtDesc(UUID learnerId);
+
+    List<ContributorApplication> findAllByStatusOrderBySubmittedAtAsc(ContributorApplicationStatus status);
 }

@@ -1,5 +1,6 @@
 package com.example.demo.admin.contributorapplication;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +31,21 @@ public class AdminContributorApplicationController {
 
     public AdminContributorApplicationController(AdminContributorApplicationService adminContributorApplicationService) {
         this.adminContributorApplicationService = adminContributorApplicationService;
+    }
+
+    @GetMapping("/pending")
+    @Operation(
+            summary = "List pending contributor applications",
+            description = "Returns all pending contributor applications ordered by oldest submission first for admin review."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pending contributor applications returned"),
+            @ApiResponse(responseCode = "403", description = "Authenticated admin user required")
+    })
+    public List<ContributorApplicationDto> getPendingApplications(
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return adminContributorApplicationService.getPendingApplications(user);
     }
 
     @GetMapping("/{applicationPublicId}")
