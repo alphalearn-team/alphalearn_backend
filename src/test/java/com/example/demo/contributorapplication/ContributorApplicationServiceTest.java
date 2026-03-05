@@ -70,6 +70,8 @@ class ContributorApplicationServiceTest {
         assertThat(saved.getStatus()).isEqualTo(ContributorApplicationStatus.PENDING);
         assertThat(result.status()).isEqualTo("PENDING");
         assertThat(result.publicId()).isNotNull();
+        assertThat(result.learnerPublicId()).isEqualTo(learner.getPublicId());
+        assertThat(result.learnerUsername()).isEqualTo(learner.getUsername());
         assertThat(result.submittedAt()).isNotNull();
     }
 
@@ -130,6 +132,9 @@ class ContributorApplicationServiceTest {
         assertThat(result)
                 .extracting(ContributorApplicationDto::publicId)
                 .containsExactly(newest.getPublicId(), older.getPublicId());
+        assertThat(result)
+                .extracting(ContributorApplicationDto::learnerPublicId)
+                .containsExactly(learner.getPublicId(), learner.getPublicId());
     }
 
     @Test

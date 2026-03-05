@@ -9,6 +9,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record ContributorApplicationDto(
         @Schema(description = "Stable public UUID for the contributor application", example = "6ac0c4e9-0648-46a0-97ee-c9b6f7f938d6")
         UUID publicId,
+        @Schema(description = "Learner public UUID for the applicant", example = "344aa76a-826c-4876-97ef-0f43ac7c2286")
+        UUID learnerPublicId,
+        @Schema(description = "Applicant username", example = "jane_doe")
+        String learnerUsername,
         @Schema(description = "Workflow status", example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED"})
         String status,
         @Schema(description = "Submission timestamp", example = "2026-03-05T12:00:00Z")
