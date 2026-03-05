@@ -15,6 +15,7 @@ import com.example.demo.contributor.dto.PromoteContributorsRequest;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.lesson.LessonRepository;
+import com.example.demo.notification.NotificationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,19 +29,22 @@ public class AdminContributorService {
     private final LessonRepository lessonRepository;
     private final ContributorMapper contributorMapper;
     private final ContributorQueryService contributorQueryService;
+    private final NotificationService notificationService;
 
     public AdminContributorService(
             ContributorRepository contributorRepository,
             LearnerRepository learnerRepository,
             LessonRepository lessonRepository,
             ContributorMapper contributorMapper,
-            ContributorQueryService contributorQueryService
+            ContributorQueryService contributorQueryService,
+            NotificationService notificationService
     ) {
         this.contributorRepository = contributorRepository;
         this.learnerRepository = learnerRepository;
         this.lessonRepository = lessonRepository;
         this.contributorMapper = contributorMapper;
         this.contributorQueryService = contributorQueryService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +86,11 @@ public class AdminContributorService {
             created.add(contributorRepository.save(newContributor));
         }
 
+        created.forEach(c -> notificationService.create(
+                c.getLearner().getId(),
+                "You have been promoted to Contributor!"
+        ));
+
         return created.stream()
                 .map(contributorMapper::toPublicDto)
                 .toList();
@@ -103,6 +112,10 @@ public class AdminContributorService {
             UUID contributorId = contributor.getContributorId();
             contributor.setDemotedAt(OffsetDateTime.now());
             lessonRepository.unpublishByContributorId(contributorId);
+            notificationService.create(
+                    contributor.getLearner().getId(),
+                    "Your contributor access has been removed."
+            );
         }
     }
 }

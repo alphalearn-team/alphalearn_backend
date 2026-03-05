@@ -201,7 +201,8 @@ public class LessonService {
         lesson.setTitle(title);
         lesson.setContent(objectMapper.valueToTree(content));
 
-        Lesson saved = previousStatus == LessonModerationStatus.APPROVED
+        Lesson saved = (previousStatus == LessonModerationStatus.APPROVED
+                || previousStatus == LessonModerationStatus.PENDING)
                 ? lessonModerationWorkflowService.submitForReview(lesson)
                 : lessonRepository.save(lesson);
         return toDetailDto(saved);

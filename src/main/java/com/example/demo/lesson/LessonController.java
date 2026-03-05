@@ -72,7 +72,7 @@ public class LessonController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create lesson", description = "Creates a lesson in UNPUBLISHED or PENDING status depending on submit flag")
+    @Operation(summary = "Create lesson", description = "Creates a lesson in UNPUBLISHED, PENDING, or REJECTED status depending on submit flag and moderation outcome")
     public LessonDetailDto createLesson(
             @RequestBody CreateLessonRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
@@ -93,7 +93,7 @@ public class LessonController {
     @PostMapping("/{lessonPublicId}/submit")
     @Operation(
             summary = "Submit lesson for review",
-            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may approve or reject immediately; otherwise the lesson remains in PENDING for manual admin review."
+            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may reject immediately for detected policy violations; otherwise the lesson remains in PENDING for manual admin review."
     )
     public LessonDetailDto submitLesson(
             @PathVariable UUID lessonPublicId,

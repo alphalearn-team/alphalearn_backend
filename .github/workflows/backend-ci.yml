@@ -1,0 +1,46 @@
+name: Backend CI (Maven)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Validate DB env
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "DB_URL is empty"
+            exit 1
+          fi
+          if echo "$DB_URL" | grep -q '^\${'; then
+            echo "DB_URL unresolved placeholder"
+            exit 1
+          fi
+          if ! echo "$DB_URL" | grep -q '^jdbc:postgresql://'; then
+            echo "DB_URL must start with jdbc:postgresql://"
+            exit 1
+          fi
+
+      - name: Build and run tests
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SUPABASE_JWT_JWKS_URL: ${{ vars.SUPABASE_JWT_JWKS_URL }}
+        run: mvn -B clean verify
