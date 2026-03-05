@@ -11,4 +11,6 @@ public interface ConceptSuggestionRepository extends JpaRepository<ConceptSugges
     Optional<ConceptSuggestion> findByPublicId(UUID publicId);
 
     List<ConceptSuggestion> findAllByOwner_IdOrderByUpdatedAtDesc(UUID ownerId);
+
+    List<ConceptSuggestion> findAllByStatusOrderByUpdatedAtAsc(ConceptSuggestionStatus status);
 }
