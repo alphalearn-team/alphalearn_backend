@@ -27,11 +27,13 @@ import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.dto.CreateLessonRequest;
 import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.lesson.dto.LessonEnrolledDetailDTO;
 import com.example.demo.lesson.dto.UpdateLessonRequest;
 import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
+import com.example.demo.lessonenrollment.LessonEnrollmentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +41,9 @@ class LessonServiceTest {
 
     @Mock
     private LessonRepository lessonRepository;
+
+    @Mock
+    private LessonEnrollmentRepository lessonEnrollmentRepository;
 
     @Mock
     private ContributorRepository contributorRepository;
@@ -68,6 +73,7 @@ class LessonServiceTest {
     @BeforeEach
     void setUp() {
         lessonService = new LessonService(
+                lessonEnrollmentRepository,
                 lessonRepository,
                 contributorRepository,
                 conceptRepository,
@@ -353,6 +359,46 @@ class LessonServiceTest {
         LessonDetailDto result = (LessonDetailDto) lessonService.getLessonDetailForUser(lessonPublicId, user);
 
         assertThat(result.adminRejectionReason()).isEqualTo("Needs revision before publication");
+    }
+
+    @Test
+    void getLessonContentForLearnerAllowsOwnerWithoutEnrollment() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.APPROVED);
+        lesson.setTitle("Owner visible lesson");
+        lesson.setContent(objectMapper.valueToTree(java.util.Map.of("body", "owner content")));
+
+        when(lessonLookupService.findPublicByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonMappingSupport.conceptPublicIds(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.conceptSummaries(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.author(lesson)).thenReturn(null);
+
+        LessonEnrolledDetailDTO result = lessonService.getLessonContentForLearner(
+                lessonPublicId,
+                contributorUser(ownerId)
+        );
+
+        assertThat(result.title()).isEqualTo("Owner visible lesson");
+        verify(lessonEnrollmentRepository, never()).existsByLearner_IdAndLesson_LessonId(any(), any());
+    }
+
+    @Test
+    void getLessonContentForLearnerRejectsWhenNotEnrolled() {
+        UUID learnerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(UUID.randomUUID(), LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findPublicByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonEnrollmentRepository.existsByLearner_IdAndLesson_LessonId(learnerId, null)).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.getLessonContentForLearner(lessonPublicId, contributorUser(learnerId))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
+        assertThat(ex.getReason()).isEqualTo("Not enrolled in this lesson");
     }
 
     private SupabaseAuthUser contributorUser(UUID contributorId) {

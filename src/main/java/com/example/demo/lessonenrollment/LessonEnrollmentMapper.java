@@ -10,6 +10,7 @@ public class LessonEnrollmentMapper {
                 lessonEnrollment.getEnrollmentId(),
                 lessonEnrollment.getLearner().getPublicId(),
                 lessonEnrollment.getLesson().getPublicId(),
+                lessonEnrollment.getLesson().getLessonModerationStatus().name(),
                 lessonEnrollment.isCompleted(),
                 lessonEnrollment.getFirstCompletedAt()
         );

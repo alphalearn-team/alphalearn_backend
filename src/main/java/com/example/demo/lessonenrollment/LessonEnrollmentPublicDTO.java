@@ -7,6 +7,7 @@ public record LessonEnrollmentPublicDTO(
     Integer enrollmentId,
     UUID learnerPublicId,
     UUID lessonPublicId,
+    String moderationStatus,
     boolean completed,
     OffsetDateTime firstCompletedAt
 ) {}
