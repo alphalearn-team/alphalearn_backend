@@ -57,6 +57,8 @@ class ContributorApplicationControllerTest {
 
         when(contributorApplicationService.submitApplication(user)).thenReturn(new ContributorApplicationDto(
                 applicationPublicId,
+                UUID.randomUUID(),
+                "learner-one",
                 "PENDING",
                 OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                 null,
@@ -80,6 +82,8 @@ class ContributorApplicationControllerTest {
         when(contributorApplicationService.getMyApplications(user)).thenReturn(List.of(
                 new ContributorApplicationDto(
                         newestApplicationId,
+                        UUID.randomUUID(),
+                        "learner-newest",
                         "PENDING",
                         OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                         null,
@@ -87,6 +91,8 @@ class ContributorApplicationControllerTest {
                 ),
                 new ContributorApplicationDto(
                         olderApplicationId,
+                        UUID.randomUUID(),
+                        "learner-older",
                         "REJECTED",
                         OffsetDateTime.parse("2026-03-04T10:00:00Z"),
                         OffsetDateTime.parse("2026-03-04T12:00:00Z"),

@@ -61,6 +61,9 @@ class AdminContributorApplicationServiceTest {
                 .extracting(ContributorApplicationDto::status)
                 .containsExactly("PENDING", "PENDING");
         assertThat(result)
+                .extracting(ContributorApplicationDto::learnerUsername)
+                .containsExactly(learner.getUsername(), learner.getUsername());
+        assertThat(result)
                 .extracting(ContributorApplicationDto::submittedAt)
                 .containsExactly(first.getSubmittedAt(), second.getSubmittedAt());
     }
@@ -76,6 +79,8 @@ class AdminContributorApplicationServiceTest {
         ContributorApplicationDto dto = service.getApplicationByPublicId(applicationPublicId, adminUser());
 
         assertThat(dto.status()).isEqualTo("PENDING");
+        assertThat(dto.learnerPublicId()).isEqualTo(learner.getPublicId());
+        assertThat(dto.learnerUsername()).isEqualTo(learner.getUsername());
         assertThat(dto.submittedAt()).isEqualTo(application.getSubmittedAt());
     }
 

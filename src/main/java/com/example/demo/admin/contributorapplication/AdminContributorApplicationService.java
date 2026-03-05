@@ -144,8 +144,11 @@ public class AdminContributorApplicationService {
     }
 
     private ContributorApplicationDto toDto(ContributorApplication application) {
+        Learner learner = application.getLearner();
         return new ContributorApplicationDto(
                 application.getPublicId(),
+                learner == null ? null : learner.getPublicId(),
+                learner == null ? null : learner.getUsername(),
                 application.getStatus().name(),
                 application.getSubmittedAt(),
                 application.getReviewedAt(),

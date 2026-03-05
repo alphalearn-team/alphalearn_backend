@@ -57,6 +57,8 @@ class AdminContributorApplicationControllerTest {
         when(adminContributorApplicationService.approveApplication(applicationPublicId, user))
                 .thenReturn(new ContributorApplicationDto(
                         applicationPublicId,
+                        UUID.randomUUID(),
+                        "learner-approved",
                         "APPROVED",
                         OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                         OffsetDateTime.parse("2026-03-05T11:00:00Z"),
@@ -78,6 +80,8 @@ class AdminContributorApplicationControllerTest {
         when(adminContributorApplicationService.getPendingApplications(user)).thenReturn(List.of(
                 new ContributorApplicationDto(
                         pendingApplicationId,
+                        UUID.randomUUID(),
+                        "learner-pending",
                         "PENDING",
                         OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                         null,
@@ -88,6 +92,7 @@ class AdminContributorApplicationControllerTest {
         mockMvc.perform(get("/api/admin/contributor-applications/pending"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].publicId").value(pendingApplicationId.toString()))
+                .andExpect(jsonPath("$[0].learnerUsername").value("learner-pending"))
                 .andExpect(jsonPath("$[0].status").value("PENDING"));
     }
 
@@ -100,6 +105,8 @@ class AdminContributorApplicationControllerTest {
         when(adminContributorApplicationService.getApplicationByPublicId(applicationPublicId, user))
                 .thenReturn(new ContributorApplicationDto(
                         applicationPublicId,
+                        UUID.randomUUID(),
+                        "learner-detail",
                         "PENDING",
                         OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                         null,
@@ -109,6 +116,7 @@ class AdminContributorApplicationControllerTest {
         mockMvc.perform(get("/api/admin/contributor-applications/{applicationPublicId}", applicationPublicId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(applicationPublicId.toString()))
+                .andExpect(jsonPath("$.learnerUsername").value("learner-detail"))
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
@@ -124,6 +132,8 @@ class AdminContributorApplicationControllerTest {
                 org.mockito.ArgumentMatchers.eq(user)
         )).thenReturn(new ContributorApplicationDto(
                 applicationPublicId,
+                UUID.randomUUID(),
+                "learner-rejected",
                 "REJECTED",
                 OffsetDateTime.parse("2026-03-05T10:00:00Z"),
                 OffsetDateTime.parse("2026-03-05T11:00:00Z"),
