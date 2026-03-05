@@ -3,6 +3,7 @@ package com.example.demo.conceptsuggestion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,30 +142,409 @@ class ConceptSuggestionServiceTest {
         );
 
         assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Concept suggestion is under review and can no longer be edited");
     }
 
     @Test
-    void getMyDraftsReturnsOnlyOwnerDraftsInRepositoryOrder() {
+    void updateDraftRejectsApprovedSuggestionsWithGenericDraftMessage() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.updateDraft(
+                        suggestion.getPublicId(),
+                        new SaveConceptSuggestionRequest("Edited", "Edited"),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be edited");
+    }
+
+    @Test
+    void submitDraftTransitionsOwnedCompleteDraftToSubmitted() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+        when(conceptSuggestionRepository.save(any(ConceptSuggestion.class))).thenAnswer(invocation -> {
+            ConceptSuggestion saved = invocation.getArgument(0);
+            saved.touchUpdatedAt();
+            return saved;
+        });
+
+        ConceptSuggestionDto result = conceptSuggestionService.submitDraft(
+                suggestion.getPublicId(),
+                authUser(ownerId, learner)
+        );
+
+        ArgumentCaptor<ConceptSuggestion> captor = ArgumentCaptor.forClass(ConceptSuggestion.class);
+        verify(conceptSuggestionRepository).save(captor.capture());
+        ConceptSuggestion saved = captor.getValue();
+
+        assertThat(saved.getStatus()).isEqualTo(ConceptSuggestionStatus.SUBMITTED);
+        assertThat(result.status()).isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void submitDraftTrimsExistingTitleAndDescriptionBeforeSaving() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setTitle("  Number bonds  ");
+        suggestion.setDescription("  Help children decompose numbers.  ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+        when(conceptSuggestionRepository.save(any(ConceptSuggestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConceptSuggestionDto result = conceptSuggestionService.submitDraft(
+                suggestion.getPublicId(),
+                authUser(ownerId, learner)
+        );
+
+        assertThat(result.title()).isEqualTo("Number bonds");
+        assertThat(result.description()).isEqualTo("Help children decompose numbers.");
+    }
+
+    @Test
+    void submitDraftRejectsBlankTitle() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setTitle("   ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        verify(conceptSuggestionRepository, never()).save(any(ConceptSuggestion.class));
+    }
+
+    @Test
+    void submitDraftRejectsBlankDescription() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setDescription("   ");
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        verify(conceptSuggestionRepository, never()).save(any(ConceptSuggestion.class));
+    }
+
+    @Test
+    void submitDraftRejectsNonOwners() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Learner owner = learner(ownerId);
+        Learner otherLearner = learner(otherUserId);
+        ConceptSuggestion suggestion = draftSuggestion(owner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(otherUserId, otherLearner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void submitDraftRejectsMissingSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        UUID suggestionPublicId = UUID.randomUUID();
+
+        when(conceptSuggestionRepository.findByPublicId(suggestionPublicId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(suggestionPublicId, authUser(ownerId, learner))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void submitDraftRejectsAlreadySubmittedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Concept suggestion is already under review");
+    }
+
+    @Test
+    void submitDraftRejectsApprovedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be submitted");
+    }
+
+    @Test
+    void submitDraftRejectsRejectedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.REJECTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.submitDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be submitted");
+    }
+
+    @Test
+    void deleteDraftRemovesOwnedDraft() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        conceptSuggestionService.deleteDraft(suggestion.getPublicId(), authUser(ownerId, learner));
+
+        verify(conceptSuggestionRepository).delete(suggestion);
+    }
+
+    @Test
+    void deleteDraftRejectsNonOwner() {
+        UUID ownerId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+        Learner owner = learner(ownerId);
+        Learner otherLearner = learner(otherUserId);
+        ConceptSuggestion suggestion = draftSuggestion(owner);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(otherUserId, otherLearner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void deleteDraftRejectsMissingSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        UUID suggestionPublicId = UUID.randomUUID();
+
+        when(conceptSuggestionRepository.findByPublicId(suggestionPublicId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(suggestionPublicId, authUser(ownerId, learner))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void deleteDraftRejectsSubmittedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
+    void deleteDraftRejectsApprovedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
+    void deleteDraftRejectsRejectedSuggestion() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion suggestion = draftSuggestion(learner);
+        suggestion.setStatus(ConceptSuggestionStatus.REJECTED);
+
+        when(conceptSuggestionRepository.findByPublicId(suggestion.getPublicId())).thenReturn(Optional.of(suggestion));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> conceptSuggestionService.deleteDraft(
+                        suggestion.getPublicId(),
+                        authUser(ownerId, learner)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(409);
+        assertThat(ex.getReason()).isEqualTo("Only draft concept suggestions can be deleted");
+    }
+
+    @Test
+    void getMySuggestionsReturnsAllOwnedSuggestionsByDefaultInRepositoryOrder() {
         UUID ownerId = UUID.randomUUID();
         Learner learner = learner(ownerId);
         ConceptSuggestion newestDraft = draftSuggestion(learner);
         newestDraft.setTitle("Newest");
         ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
         submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
         ConceptSuggestion olderDraft = draftSuggestion(learner);
         olderDraft.setTitle("Older");
 
         when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
                 .thenReturn(List.of(newestDraft, submittedSuggestion, olderDraft));
 
-        List<ConceptSuggestionDto> result = conceptSuggestionService.getMyDrafts(authUser(ownerId, learner));
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(authUser(ownerId, learner), null);
 
         assertThat(result)
                 .extracting(ConceptSuggestionDto::title)
-                .containsExactly("Newest", "Older");
+                .containsExactly("Newest", "Submitted", "Older");
         assertThat(result)
                 .extracting(ConceptSuggestionDto::status)
-                .containsOnly("DRAFT");
+                .containsExactly("DRAFT", "SUBMITTED", "DRAFT");
+    }
+
+    @Test
+    void getMySuggestionsFiltersByRequestedStatuses() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion newestDraft = draftSuggestion(learner);
+        newestDraft.setTitle("Newest");
+        ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
+        submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
+        ConceptSuggestion approvedSuggestion = draftSuggestion(learner);
+        approvedSuggestion.setStatus(ConceptSuggestionStatus.APPROVED);
+        approvedSuggestion.setTitle("Approved");
+
+        when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
+                .thenReturn(List.of(newestDraft, submittedSuggestion, approvedSuggestion));
+
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(
+                authUser(ownerId, learner),
+                List.of(ConceptSuggestionStatus.DRAFT, ConceptSuggestionStatus.SUBMITTED)
+        );
+
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::title)
+                .containsExactly("Newest", "Submitted");
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::status)
+                .containsExactly("DRAFT", "SUBMITTED");
+    }
+
+    @Test
+    void getMySuggestionsReturnsOnlySubmittedWhenRequested() {
+        UUID ownerId = UUID.randomUUID();
+        Learner learner = learner(ownerId);
+        ConceptSuggestion draftSuggestion = draftSuggestion(learner);
+        ConceptSuggestion submittedSuggestion = draftSuggestion(learner);
+        submittedSuggestion.setStatus(ConceptSuggestionStatus.SUBMITTED);
+        submittedSuggestion.setTitle("Submitted");
+
+        when(conceptSuggestionRepository.findAllByOwner_IdOrderByUpdatedAtDesc(ownerId))
+                .thenReturn(List.of(draftSuggestion, submittedSuggestion));
+
+        List<ConceptSuggestionDto> result = conceptSuggestionService.getMySuggestions(
+                authUser(ownerId, learner),
+                List.of(ConceptSuggestionStatus.SUBMITTED)
+        );
+
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::title)
+                .containsExactly("Submitted");
+        assertThat(result)
+                .extracting(ConceptSuggestionDto::status)
+                .containsExactly("SUBMITTED");
     }
 
     @Test

@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,7 +30,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/concept-suggestions")
-@Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion draft endpoints")
+@Tag(name = "Concept Suggestions", description = "Authenticated concept suggestion endpoints")
 public class ConceptSuggestionController {
 
     private final ConceptSuggestionService conceptSuggestionService;
@@ -38,19 +40,23 @@ public class ConceptSuggestionController {
     }
 
     @GetMapping("/mine")
-    @Operation(summary = "List my concept suggestion drafts", description = "Returns DRAFT concept suggestions owned by the authenticated user ordered by most recently updated")
+    @Operation(summary = "List my concept suggestions", description = "Returns concept suggestions owned by the authenticated user ordered by most recently updated. Optionally filter by workflow status.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Drafts returned"),
+            @ApiResponse(responseCode = "200", description = "Owned concept suggestions returned"),
             @ApiResponse(
                     responseCode = "403",
                     description = "Authenticated user required",
                     content = @Content(schema = @Schema(implementation = String.class))
             )
     })
-    public List<ConceptSuggestionDto> getMyDrafts(
+    public List<ConceptSuggestionDto> getMySuggestions(
+            @Parameter(
+                    description = "Optional workflow status filter. Repeat or comma-separate values such as DRAFT or SUBMITTED."
+            )
+            @RequestParam(required = false) List<ConceptSuggestionStatus> status,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        return conceptSuggestionService.getMyDrafts(user);
+        return conceptSuggestionService.getMySuggestions(user, status);
     }
 
     @GetMapping("/{conceptSuggestionPublicId}")
@@ -108,6 +114,68 @@ public class ConceptSuggestionController {
         return conceptSuggestionService.createDraft(request, user);
     }
 
+    @PostMapping("/{conceptSuggestionPublicId}/submit")
+    @Operation(summary = "Submit concept suggestion for review", description = "Submits the authenticated owner's draft for admin review and changes its status to SUBMITTED")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Concept suggestion submitted for review"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Draft title or description is missing",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user is not the draft owner",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Concept suggestion not found",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Concept suggestion is already submitted or otherwise not in DRAFT status",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public ConceptSuggestionDto submitDraft(
+            @Parameter(description = "Public UUID of the concept suggestion draft")
+            @PathVariable UUID conceptSuggestionPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return conceptSuggestionService.submitDraft(conceptSuggestionPublicId, user);
+    }
+
+    @DeleteMapping("/{conceptSuggestionPublicId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete concept suggestion draft", description = "Deletes the authenticated owner's concept suggestion while it remains in DRAFT status")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Draft deleted"),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Authenticated user is not the draft owner",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Concept suggestion not found",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Concept suggestion is no longer deletable because it is not in DRAFT status",
+                    content = @Content(schema = @Schema(implementation = String.class))
+            )
+    })
+    public void deleteDraft(
+            @Parameter(description = "Public UUID of the concept suggestion draft")
+            @PathVariable UUID conceptSuggestionPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        conceptSuggestionService.deleteDraft(conceptSuggestionPublicId, user);
+    }
+
     @PutMapping("/{conceptSuggestionPublicId}")
     @Operation(summary = "Save concept suggestion draft", description = "Updates the authenticated owner's concept suggestion while it remains in DRAFT status")
     @ApiResponses({
@@ -129,7 +197,7 @@ public class ConceptSuggestionController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Concept suggestion is no longer editable because it is not in DRAFT status",
+                    description = "Concept suggestion is under review or otherwise no longer editable because it is not in DRAFT status",
                     content = @Content(schema = @Schema(implementation = String.class))
             )
     })
