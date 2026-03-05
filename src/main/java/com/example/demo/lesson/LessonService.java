@@ -13,18 +13,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.lesson.dto.CreateLessonRequest;
-import com.example.demo.lesson.dto.UpdateLessonRequest;
-import com.example.demo.config.SupabaseAuthUser;
-import com.example.demo.lesson.dto.LessonContributorSummaryDto;
+import com.example.demo.lesson.dto.LessonAuthorDto;
 import com.example.demo.lesson.dto.LessonConceptSummaryDto;
+import com.example.demo.lesson.dto.LessonContributorSummaryDto;
 import com.example.demo.lesson.dto.LessonDetailDto;
 import com.example.demo.lesson.dto.LessonDetailView;
-import com.example.demo.lesson.dto.LessonAuthorDto;
+import com.example.demo.lesson.dto.LessonEnrolledDetailDTO;
 import com.example.demo.lesson.dto.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
+import com.example.demo.lesson.dto.UpdateLessonRequest;
 import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
@@ -32,12 +33,14 @@ import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
+import com.example.demo.lessonenrollment.LessonEnrollmentRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class LessonService {
 
+    private final LessonEnrollmentRepository lessonEnrollmentRepository;
     private final LessonRepository lessonRepository;
     private final ContributorRepository contributorRepository;
     private final ConceptRepository conceptRepository;
@@ -48,6 +51,7 @@ public class LessonService {
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
     public LessonService(
+            LessonEnrollmentRepository lessonEnrollmentRepository,
             LessonRepository lessonRepository,
             ContributorRepository contributorRepository,
             ConceptRepository conceptRepository,
@@ -58,6 +62,7 @@ public class LessonService {
             LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper
     ) {
+        this.lessonEnrollmentRepository = lessonEnrollmentRepository;
         this.lessonRepository = lessonRepository;
         this.contributorRepository = contributorRepository;
         this.conceptRepository = conceptRepository;
@@ -360,7 +365,6 @@ public class LessonService {
         return new LessonPublicDetailDto(
                 base.lessonPublicId(),
                 base.title(),
-                base.content(),
                 base.conceptPublicIds(),
                 base.concepts(),
                 base.author(),
@@ -426,5 +430,39 @@ public class LessonService {
         if (ownerId == null || !ownerId.equals(user.userId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lesson owner access required");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public LessonEnrolledDetailDTO getLessonContentForLearner(UUID lessonPublicId, SupabaseAuthUser user) {
+        if (user == null || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
+        }
+
+        // lesson must be public/approved (and not deleted)
+        Lesson lesson = lessonLookupService.findPublicByPublicIdOrThrow(lessonPublicId);
+
+        // allow owner contributor to see content too
+        if (lesson.getContributor() != null && lesson.getContributor().getContributorId().equals(user.userId())) {
+            LessonDetailBase base = toDetailBase(lesson);
+            return new LessonEnrolledDetailDTO(
+                    base.lessonPublicId(), base.title(), base.content(),
+                    base.conceptPublicIds(), base.concepts(), base.author(), base.createdAt()
+            );
+        }
+
+        // otherwise must be enrolled learner
+        boolean enrolled = lessonEnrollmentRepository.existsByLearner_IdAndLesson_LessonId(
+                user.userId(), lesson.getLessonId()
+        );
+
+        if (!enrolled) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not enrolled in this lesson");
+        }
+
+        LessonDetailBase base = toDetailBase(lesson);
+        return new LessonEnrolledDetailDTO(
+                base.lessonPublicId(), base.title(), base.content(),
+                base.conceptPublicIds(), base.concepts(), base.author(), base.createdAt()
+        );
     }
 }

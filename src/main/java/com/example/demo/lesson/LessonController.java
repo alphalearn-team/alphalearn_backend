@@ -4,28 +4,30 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lesson.dto.CreateLessonRequest;
-import com.example.demo.lesson.dto.UpdateLessonRequest;
 import com.example.demo.lesson.dto.LessonContributorSummaryDto;
 import com.example.demo.lesson.dto.LessonDetailDto;
 import com.example.demo.lesson.dto.LessonDetailView;
+import com.example.demo.lesson.dto.LessonEnrolledDetailDTO;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
-import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.lesson.dto.UpdateLessonRequest;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/lessons")
@@ -119,4 +121,11 @@ public class LessonController {
         lessonService.softDeleteLesson(lessonPublicId, user);
     }
 
+    @GetMapping("/{lessonPublicId}/content")
+    public LessonEnrolledDetailDTO getLessonContent(
+            @PathVariable UUID lessonPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return lessonService.getLessonContentForLearner(lessonPublicId, user);
+    }
 }
