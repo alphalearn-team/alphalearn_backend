@@ -3,6 +3,7 @@ package com.example.demo.admin.contributorapplication;
 import java.util.UUID;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import com.example.demo.config.SupabaseAuthUser;
@@ -29,6 +30,23 @@ public class AdminContributorApplicationController {
 
     public AdminContributorApplicationController(AdminContributorApplicationService adminContributorApplicationService) {
         this.adminContributorApplicationService = adminContributorApplicationService;
+    }
+
+    @GetMapping("/{applicationPublicId}")
+    @Operation(
+            summary = "Get contributor application",
+            description = "Returns a contributor application by public UUID for admin review."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Contributor application returned"),
+            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
+            @ApiResponse(responseCode = "404", description = "Contributor application not found")
+    })
+    public ContributorApplicationDto getApplicationByPublicId(
+            @PathVariable UUID applicationPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return adminContributorApplicationService.getApplicationByPublicId(applicationPublicId, user);
     }
 
     @PutMapping("/{applicationPublicId}/approve")

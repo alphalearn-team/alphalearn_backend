@@ -31,6 +31,16 @@ public class AdminContributorApplicationService {
         this.contributorRepository = contributorRepository;
     }
 
+    @Transactional(readOnly = true)
+    public ContributorApplicationDto getApplicationByPublicId(UUID applicationPublicId, SupabaseAuthUser user) {
+        requireActorUserId(user);
+
+        ContributorApplication application = contributorApplicationRepository.findByPublicId(applicationPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor application not found"));
+
+        return toDto(application);
+    }
+
     @Transactional
     public ContributorApplicationDto approveApplication(UUID applicationPublicId, SupabaseAuthUser user) {
         requireActorUserId(user);

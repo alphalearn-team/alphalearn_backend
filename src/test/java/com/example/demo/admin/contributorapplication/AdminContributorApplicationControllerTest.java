@@ -1,6 +1,7 @@
 package com.example.demo.admin.contributorapplication;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -66,6 +67,27 @@ class AdminContributorApplicationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(applicationPublicId.toString()))
                 .andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    void getApplicationByPublicIdReturnsApplication() throws Exception {
+        UUID applicationPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = adminUser();
+        setAuthentication(user);
+
+        when(adminContributorApplicationService.getApplicationByPublicId(applicationPublicId, user))
+                .thenReturn(new ContributorApplicationDto(
+                        applicationPublicId,
+                        "PENDING",
+                        OffsetDateTime.parse("2026-03-05T10:00:00Z"),
+                        null,
+                        null
+                ));
+
+        mockMvc.perform(get("/api/admin/contributor-applications/{applicationPublicId}", applicationPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(applicationPublicId.toString()))
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test

@@ -45,6 +45,35 @@ class AdminContributorApplicationServiceTest {
     }
 
     @Test
+    void getApplicationByPublicIdReturnsApplication() {
+        UUID applicationPublicId = UUID.randomUUID();
+        Learner learner = learner(UUID.randomUUID());
+        ContributorApplication application = pendingApplication(learner);
+
+        when(contributorApplicationRepository.findByPublicId(applicationPublicId)).thenReturn(Optional.of(application));
+
+        ContributorApplicationDto dto = service.getApplicationByPublicId(applicationPublicId, adminUser());
+
+        assertThat(dto.status()).isEqualTo("PENDING");
+        assertThat(dto.submittedAt()).isEqualTo(application.getSubmittedAt());
+    }
+
+    @Test
+    void getApplicationByPublicIdRejectsUnknownApplication() {
+        UUID applicationPublicId = UUID.randomUUID();
+
+        when(contributorApplicationRepository.findByPublicId(applicationPublicId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> service.getApplicationByPublicId(applicationPublicId, adminUser())
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+        assertThat(ex.getReason()).isEqualTo("Contributor application not found");
+    }
+
+    @Test
     void approveApplicationApprovesPendingAndPromotesLearnerWithoutContributorRecord() {
         UUID applicationPublicId = UUID.randomUUID();
         UUID learnerId = UUID.randomUUID();
