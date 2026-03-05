@@ -25,6 +25,7 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonMappingSupport;
 import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.notification.NotificationService;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
@@ -38,6 +39,7 @@ public class AdminLessonService {
     private final ConceptRepository conceptRepository;
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     public AdminLessonService(
             LessonLookupService lessonLookupService,
@@ -46,7 +48,8 @@ public class AdminLessonService {
             LessonListQueryService lessonListQueryService,
             ConceptRepository conceptRepository,
             LessonModerationRecordRepository lessonModerationRecordRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            NotificationService notificationService
     ){
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
@@ -55,6 +58,7 @@ public class AdminLessonService {
         this.conceptRepository = conceptRepository;
         this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +101,7 @@ public class AdminLessonService {
     public AdminLessonDetailDto approveLesson(UUID lessonPublicId, SupabaseAuthUser user){
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         Lesson saved = lessonModerationWorkflowService.approve(lesson, requireActorUserId(user));
+        notifyAuthor(lesson, "Your lesson \"" + lesson.getTitle() + "\" has been approved!");
         return toAdminLessonDetailDto(saved);
     }
 
@@ -108,7 +113,13 @@ public class AdminLessonService {
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         Lesson saved = lessonModerationWorkflowService.reject(lesson, reason, requireActorUserId(user));
+        notifyAuthor(lesson, "Your lesson \"" + lesson.getTitle() + "\" was not approved. Reason: " + reason);
         return toAdminLessonDetailDto(saved);
+    }
+
+    private void notifyAuthor(Lesson lesson, String message) {
+        if (lesson.getContributor() == null || lesson.getContributor().getLearner() == null) return;
+        notificationService.create(lesson.getContributor().getLearner().getId(), message);
     }
 
     private AdminLessonDetailDto toAdminLessonDetailDto(Lesson lesson) {
