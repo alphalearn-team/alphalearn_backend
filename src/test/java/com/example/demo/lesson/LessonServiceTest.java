@@ -267,13 +267,19 @@ class LessonServiceTest {
     }
 
     @Test
-    void updateLessonPendingSavesDirectlyWithoutModeration() {
+    void updateLessonPendingReusesModerationWorkflow() {
         UUID ownerId = UUID.randomUUID();
         UUID lessonPublicId = UUID.randomUUID();
         Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.PENDING);
 
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
-        when(lessonRepository.save(lesson)).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonModerationWorkflowService.submitForReview(lesson)).thenAnswer(invocation -> {
+            Lesson submittedLesson = invocation.getArgument(0);
+            assertThat(submittedLesson.getTitle()).isEqualTo("Updated pending title");
+            assertThat(submittedLesson.getContent()).isEqualTo(objectMapper.valueToTree(java.util.Map.of("body", "pending body")));
+            submittedLesson.setLessonModerationStatus(LessonModerationStatus.REJECTED);
+            return submittedLesson;
+        });
         stubDetailMappings(lesson);
 
         LessonDetailDto result = lessonService.updateLesson(
@@ -283,8 +289,9 @@ class LessonServiceTest {
         );
 
         assertThat(lesson.getTitle()).isEqualTo("Updated pending title");
-        assertThat(result.moderationStatus()).isEqualTo("PENDING");
-        verify(lessonModerationWorkflowService, never()).submitForReview(any(Lesson.class));
+        assertThat(result.moderationStatus()).isEqualTo("REJECTED");
+        verify(lessonModerationWorkflowService).submitForReview(lesson);
+        verify(lessonRepository, never()).save(any(Lesson.class));
     }
 
     @Test
