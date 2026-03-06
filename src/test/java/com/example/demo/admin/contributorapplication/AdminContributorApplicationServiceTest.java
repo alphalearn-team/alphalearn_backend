@@ -28,6 +28,7 @@ import com.example.demo.contributorapplication.ContributorApplicationRepository;
 import com.example.demo.contributorapplication.ContributorApplicationStatus;
 import com.example.demo.contributorapplication.dto.ContributorApplicationDto;
 import com.example.demo.learner.Learner;
+import com.example.demo.notification.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class AdminContributorApplicationServiceTest {
@@ -38,11 +39,14 @@ class AdminContributorApplicationServiceTest {
     @Mock
     private ContributorRepository contributorRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private AdminContributorApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminContributorApplicationService(contributorApplicationRepository, contributorRepository);
+        service = new AdminContributorApplicationService(contributorApplicationRepository, contributorRepository, notificationService);
     }
 
     @Test
