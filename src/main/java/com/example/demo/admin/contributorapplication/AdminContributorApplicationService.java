@@ -17,19 +17,23 @@ import com.example.demo.contributorapplication.ContributorApplicationRepository;
 import com.example.demo.contributorapplication.ContributorApplicationStatus;
 import com.example.demo.contributorapplication.dto.ContributorApplicationDto;
 import com.example.demo.learner.Learner;
+import com.example.demo.notification.NotificationService;
 
 @Service
 public class AdminContributorApplicationService {
 
     private final ContributorApplicationRepository contributorApplicationRepository;
     private final ContributorRepository contributorRepository;
+    private final NotificationService notificationService;
 
     public AdminContributorApplicationService(
             ContributorApplicationRepository contributorApplicationRepository,
-            ContributorRepository contributorRepository
+            ContributorRepository contributorRepository,
+            NotificationService notificationService
     ) {
         this.contributorApplicationRepository = contributorApplicationRepository;
         this.contributorRepository = contributorRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +78,10 @@ public class AdminContributorApplicationService {
         ensureCurrentContributor(learner, reviewedAt);
 
         ContributorApplication saved = contributorApplicationRepository.save(application);
+        notificationService.create(
+                learner.getId(),
+                "Your contributor application has been approved! You are now a Contributor."
+        );
         return toDto(saved);
     }
 
@@ -99,7 +107,14 @@ public class AdminContributorApplicationService {
         application.setReviewedAt(OffsetDateTime.now());
         application.setRejectionReason(reason);
 
+        Learner learner = application.getLearner();
         ContributorApplication saved = contributorApplicationRepository.save(application);
+        if (learner != null && learner.getId() != null) {
+            notificationService.create(
+                    learner.getId(),
+                    "Your contributor application was not approved. Reason: " + reason
+            );
+        }
         return toDto(saved);
     }
 
