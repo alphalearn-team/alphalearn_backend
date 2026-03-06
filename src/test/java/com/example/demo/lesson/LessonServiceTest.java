@@ -366,6 +366,40 @@ class LessonServiceTest {
         assertThat(result.adminRejectionReason()).isEqualTo("Needs revision before publication");
     }
 
+    @Test
+    void softDeleteLessonAllowsApprovedStatus() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonRepository.save(lesson)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        lessonService.softDeleteLesson(lessonPublicId, contributorUser(ownerId));
+
+        assertThat(lesson.getDeletedAt()).isNotNull();
+        verify(lessonRepository).save(lesson);
+    }
+
+    @Test
+    void softDeleteLessonStillRejectsAlreadyDeletedLesson() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.UNPUBLISHED);
+        lesson.setDeletedAt(OffsetDateTime.now().minusDays(1));
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.softDeleteLesson(lessonPublicId, contributorUser(ownerId))
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(404);
+        assertThat(ex.getReason()).isEqualTo("Lesson not found");
+        verify(lessonRepository, never()).save(any(Lesson.class));
+    }
+
     private SupabaseAuthUser contributorUser(UUID contributorId) {
         Learner learner = new Learner(contributorId, UUID.randomUUID(), "user-" + contributorId, OffsetDateTime.now(), (short) 0);
         Contributor contributor = contributor(contributorId);
@@ -493,4 +527,3 @@ class LessonServiceTest {
         verify(lessonSectionService).createSectionsForLesson(any(Lesson.class), any());
     }
 }
-

@@ -263,12 +263,6 @@ public class LessonService {
         if (lesson.getDeletedAt() != null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found");
         }
-        if (lesson.getLessonModerationStatus() != LessonModerationStatus.UNPUBLISHED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Only unpublished lessons can be deleted"
-            );
-        }
 
         lesson.setDeletedAt(OffsetDateTime.now());
         lessonRepository.save(lesson);

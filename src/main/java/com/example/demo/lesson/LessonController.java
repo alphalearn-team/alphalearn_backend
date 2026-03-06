@@ -111,7 +111,7 @@ public class LessonController {
 
     @DeleteMapping("/{lessonPublicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft delete lesson", description = "Owner-only; lesson must be unpublished")
+    @Operation(summary = "Soft delete lesson", description = "Owner-only soft delete regardless of moderation status")
     public void softDeleteLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
