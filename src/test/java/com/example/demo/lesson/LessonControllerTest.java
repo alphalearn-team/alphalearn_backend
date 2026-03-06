@@ -118,7 +118,9 @@ class LessonControllerTest {
                 List.of("Needs manual review"),
                 "AUTO_FLAGGED",
                 OffsetDateTime.parse("2026-03-04T12:01:00Z"),
-                null
+                null,
+                List.of(),
+                0
         );
 
         when(lessonService.updateLesson(
