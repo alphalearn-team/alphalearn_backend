@@ -3,6 +3,7 @@ package com.example.demo.lesson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
@@ -41,6 +42,7 @@ class LessonSectionServiceTest {
     void createSectionsWithValidTextSection() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "text",
                 "Introduction",
                 Map.of("html", "<p>This is the introduction</p>")
@@ -60,6 +62,7 @@ class LessonSectionServiceTest {
     void createSectionsWithValidExampleSection() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "example",
                 "Common Usage",
                 Map.of("examples", List.of(
@@ -80,6 +83,7 @@ class LessonSectionServiceTest {
     void createSectionsWithValidCalloutSection() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "callout",
                 null,
                 Map.of(
@@ -101,6 +105,7 @@ class LessonSectionServiceTest {
     void createSectionsWithValidDefinitionSection() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "definition",
                 null,
                 Map.of(
@@ -122,6 +127,7 @@ class LessonSectionServiceTest {
     void createSectionsWithValidComparisonSection() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "comparison",
                 null,
                 Map.of("items", List.of(
@@ -142,9 +148,9 @@ class LessonSectionServiceTest {
     void createSectionsWithMultipleSectionsAssignsCorrectOrderIndex() {
         Lesson lesson = createLesson();
         List<CreateLessonSectionRequest> requests = List.of(
-                new CreateLessonSectionRequest("text", "First", Map.of("html", "<p>First section</p>")),
-                new CreateLessonSectionRequest("text", "Second", Map.of("html", "<p>Second section</p>")),
-                new CreateLessonSectionRequest("text", "Third", Map.of("html", "<p>Third section</p>"))
+                new CreateLessonSectionRequest(null, "text", "First", Map.of("html", "<p>First section</p>")),
+                new CreateLessonSectionRequest(null, "text", "Second", Map.of("html", "<p>Second section</p>")),
+                new CreateLessonSectionRequest(null, "text", "Third", Map.of("html", "<p>Third section</p>"))
         );
 
         when(lessonSectionRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -161,6 +167,7 @@ class LessonSectionServiceTest {
     void createSectionsWithInvalidSectionTypeFails() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "invalid_type",
                 null,
                 Map.of("html", "<p>Content</p>")
@@ -179,6 +186,7 @@ class LessonSectionServiceTest {
     void createSectionsWithMissingRequiredFieldFails() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "text",
                 null,
                 Map.of() // Missing 'html' field
@@ -197,6 +205,7 @@ class LessonSectionServiceTest {
     void createSectionsWithInvalidCalloutVariantFails() {
         Lesson lesson = createLesson();
         CreateLessonSectionRequest request = new CreateLessonSectionRequest(
+                null,
                 "callout",
                 null,
                 Map.of(
@@ -248,6 +257,70 @@ class LessonSectionServiceTest {
         assertThat(result.get(0).title()).isEqualTo("Test Section");
     }
 
+    @Test
+    void replaceSectionsDeletesExistingAndCreatesNew() {
+        Lesson lesson = createLessonWithId(1);
+        List<CreateLessonSectionRequest> newSections = List.of(
+                new CreateLessonSectionRequest(null, "text", "New Section", Map.of("html", "<p>New content</p>"))
+        );
+
+        when(lessonSectionRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<LessonSection> result = lessonSectionService.replaceSectionsForLesson(lesson, newSections);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getSectionType()).isEqualTo(SectionType.TEXT);
+        assertThat(result.get(0).getTitle()).isEqualTo("New Section");
+    }
+
+    @Test
+    void replaceSectionsWithMultipleSectionsAssignsCorrectOrderIndex() {
+        Lesson lesson = createLessonWithId(1);
+        List<CreateLessonSectionRequest> newSections = List.of(
+                new CreateLessonSectionRequest(null, "text", "First", Map.of("html", "<p>First</p>")),
+                new CreateLessonSectionRequest(null, "definition", null, Map.of("term", "Test", "definition", "A test")),
+                new CreateLessonSectionRequest(null, "callout", null, Map.of("variant", "info", "html", "<p>Note</p>"))
+        );
+
+        when(lessonSectionRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<LessonSection> result = lessonSectionService.replaceSectionsForLesson(lesson, newSections);
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).getOrderIndex()).isEqualTo((short) 0);
+        assertThat(result.get(1).getOrderIndex()).isEqualTo((short) 1);
+        assertThat(result.get(2).getOrderIndex()).isEqualTo((short) 2);
+    }
+
+    @Test
+    void replaceSectionsWithEmptyArrayFails() {
+        Lesson lesson = createLessonWithId(1);
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonSectionService.replaceSectionsForLesson(lesson, List.of())
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).contains("At least one section is required");
+    }
+
+    @Test
+    void replaceSectionsWithInvalidSectionTypeFails() {
+        Lesson lesson = createLessonWithId(1);
+        List<CreateLessonSectionRequest> newSections = List.of(
+                new CreateLessonSectionRequest(null, "invalid", null, Map.of("html", "<p>Content</p>"))
+        );
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonSectionService.replaceSectionsForLesson(lesson, newSections)
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).contains("Invalid sectionType");
+    }
+
     private Lesson createLesson() {
         Lesson lesson = new Lesson();
         lesson.setTitle("Test Lesson");
@@ -259,6 +332,18 @@ class LessonSectionServiceTest {
         contributor.setContributorId(UUID.randomUUID());
         lesson.setContributor(contributor);
         
+        return lesson;
+    }
+
+    private Lesson createLessonWithId(Integer lessonId) {
+        Lesson lesson = createLesson();
+        try {
+            java.lang.reflect.Field field = Lesson.class.getDeclaredField("lessonId");
+            field.setAccessible(true);
+            field.set(lesson, lessonId);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set lessonId", e);
+        }
         return lesson;
     }
 }
