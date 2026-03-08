@@ -60,6 +60,80 @@ public class LessonSectionService {
         return lessonSectionRepository.saveAll(sections);
     }
 
+    @Transactional
+    public List<LessonSection> replaceSectionsForLesson(Lesson lesson, List<CreateLessonSectionRequest> sectionsRequest) {
+        if (sectionsRequest == null || sectionsRequest.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one section is required");
+        }
+
+        // Validate all provided sectionPublicIds before modifying anything
+        for (CreateLessonSectionRequest sectionRequest : sectionsRequest) {
+            if (sectionRequest.sectionPublicId() != null) {
+                LessonSection existingSection = lessonSectionRepository
+                        .findByPublicId(sectionRequest.sectionPublicId())
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Section with ID " + sectionRequest.sectionPublicId() + " not found"
+                        ));
+                
+                if (!existingSection.getLesson().getLessonId().equals(lesson.getLessonId())) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Section with ID " + sectionRequest.sectionPublicId() + " does not belong to this lesson"
+                    );
+                }
+            }
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        
+        // Delete all existing sections to avoid order_index constraint violations
+        lessonSectionRepository.deleteByLesson_LessonId(lesson.getLessonId());
+        
+        // Flush the deletion to ensure it's committed before inserting
+        lessonSectionRepository.flush();
+        
+        // Create all sections (preserving publicId for existing ones)
+        List<LessonSection> newSections = new ArrayList<>();
+        for (int i = 0; i < sectionsRequest.size(); i++) {
+            CreateLessonSectionRequest sectionRequest = sectionsRequest.get(i);
+            validateSectionRequest(sectionRequest, i);
+
+            SectionType sectionType = parseSectionType(sectionRequest.sectionType());
+            JsonNode content = objectMapper.valueToTree(sectionRequest.content());
+            validateSectionContent(sectionType, content, i);
+
+            LessonSection section;
+            if (sectionRequest.sectionPublicId() != null) {
+                // Recreate section with preserved publicId
+                section = new LessonSection(
+                        sectionRequest.sectionPublicId(),
+                        lesson,
+                        (short) i,
+                        sectionType,
+                        sectionRequest.title(),
+                        content,
+                        now,
+                        now
+                );
+            } else {
+                // Create new section (publicId will be auto-generated)
+                section = new LessonSection(
+                        lesson,
+                        (short) i,
+                        sectionType,
+                        sectionRequest.title(),
+                        content,
+                        now,
+                        now
+                );
+            }
+            newSections.add(section);
+        }
+
+        return lessonSectionRepository.saveAll(newSections);
+    }
+
     @Transactional(readOnly = true)
     public List<LessonSection> getSectionsForLesson(Lesson lesson) {
         return lessonSectionRepository.findByLessonIdOrderByOrderIndexAsc(lesson.getLessonId());
