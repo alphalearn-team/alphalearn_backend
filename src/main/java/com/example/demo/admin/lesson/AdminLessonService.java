@@ -25,6 +25,8 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonMappingSupport;
 import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lesson.LessonSection;
+import com.example.demo.lesson.LessonSectionService;
 import com.example.demo.notification.NotificationService;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
@@ -40,6 +42,7 @@ public class AdminLessonService {
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final LessonSectionService lessonSectionService;
 
     public AdminLessonService(
             LessonLookupService lessonLookupService,
@@ -49,7 +52,8 @@ public class AdminLessonService {
             ConceptRepository conceptRepository,
             LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper,
-            NotificationService notificationService
+            NotificationService notificationService,
+            LessonSectionService lessonSectionService
     ){
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
@@ -59,6 +63,7 @@ public class AdminLessonService {
         this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
+        this.lessonSectionService = lessonSectionService;
     }
 
     @Transactional(readOnly = true)
@@ -84,6 +89,8 @@ public class AdminLessonService {
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         LessonModerationRecord automatedRecord = latestAutomatedRecord(lesson);
         LessonModerationRecord adminRecord = latestAdminRecord(lesson);
+        List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
+        
         return new AdminLessonReviewDto(
                 lesson.getPublicId(),
                 lesson.getTitle(),
@@ -94,7 +101,9 @@ public class AdminLessonService {
                 toReasons(automatedRecord),
                 adminRejectionReason(adminRecord),
                 lesson.getCreatedAt(),
-                lesson.getDeletedAt()
+                lesson.getDeletedAt(),
+                lessonSectionService.toSectionDtos(sections),
+                sections.size()
         );
     }
 

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.dto.LessonAuthorDto;
+import com.example.demo.lesson.dto.LessonSectionDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(name = "AdminLessonReview", description = "Admin detail payload used during moderation review, including moderation outcomes from history.")
@@ -14,7 +15,7 @@ public record AdminLessonReviewDto(
         UUID lessonPublicId,
         @Schema(description = "Lesson title")
         String title,
-        @Schema(description = "Lesson content object")
+        @Schema(description = "Lesson content object (legacy field, may be null for section-based lessons)")
         Object content,
         @Schema(description = "Associated concept public UUIDs")
         List<UUID> conceptPublicIds,
@@ -29,5 +30,9 @@ public record AdminLessonReviewDto(
         @Schema(description = "Lesson creation timestamp")
         OffsetDateTime createdAt,
         @Schema(description = "Soft-delete timestamp; null means active")
-        OffsetDateTime deletedAt
+        OffsetDateTime deletedAt,
+        @Schema(description = "Lesson sections (ordered by orderIndex)")
+        List<LessonSectionDto> sections,
+        @Schema(description = "Total number of sections")
+        Integer totalSections
 ) {}
