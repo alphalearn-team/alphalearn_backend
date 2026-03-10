@@ -12,7 +12,7 @@ public record LessonDetailDto(
         UUID lessonPublicId,
         @Schema(description = "Lesson title")
         String title,
-        @Schema(description = "Lesson content JSON")
+        @Schema(description = "Lesson content JSON (legacy field, may be null for section-based lessons)")
         Object content,
         @Schema(description = "Moderation status text")
         String moderationStatus,
@@ -31,5 +31,9 @@ public record LessonDetailDto(
         @Schema(description = "Timestamp of latest moderation event")
         OffsetDateTime latestModeratedAt,
         @Schema(description = "Latest admin rejection reason for the lesson owner, if the most recent admin moderation action was a rejection")
-        String adminRejectionReason
+        String adminRejectionReason,
+        @Schema(description = "Lesson sections (ordered by orderIndex)")
+        List<LessonSectionDto> sections,
+        @Schema(description = "Total number of sections")
+        Integer totalSections
 ) implements LessonDetailView {}

@@ -25,8 +25,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.CascadeType;
 
 @JsonIgnoreProperties({"profile"}) //temporary fix to prevent loop, to review in the future
 @Getter
@@ -75,6 +77,9 @@ public class Lesson {
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
+
+    @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<LessonSection> sections = new java.util.ArrayList<>();
 
     public Lesson(
             String title,

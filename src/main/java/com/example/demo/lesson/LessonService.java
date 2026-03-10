@@ -49,6 +49,7 @@ public class LessonService {
     private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
+    private final LessonSectionService lessonSectionService;
     private final ObjectMapper objectMapper;
     public LessonService(
             LessonEnrollmentRepository lessonEnrollmentRepository,
@@ -60,6 +61,7 @@ public class LessonService {
             LessonMappingSupport lessonMappingSupport,
             LessonListQueryService lessonListQueryService,
             LessonModerationRecordRepository lessonModerationRecordRepository,
+            LessonSectionService lessonSectionService,
             ObjectMapper objectMapper
     ) {
         this.lessonEnrollmentRepository = lessonEnrollmentRepository;
@@ -71,6 +73,7 @@ public class LessonService {
         this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
         this.lessonModerationRecordRepository = lessonModerationRecordRepository;
+        this.lessonSectionService = lessonSectionService;
         this.objectMapper = objectMapper;
     }
 
@@ -132,12 +135,25 @@ public class LessonService {
         List<UUID> conceptPublicIds = normalizeCreateConceptPublicIds(request.conceptPublicIds());
         UUID contributorId = user.userId();
 
-        if (title == null || content == null || conceptPublicIds.isEmpty()) {
+        // Support both legacy content and new sections format
+        boolean hasSections = request.sections() != null && !request.sections().isEmpty();
+        boolean hasContent = content != null;
+
+        if (title == null || conceptPublicIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title, content, and conceptPublicIds are required"
+                    "title and conceptPublicIds are required"
             );
         }
+
+        // Require at least content OR sections
+        if (!hasContent && !hasSections) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Either content or sections must be provided"
+            );
+        }
+
         if (contributorId == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user id is required");
         }
@@ -162,7 +178,7 @@ public class LessonService {
         boolean submit = Boolean.TRUE.equals(request.submit());
         Lesson lesson = new Lesson(
                 title,
-                objectMapper.valueToTree(content),
+                hasContent ? objectMapper.valueToTree(content) : null,
                 LessonModerationStatus.UNPUBLISHED,
                 contributor,
                 OffsetDateTime.now()
@@ -170,6 +186,12 @@ public class LessonService {
         lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
+
+        // Create sections if provided
+        if (hasSections) {
+            lessonSectionService.createSectionsForLesson(saved, request.sections());
+        }
+
         if (submit) {
             saved = lessonModerationWorkflowService.submitForReview(saved);
         }
@@ -245,12 +267,6 @@ public class LessonService {
 
         if (lesson.getDeletedAt() != null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found");
-        }
-        if (lesson.getLessonModerationStatus() != LessonModerationStatus.UNPUBLISHED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Only unpublished lessons can be deleted"
-            );
         }
 
         lesson.setDeletedAt(OffsetDateTime.now());
@@ -344,6 +360,9 @@ public class LessonService {
         LessonModerationRecord latestAdminRecord = lessonModerationRecordRepository
                 .findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(lesson, LessonModerationDecisionSource.ADMIN)
                 .orElse(null);
+        
+        List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
+        
         return new LessonDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -356,19 +375,25 @@ public class LessonService {
                 latestModerationReasons(latestRecord),
                 latestModerationEventType(latestRecord),
                 latestModeratedAt(latestRecord),
-                adminRejectionReason(latestAdminRecord)
+                adminRejectionReason(latestAdminRecord),
+                lessonSectionService.toSectionDtos(sections),
+                sections.size()
         );
     }
 
     private LessonPublicDetailDto toPublicDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
+        List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
+        
         return new LessonPublicDetailDto(
                 base.lessonPublicId(),
                 base.title(),
                 base.conceptPublicIds(),
                 base.concepts(),
                 base.author(),
-                base.createdAt()
+                base.createdAt(),
+                lessonSectionService.toSectionDtos(sections),
+                sections.size()
         );
     }
 
