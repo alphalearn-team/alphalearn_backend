@@ -388,6 +388,7 @@ public class LessonService {
         return new LessonPublicDetailDto(
                 base.lessonPublicId(),
                 base.title(),
+                base.content(),
                 base.conceptPublicIds(),
                 base.concepts(),
                 base.author(),

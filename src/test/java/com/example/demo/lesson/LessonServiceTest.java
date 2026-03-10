@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.concept.Concept;
@@ -88,6 +89,8 @@ class LessonServiceTest {
                 lessonSectionService,
                 objectMapper
         );
+        Mockito.lenient().when(lessonSectionService.getSectionsForLesson(any())).thenReturn(List.of());
+        Mockito.lenient().when(lessonSectionService.toSectionDtos(any())).thenReturn(List.of());
     }
 
     @Test
