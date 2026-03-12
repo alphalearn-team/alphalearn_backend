@@ -18,6 +18,8 @@ import com.example.demo.weeklyconcept.dto.WeeklyConceptUpsertRequest;
 @Service
 public class AdminWeeklyConceptService {
 
+    private static final int MAX_CONCEPT_LENGTH = 500;
+
     private final WeeklyConceptRepository weeklyConceptRepository;
 
     public AdminWeeklyConceptService(WeeklyConceptRepository weeklyConceptRepository) {
@@ -46,13 +48,14 @@ public class AdminWeeklyConceptService {
             SupabaseAuthUser user
     ) {
         UUID actorUserId = requireActorUserId(user);
+        String concept = validateAndNormalizeConcept(request);
         OffsetDateTime now = OffsetDateTime.now();
 
         WeeklyConcept weeklyConcept = weeklyConceptRepository.findByWeekStartDate(weekStartDate)
                 .orElseGet(WeeklyConcept::new);
 
         weeklyConcept.setWeekStartDate(weekStartDate);
-        weeklyConcept.setConcept(request.concept().trim());
+        weeklyConcept.setConcept(concept);
         weeklyConcept.setUpdatedBy(actorUserId);
         weeklyConcept.setUpdatedAt(now);
 
@@ -62,6 +65,26 @@ public class AdminWeeklyConceptService {
                 saved.getConcept(),
                 saved.getUpdatedAt()
         );
+    }
+
+    private String validateAndNormalizeConcept(WeeklyConceptUpsertRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
+        }
+
+        String concept = request.concept();
+        if (concept == null || concept.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "concept is required");
+        }
+
+        String trimmed = concept.trim();
+        if (trimmed.length() > MAX_CONCEPT_LENGTH) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "concept must be at most " + MAX_CONCEPT_LENGTH + " characters"
+            );
+        }
+        return trimmed;
     }
 
     private UUID requireActorUserId(SupabaseAuthUser user) {
