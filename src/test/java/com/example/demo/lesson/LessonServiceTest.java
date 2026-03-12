@@ -240,7 +240,7 @@ class LessonServiceTest {
 
         LessonDetailDto result = lessonService.updateLesson(
                 lessonPublicId,
-                new UpdateLessonRequest("  Updated draft title  ", java.util.Map.of("body", "draft body")),
+                new UpdateLessonRequest("  Updated draft title  ", java.util.Map.of("body", "draft body"), null),
                 contributorUser(ownerId)
         );
 
@@ -261,7 +261,7 @@ class LessonServiceTest {
 
         LessonDetailDto result = lessonService.updateLesson(
                 lessonPublicId,
-                new UpdateLessonRequest("Updated rejected title", java.util.Map.of("body", "rejected body")),
+                new UpdateLessonRequest("Updated rejected title", java.util.Map.of("body", "rejected body"), null),
                 contributorUser(ownerId)
         );
 
@@ -288,7 +288,7 @@ class LessonServiceTest {
 
         LessonDetailDto result = lessonService.updateLesson(
                 lessonPublicId,
-                new UpdateLessonRequest("Updated pending title", java.util.Map.of("body", "pending body")),
+                new UpdateLessonRequest("Updated pending title", java.util.Map.of("body", "pending body"), null),
                 contributorUser(ownerId)
         );
 
@@ -316,7 +316,7 @@ class LessonServiceTest {
 
         LessonDetailDto result = lessonService.updateLesson(
                 lessonPublicId,
-                new UpdateLessonRequest("Approved lesson update", java.util.Map.of("body", "approved body")),
+                new UpdateLessonRequest("Approved lesson update", java.util.Map.of("body", "approved body"), null),
                 contributorUser(ownerId)
         );
 
@@ -456,6 +456,7 @@ class LessonServiceTest {
 
         List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
                 new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        null,
                         "text",
                         "Introduction",
                         java.util.Map.of("html", "<p>Welcome to the lesson</p>")
@@ -506,6 +507,7 @@ class LessonServiceTest {
 
         List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
                 new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        null,
                         "text",
                         null,
                         java.util.Map.of("html", "<p>Section content</p>")
@@ -525,5 +527,136 @@ class LessonServiceTest {
 
         assertThat(result.moderationStatus()).isEqualTo("UNPUBLISHED");
         verify(lessonSectionService).createSectionsForLesson(any(Lesson.class), any());
+    }
+
+    @Test
+    void updateLessonWithSectionsReplacesSections() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.UNPUBLISHED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonRepository.save(lesson)).thenAnswer(invocation -> invocation.getArgument(0));
+        stubDetailMappings(lesson);
+
+        List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
+                new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        null,
+                        "text",
+                        "New Section",
+                        java.util.Map.of("html", "<p>Updated content</p>")
+                )
+        );
+
+        LessonDetailDto result = lessonService.updateLesson(
+                lessonPublicId,
+                new UpdateLessonRequest("Updated title", java.util.Map.of(), sections),
+                contributorUser(ownerId)
+        );
+
+        assertThat(lesson.getTitle()).isEqualTo("Updated title");
+        assertThat(result.moderationStatus()).isEqualTo("UNPUBLISHED");
+        verify(lessonSectionService).replaceSectionsForLesson(any(Lesson.class), any());
+    }
+
+    @Test
+    void updateLessonWithSectionsOnlySucceeds() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.UNPUBLISHED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonRepository.save(lesson)).thenAnswer(invocation -> invocation.getArgument(0));
+        stubDetailMappings(lesson);
+
+        List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
+                new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        null,
+                        "definition",
+                        null,
+                        java.util.Map.of("term", "Test", "definition", "A test term")
+                )
+        );
+
+        LessonDetailDto result = lessonService.updateLesson(
+                lessonPublicId,
+                new UpdateLessonRequest("Title with sections only", java.util.Map.of(), sections),
+                contributorUser(ownerId)
+        );
+
+        assertThat(lesson.getTitle()).isEqualTo("Title with sections only");
+        assertThat(result.moderationStatus()).isEqualTo("UNPUBLISHED");
+        verify(lessonSectionService).replaceSectionsForLesson(any(Lesson.class), any());
+        verify(lessonModerationWorkflowService, never()).submitForReview(any());
+    }
+
+    @Test
+    void updateLessonWithoutContentOrSectionsFails() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.updateLesson(
+                        lessonPublicId,
+                        new UpdateLessonRequest("Title", null, null),
+                        contributorUser(ownerId)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).contains("Either content or sections must be provided");
+    }
+
+    @Test
+    void updateLessonWithEmptyContentAndEmptySectionsFails() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> lessonService.updateLesson(
+                        lessonPublicId,
+                        new UpdateLessonRequest("Title", java.util.Map.of(), List.of()),
+                        contributorUser(ownerId)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).contains("Either content or sections must be provided");
+    }
+
+    @Test
+    void updateLessonApprovedWithSectionsTriggersModeration() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = lessonForUpdate(ownerId, LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationWorkflowService.submitForReview(lesson)).thenAnswer(invocation -> {
+            Lesson submittedLesson = invocation.getArgument(0);
+            submittedLesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
+            return submittedLesson;
+        });
+        stubDetailMappings(lesson);
+
+        List<com.example.demo.lesson.dto.CreateLessonSectionRequest> sections = List.of(
+                new com.example.demo.lesson.dto.CreateLessonSectionRequest(
+                        null,
+                        "text",
+                        "Updated Section",
+                        java.util.Map.of("html", "<p>New content</p>")
+                )
+        );
+
+        LessonDetailDto result = lessonService.updateLesson(
+                lessonPublicId,
+                new UpdateLessonRequest("Updated approved lesson", java.util.Map.of(), sections),
+                contributorUser(ownerId)
+        );
+
+        assertThat(result.moderationStatus()).isEqualTo("PENDING");
+        verify(lessonSectionService).replaceSectionsForLesson(any(Lesson.class), any());
+        verify(lessonModerationWorkflowService).submitForReview(lesson);
     }
 }

@@ -81,6 +81,26 @@ public class LessonSection {
         this.updatedAt = updatedAt;
     }
 
+    public LessonSection(
+            UUID publicId,
+            Lesson lesson,
+            Short orderIndex,
+            SectionType sectionType,
+            String title,
+            JsonNode content,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+        this.publicId = publicId;
+        this.lesson = lesson;
+        this.orderIndex = orderIndex;
+        this.sectionType = sectionType;
+        this.title = title;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
     @PrePersist
     void assignPublicIdIfMissing() {
         if (publicId == null) {

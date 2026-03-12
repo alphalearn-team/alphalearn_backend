@@ -127,7 +127,8 @@ class LessonControllerTest {
                 eq(lessonPublicId),
                 eq(new com.example.demo.lesson.dto.UpdateLessonRequest(
                         "Approved lesson update",
-                        java.util.Map.of("body", "approved body")
+                        java.util.Map.of("body", "approved body"),
+                        null
                 )),
                 eq(user)
         )).thenReturn(response);

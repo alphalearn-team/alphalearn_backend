@@ -204,10 +204,22 @@ public class LessonService {
         String title = trimToNull(request.title());
         Object content = request.content();
 
-        if (title == null || content == null) {
+        // Support both legacy content and new sections format
+        boolean hasSections = request.sections() != null && !request.sections().isEmpty();
+        boolean hasContent = content != null && !isEmptyContent(content);
+
+        if (title == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title and content are required"
+                    "title is required"
+            );
+        }
+
+        // Require at least content OR sections
+        if (!hasContent && !hasSections) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Either content or sections must be provided"
             );
         }
 
@@ -216,13 +228,31 @@ public class LessonService {
         LessonModerationStatus previousStatus = lesson.getLessonModerationStatus();
 
         lesson.setTitle(title);
-        lesson.setContent(objectMapper.valueToTree(content));
+        // Update content if provided (even empty object for backward compatibility)
+        if (content != null) {
+            lesson.setContent(objectMapper.valueToTree(content));
+        }
+
+        // Replace sections if provided
+        if (hasSections) {
+            lessonSectionService.replaceSectionsForLesson(lesson, request.sections());
+        }
 
         Lesson saved = (previousStatus == LessonModerationStatus.APPROVED
                 || previousStatus == LessonModerationStatus.PENDING)
                 ? lessonModerationWorkflowService.submitForReview(lesson)
                 : lessonRepository.save(lesson);
         return toDetailDto(saved);
+    }
+
+    private boolean isEmptyContent(Object content) {
+        if (content == null) {
+            return true;
+        }
+        if (content instanceof java.util.Map<?, ?> map) {
+            return map.isEmpty();
+        }
+        return false;
     }
 
     public LessonDetailDto submitLesson(UUID lessonPublicId, SupabaseAuthUser user) {
