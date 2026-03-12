@@ -47,11 +47,12 @@ public class AdminWeeklyConceptController {
     }
 
     @PutMapping("/{weekStartDate}")
-    @Operation(summary = "Set or update weekly concept", description = "Creates or updates the weekly concept for the provided week start date")
+    @Operation(summary = "Set or update weekly concept", description = "Creates or updates the weekly concept for the provided week start date using conceptPublicId")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Weekly concept created or updated"),
             @ApiResponse(responseCode = "400", description = "Invalid payload"),
-            @ApiResponse(responseCode = "403", description = "Authenticated admin user required")
+            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
+            @ApiResponse(responseCode = "404", description = "Concept not found")
     })
     public WeeklyConceptResponse upsertWeeklyConcept(
             @PathVariable

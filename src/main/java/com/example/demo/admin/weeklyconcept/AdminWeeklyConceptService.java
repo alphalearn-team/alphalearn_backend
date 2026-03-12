@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import com.example.demo.concept.Concept;
+import com.example.demo.concept.ConceptRepository;
 import com.example.demo.config.SupabaseAuthUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,12 +20,15 @@ import com.example.demo.weeklyconcept.dto.WeeklyConceptUpsertRequest;
 @Service
 public class AdminWeeklyConceptService {
 
-    private static final int MAX_CONCEPT_LENGTH = 500;
-
     private final WeeklyConceptRepository weeklyConceptRepository;
+    private final ConceptRepository conceptRepository;
 
-    public AdminWeeklyConceptService(WeeklyConceptRepository weeklyConceptRepository) {
+    public AdminWeeklyConceptService(
+            WeeklyConceptRepository weeklyConceptRepository,
+            ConceptRepository conceptRepository
+    ) {
         this.weeklyConceptRepository = weeklyConceptRepository;
+        this.conceptRepository = conceptRepository;
     }
 
     @Transactional(readOnly = true)
@@ -36,7 +41,8 @@ public class AdminWeeklyConceptService {
 
         return new WeeklyConceptResponse(
                 weeklyConcept.getWeekStartDate(),
-                weeklyConcept.getConcept(),
+                weeklyConcept.getConcept().getPublicId(),
+                weeklyConcept.getConcept().getTitle(),
                 weeklyConcept.getUpdatedAt()
         );
     }
@@ -48,7 +54,7 @@ public class AdminWeeklyConceptService {
             SupabaseAuthUser user
     ) {
         UUID actorUserId = requireActorUserId(user);
-        String concept = validateAndNormalizeConcept(request);
+        Concept concept = validateAndResolveConcept(request);
         OffsetDateTime now = OffsetDateTime.now();
 
         WeeklyConcept weeklyConcept = weeklyConceptRepository.findByWeekStartDate(weekStartDate)
@@ -62,29 +68,27 @@ public class AdminWeeklyConceptService {
         WeeklyConcept saved = weeklyConceptRepository.save(weeklyConcept);
         return new WeeklyConceptResponse(
                 saved.getWeekStartDate(),
-                saved.getConcept(),
+                saved.getConcept().getPublicId(),
+                saved.getConcept().getTitle(),
                 saved.getUpdatedAt()
         );
     }
 
-    private String validateAndNormalizeConcept(WeeklyConceptUpsertRequest request) {
+    private Concept validateAndResolveConcept(WeeklyConceptUpsertRequest request) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
 
-        String concept = request.concept();
-        if (concept == null || concept.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "concept is required");
+        UUID conceptPublicId = request.conceptPublicId();
+        if (conceptPublicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "conceptPublicId is required");
         }
 
-        String trimmed = concept.trim();
-        if (trimmed.length() > MAX_CONCEPT_LENGTH) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "concept must be at most " + MAX_CONCEPT_LENGTH + " characters"
-            );
-        }
-        return trimmed;
+        return conceptRepository.findByPublicId(conceptPublicId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Concept not found: " + conceptPublicId
+                ));
     }
 
     private UUID requireActorUserId(SupabaseAuthUser user) {

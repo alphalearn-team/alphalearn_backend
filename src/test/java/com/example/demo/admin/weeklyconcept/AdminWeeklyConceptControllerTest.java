@@ -65,10 +65,12 @@ class AdminWeeklyConceptControllerTest {
     @Test
     void getWeeklyConceptReturnsRow() throws Exception {
         LocalDate weekStartDate = LocalDate.parse("2026-03-09");
+        UUID conceptPublicId = UUID.randomUUID();
 
         when(adminWeeklyConceptService.getByWeekStartDate(weekStartDate))
                 .thenReturn(new WeeklyConceptResponse(
                         weekStartDate,
+                        conceptPublicId,
                         "Algebra foundations",
                         OffsetDateTime.parse("2026-03-12T10:00:00Z")
                 ));
@@ -76,7 +78,8 @@ class AdminWeeklyConceptControllerTest {
         mockMvc.perform(get("/api/admin/weekly-concepts/{weekStartDate}", weekStartDate))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weekStartDate").value("2026-03-09"))
-                .andExpect(jsonPath("$.concept").value("Algebra foundations"));
+                .andExpect(jsonPath("$.conceptPublicId").value(conceptPublicId.toString()))
+                .andExpect(jsonPath("$.conceptTitle").value("Algebra foundations"));
     }
 
     @Test
@@ -95,60 +98,84 @@ class AdminWeeklyConceptControllerTest {
     @Test
     void upsertWeeklyConceptReturnsOkForCreate() throws Exception {
         LocalDate weekStartDate = LocalDate.parse("2026-03-09");
+        UUID conceptPublicId = UUID.randomUUID();
         SupabaseAuthUser user = adminUser();
         setAuthentication(user);
 
         when(adminWeeklyConceptService.upsertByWeekStartDate(
                 eq(weekStartDate),
-                eq(new WeeklyConceptUpsertRequest("Algebra foundations")),
+                eq(new WeeklyConceptUpsertRequest(conceptPublicId)),
                 eq(user)
         )).thenReturn(new WeeklyConceptResponse(
                 weekStartDate,
+                conceptPublicId,
                 "Algebra foundations",
                 OffsetDateTime.parse("2026-03-12T10:00:00Z")
         ));
 
         mockMvc.perform(put("/api/admin/weekly-concepts/{weekStartDate}", weekStartDate)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("concept", "Algebra foundations"))))
+                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("conceptPublicId", conceptPublicId))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weekStartDate").value("2026-03-09"))
-                .andExpect(jsonPath("$.concept").value("Algebra foundations"));
+                .andExpect(jsonPath("$.conceptPublicId").value(conceptPublicId.toString()))
+                .andExpect(jsonPath("$.conceptTitle").value("Algebra foundations"));
     }
 
     @Test
     void upsertWeeklyConceptReturnsOkForUpdate() throws Exception {
         LocalDate weekStartDate = LocalDate.parse("2026-03-09");
+        UUID conceptPublicId = UUID.randomUUID();
         SupabaseAuthUser user = adminUser();
         setAuthentication(user);
 
         when(adminWeeklyConceptService.upsertByWeekStartDate(
                 eq(weekStartDate),
-                eq(new WeeklyConceptUpsertRequest("Updated focus")),
+                eq(new WeeklyConceptUpsertRequest(conceptPublicId)),
                 eq(user)
         )).thenReturn(new WeeklyConceptResponse(
                 weekStartDate,
+                conceptPublicId,
                 "Updated focus",
                 OffsetDateTime.parse("2026-03-12T11:00:00Z")
         ));
 
         mockMvc.perform(put("/api/admin/weekly-concepts/{weekStartDate}", weekStartDate)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("concept", "Updated focus"))))
+                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("conceptPublicId", conceptPublicId))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.concept").value("Updated focus"));
+                .andExpect(jsonPath("$.conceptTitle").value("Updated focus"));
     }
 
     @Test
-    void upsertWeeklyConceptReturnsBadRequestForInvalidPayload() throws Exception {
+    void upsertWeeklyConceptReturnsBadRequestForMissingConceptPublicId() throws Exception {
         LocalDate weekStartDate = LocalDate.parse("2026-03-09");
         SupabaseAuthUser user = adminUser();
         setAuthentication(user);
 
         mockMvc.perform(put("/api/admin/weekly-concepts/{weekStartDate}", weekStartDate)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("concept", "   "))))
+                        .content(objectMapper.writeValueAsBytes(java.util.Map.of())))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void upsertWeeklyConceptReturnsNotFoundForUnknownConcept() throws Exception {
+        LocalDate weekStartDate = LocalDate.parse("2026-03-09");
+        UUID conceptPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = adminUser();
+        setAuthentication(user);
+
+        when(adminWeeklyConceptService.upsertByWeekStartDate(
+                eq(weekStartDate),
+                eq(new WeeklyConceptUpsertRequest(conceptPublicId)),
+                eq(user)
+        )).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + conceptPublicId));
+
+        mockMvc.perform(put("/api/admin/weekly-concepts/{weekStartDate}", weekStartDate)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(java.util.Map.of("conceptPublicId", conceptPublicId))))
+                .andExpect(status().isNotFound());
     }
 
     private void setAuthentication(SupabaseAuthUser user) {

@@ -1,17 +1,16 @@
 package com.example.demo.weeklyconcept.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import java.util.UUID;
+
+import jakarta.validation.constraints.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(name = "WeeklyConceptUpsertRequest", description = "Request payload to set or update weekly concept")
 public record WeeklyConceptUpsertRequest(
-        @NotBlank(message = "concept is required")
-        @Size(max = 500, message = "concept must be at most 500 characters")
+        @NotNull(message = "conceptPublicId is required")
         @Schema(
-                description = "Concept text for the selected week",
-                example = "Linear equations and inequalities",
-                maxLength = 500
+                description = "Public UUID of an existing concept",
+                example = "123e4567-e89b-12d3-a456-426614174000"
         )
-        String concept
+        UUID conceptPublicId
 ) {}
