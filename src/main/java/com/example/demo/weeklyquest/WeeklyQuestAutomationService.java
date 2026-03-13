@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class WeeklyQuestAutomationService {
     private static final Logger log = LoggerFactory.getLogger(WeeklyQuestAutomationService.class);
     private static final UUID UNCONFIGURED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    private static final String REMINDER_TYPE_MISSING_OFFICIAL = "MISSING_OFFICIAL_QUEST";
 
     private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
     private final WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
@@ -86,6 +87,31 @@ public class WeeklyQuestAutomationService {
 
         retireOlderActiveAssignments(currentWeek.getId(), now);
         completeOlderActiveWeeks(currentWeek.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public void sendMissingUpcomingWeekReminder() {
+        OffsetDateTime targetWeekStartAt = weeklyQuestCalendarService.nextSchedulableWeekStartAt();
+        OffsetDateTime deadlineAt = weeklyQuestCalendarService.setupDeadlineAt(targetWeekStartAt);
+        if (!weeklyQuestCalendarService.now().isBefore(deadlineAt)) {
+            return;
+        }
+
+        WeeklyQuestWeek week = weeklyQuestWeekRepository.findByWeekStartAt(targetWeekStartAt).orElse(null);
+        boolean hasOfficialAssignment = week != null
+                && weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(week.getId()).isPresent();
+        if (hasOfficialAssignment) {
+            return;
+        }
+
+        long daysUntilDeadline = weeklyQuestCalendarService.daysUntilSetupDeadline(targetWeekStartAt);
+        log.warn(
+                "Weekly quest reminder [{}]: week starting {} is still unset. {} days left before setup deadline on {}.",
+                REMINDER_TYPE_MISSING_OFFICIAL,
+                targetWeekStartAt,
+                daysUntilDeadline,
+                deadlineAt
+        );
     }
 
     private WeeklyQuestWeek createScheduledWeek(OffsetDateTime weekStartAt, OffsetDateTime now) {
