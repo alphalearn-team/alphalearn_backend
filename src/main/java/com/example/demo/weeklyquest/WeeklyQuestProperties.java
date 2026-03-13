@@ -17,7 +17,8 @@ public record WeeklyQuestProperties(
     ) {}
 
     public record Reminder(
-            int dailyHour
+            int dailyHour,
+            int dailyMinute
     ) {}
 
     public record Activation(

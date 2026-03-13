@@ -13,7 +13,7 @@ public class WeeklyQuestReminderScheduler {
     }
 
     @Scheduled(
-            cron = "0 0 ${weekly-quest.reminder.daily-hour:9} * * *",
+            cron = "0 ${weekly-quest.reminder.daily-minute:0} ${weekly-quest.reminder.daily-hour:9} * * *",
             zone = "${weekly-quest.zone-id:UTC}"
     )
     public void sendReminderForUnsetUpcomingWeek() {
