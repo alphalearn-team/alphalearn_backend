@@ -15,7 +15,24 @@ public record QuizQuestionDto(
         @NotBlank
         String prompt,
 
-        @Schema(description = "Type-specific properties like options and correct answers")
+        @Schema(
+                description = "Type-specific properties. \n\n" +
+                        "For 'multiple-choice': \n" +
+                        "```json\n" +
+                        "{\n" +
+                        "  \"options\": [\n" +
+                        "    { \"id\": \"uuid\", \"text\": \"Option A\" }\n" +
+                        "  ],\n" +
+                        "  \"correctOptionIds\": [\"uuid\"]\n" +
+                        "}\n" +
+                        "```\n\n" +
+                        "For 'true-false': \n" +
+                        "```json\n" +
+                        "{\n" +
+                        "  \"correctBoolean\": true\n" +
+                        "}\n" +
+                        "```"
+        )
         @NotNull
         JsonNode properties
 ) {}

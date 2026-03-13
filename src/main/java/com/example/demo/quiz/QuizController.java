@@ -27,7 +27,7 @@ public class QuizController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson")
+    @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson. NOTE: properties is meant to handle different question types. Refer to quiz question DTO for info on the question types")
     public void createQuiz(@Valid @RequestBody CreateQuizRequest request) {
         quizService.createQuiz(request);
     }
