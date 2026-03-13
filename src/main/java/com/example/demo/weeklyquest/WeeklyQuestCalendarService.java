@@ -46,6 +46,13 @@ public class WeeklyQuestCalendarService {
         return weekStartAt.minusDays(7);
     }
 
+    public long daysUntilSetupDeadline(OffsetDateTime weekStartAt) {
+        LocalDate today = localDate(now());
+        LocalDate deadlineDate = localDate(setupDeadlineAt(weekStartAt));
+        long days = java.time.temporal.ChronoUnit.DAYS.between(today, deadlineDate);
+        return Math.max(days, 0);
+    }
+
     public OffsetDateTime currentWeekStartAt() {
         ZonedDateTime zonedNow = ZonedDateTime.now(clock).withZoneSameInstant(zoneId);
         LocalDate currentDate = zonedNow.toLocalDate();
