@@ -41,7 +41,7 @@ class WeeklyQuestReminderAutomationServiceTest {
         properties = new WeeklyQuestProperties(
                 "Asia/Singapore",
                 new WeeklyQuestProperties.Fallback(UUID.randomUUID(), UUID.randomUUID()),
-                new WeeklyQuestProperties.Reminder(9),
+                new WeeklyQuestProperties.Reminder(9, 0),
                 new WeeklyQuestProperties.Activation(10)
         );
         Clock clock = Clock.fixed(Instant.parse("2026-03-15T01:00:00Z"), ZoneId.of("UTC"));
