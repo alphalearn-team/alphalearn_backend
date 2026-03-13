@@ -16,12 +16,18 @@ public record WeeklyQuestWeekDto(
         OffsetDateTime activatedAt,
         OffsetDateTime createdAt,
         boolean editable,
-        WeeklyQuestAssignmentDto officialAssignment
+        WeeklyQuestAssignmentDto officialAssignment,
+        boolean unset,
+        long daysUntilDeadline,
+        boolean shouldShowReminder
 ) {
     public static WeeklyQuestWeekDto from(
             WeeklyQuestWeek week,
             boolean editable,
-            WeeklyQuestAssignmentDto officialAssignment
+            WeeklyQuestAssignmentDto officialAssignment,
+            boolean unset,
+            long daysUntilDeadline,
+            boolean shouldShowReminder
     ) {
         return new WeeklyQuestWeekDto(
                 week.getPublicId(),
@@ -32,7 +38,10 @@ public record WeeklyQuestWeekDto(
                 week.getActivatedAt(),
                 week.getCreatedAt(),
                 editable,
-                officialAssignment
+                officialAssignment,
+                unset,
+                daysUntilDeadline,
+                shouldShowReminder
         );
     }
 }

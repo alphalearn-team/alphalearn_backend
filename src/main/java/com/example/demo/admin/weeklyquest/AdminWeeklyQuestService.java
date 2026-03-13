@@ -199,7 +199,9 @@ public class AdminWeeklyQuestService {
     }
 
     private WeeklyQuestWeekDto toWeekDto(WeeklyQuestWeek week, OffsetDateTime weekStartAt) {
+        long daysUntilDeadline = weeklyQuestCalendarService.daysUntilSetupDeadline(weekStartAt);
         if (week == null) {
+            boolean editable = weeklyQuestCalendarService.isEditable(weekStartAt);
             return new WeeklyQuestWeekDto(
                     null,
                     weekStartAt,
@@ -208,18 +210,26 @@ public class AdminWeeklyQuestService {
                     null,
                     null,
                     null,
-                    weeklyQuestCalendarService.isEditable(weekStartAt),
-                    null
+                    editable,
+                    null,
+                    true,
+                    daysUntilDeadline,
+                    editable
             );
         }
 
         WeeklyQuestAssignmentDto officialAssignment = weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(week.getId())
                 .map(WeeklyQuestAssignmentDto::from)
                 .orElse(null);
+        boolean editable = weeklyQuestCalendarService.isEditable(week.getWeekStartAt()) && week.getStatus() == WeeklyQuestWeekStatus.SCHEDULED;
+        boolean unset = officialAssignment == null;
         return WeeklyQuestWeekDto.from(
                 week,
-                weeklyQuestCalendarService.isEditable(week.getWeekStartAt()) && week.getStatus() == WeeklyQuestWeekStatus.SCHEDULED,
-                officialAssignment
+                editable,
+                officialAssignment,
+                unset,
+                daysUntilDeadline,
+                unset && editable
         );
     }
 }
