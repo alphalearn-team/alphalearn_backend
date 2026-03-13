@@ -1,7 +1,13 @@
 package com.example.demo.admin.weeklyquest;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.example.demo.concept.Concept;
@@ -46,6 +52,47 @@ public class AdminWeeklyQuestService {
         this.conceptRepository = conceptRepository;
         this.weeklyQuestCalendarService = weeklyQuestCalendarService;
         this.clock = clock;
+    }
+
+    @Transactional(readOnly = true)
+    public List<WeeklyQuestWeekDto> getWeeks(LocalDate from, LocalDate to) {
+        LocalDate resolvedFrom = resolveRangeStart(from, to);
+        LocalDate resolvedTo = resolveRangeEnd(resolvedFrom, from, to);
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must be on or before to");
+        }
+
+        OffsetDateTime fromStart = weeklyQuestCalendarService.weekStartAt(resolvedFrom);
+        OffsetDateTime toStart = weeklyQuestCalendarService.weekStartAt(resolvedTo);
+        Map<Instant, WeeklyQuestWeek> persistedWeeksByStart = new HashMap<>();
+        weeklyQuestWeekRepository.findByWeekStartAtBetweenOrderByWeekStartAtAsc(fromStart, toStart)
+                .forEach(week -> persistedWeeksByStart.put(week.getWeekStartAt().toInstant(), week));
+
+        return buildRequestedWeekStarts(resolvedFrom, resolvedTo).stream()
+                .map(weeklyQuestCalendarService::weekStartAt)
+                .map(weekStartAt -> toWeekDto(persistedWeeksByStart.get(weekStartAt.toInstant()), weekStartAt))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyQuestWeekDto getWeek(String weekStartDate) {
+        OffsetDateTime weekStartAt = weeklyQuestCalendarService.parseWeekStartDate(weekStartDate);
+        WeeklyQuestWeek week = weeklyQuestWeekRepository.findByWeekStartAt(weekStartAt).orElse(null);
+        return toWeekDto(week, weekStartAt);
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyQuestWeekDto getCurrentWeek() {
+        OffsetDateTime currentWeekStartAt = weeklyQuestCalendarService.currentWeekStartAt();
+        WeeklyQuestWeek week = weeklyQuestWeekRepository.findByWeekStartAt(currentWeekStartAt).orElse(null);
+        return toWeekDto(week, currentWeekStartAt);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WeeklyQuestTemplateDto> getTemplates() {
+        return questTemplateRepository.findByActiveTrueOrderByTitleAsc().stream()
+                .map(WeeklyQuestTemplateDto::from)
+                .toList();
     }
 
     @Transactional
@@ -97,7 +144,7 @@ public class AdminWeeklyQuestService {
         week.setActivationSource(WeeklyQuestActivationSource.ADMIN);
         weeklyQuestAssignmentRepository.save(assignment);
         weeklyQuestWeekRepository.save(week);
-        return toWeekDto(week);
+        return toWeekDto(week, week.getWeekStartAt());
     }
 
     private WeeklyQuestWeek createScheduledWeek(OffsetDateTime weekStartAt) {
@@ -121,7 +168,51 @@ public class AdminWeeklyQuestService {
         return assignment;
     }
 
-    private WeeklyQuestWeekDto toWeekDto(WeeklyQuestWeek week) {
+    private LocalDate resolveRangeStart(LocalDate from, LocalDate to) {
+        if (from != null) {
+            weeklyQuestCalendarService.weekStartAt(from);
+            return from;
+        }
+        if (to != null) {
+            weeklyQuestCalendarService.weekStartAt(to);
+            return to.minusWeeks(8);
+        }
+        return weeklyQuestCalendarService.localDate(weeklyQuestCalendarService.currentWeekStartAt());
+    }
+
+    private LocalDate resolveRangeEnd(LocalDate resolvedFrom, LocalDate from, LocalDate to) {
+        if (to != null) {
+            weeklyQuestCalendarService.weekStartAt(to);
+            return to;
+        }
+        if (from != null) {
+            return from.plusWeeks(8);
+        }
+        return resolvedFrom.plusWeeks(8);
+    }
+
+    private List<LocalDate> buildRequestedWeekStarts(LocalDate from, LocalDate to) {
+        long weeksInclusive = ChronoUnit.WEEKS.between(from, to) + 1;
+        return java.util.stream.Stream.iterate(from, date -> date.plusWeeks(1))
+                .limit(weeksInclusive)
+                .toList();
+    }
+
+    private WeeklyQuestWeekDto toWeekDto(WeeklyQuestWeek week, OffsetDateTime weekStartAt) {
+        if (week == null) {
+            return new WeeklyQuestWeekDto(
+                    null,
+                    weekStartAt,
+                    weeklyQuestCalendarService.setupDeadlineAt(weekStartAt),
+                    WeeklyQuestWeekStatus.SCHEDULED,
+                    null,
+                    null,
+                    null,
+                    weeklyQuestCalendarService.isEditable(weekStartAt),
+                    null
+            );
+        }
+
         WeeklyQuestAssignmentDto officialAssignment = weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(week.getId())
                 .map(WeeklyQuestAssignmentDto::from)
                 .orElse(null);

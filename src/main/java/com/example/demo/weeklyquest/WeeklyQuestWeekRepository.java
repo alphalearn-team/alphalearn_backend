@@ -13,5 +13,7 @@ public interface WeeklyQuestWeekRepository extends JpaRepository<WeeklyQuestWeek
 
     Optional<WeeklyQuestWeek> findByWeekStartAt(OffsetDateTime weekStartAt);
 
+    List<WeeklyQuestWeek> findByWeekStartAtBetweenOrderByWeekStartAtAsc(OffsetDateTime from, OffsetDateTime to);
+
     List<WeeklyQuestWeek> findAllByOrderByWeekStartAtAsc();
 }
