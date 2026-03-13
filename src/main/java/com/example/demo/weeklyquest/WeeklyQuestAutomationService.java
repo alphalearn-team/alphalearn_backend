@@ -1,9 +1,12 @@
 package com.example.demo.weeklyquest;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
@@ -31,6 +34,7 @@ public class WeeklyQuestAutomationService {
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
     private final WeeklyQuestProperties weeklyQuestProperties;
     private final Clock clock;
+    private final Set<String> emittedReminderKeys = ConcurrentHashMap.newKeySet();
 
     public WeeklyQuestAutomationService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
@@ -101,6 +105,12 @@ public class WeeklyQuestAutomationService {
         boolean hasOfficialAssignment = week != null
                 && weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(week.getId()).isPresent();
         if (hasOfficialAssignment) {
+            return;
+        }
+
+        LocalDate reminderDate = weeklyQuestCalendarService.localDate(weeklyQuestCalendarService.now());
+        String reminderKey = buildReminderKey(targetWeekStartAt, reminderDate, REMINDER_TYPE_MISSING_OFFICIAL);
+        if (!emittedReminderKeys.add(reminderKey)) {
             return;
         }
 
@@ -180,5 +190,9 @@ public class WeeklyQuestAutomationService {
 
     private boolean isUnconfigured(UUID value) {
         return value == null || UNCONFIGURED_UUID.equals(value);
+    }
+
+    private String buildReminderKey(OffsetDateTime targetWeekStartAt, LocalDate reminderDate, String reminderType) {
+        return reminderType + "|" + targetWeekStartAt.toInstant() + "|" + reminderDate;
     }
 }
