@@ -2,16 +2,15 @@ package com.example.demo.quiz;
 
 import java.util.UUID;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
-import com.fasterxml.jackson.databind.JsonNode;
-
 import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorColumn;
+import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
@@ -25,7 +24,9 @@ import lombok.Setter;
 @NoArgsConstructor
 @Entity
 @Table(name = "quiz_questions")
-public class QuizQuestion {
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn(name = "question_type", discriminatorType = DiscriminatorType.STRING)
+public abstract class QuizQuestion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,25 +42,16 @@ public class QuizQuestion {
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
 
-    @Column(nullable = false)
-    private String type;
-
     @Column(nullable = false, columnDefinition = "TEXT")
     private String prompt;
 
     @Column(name = "order_index", nullable = false)
     private int orderIndex;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "properties", columnDefinition = "jsonb")
-    private JsonNode properties;
-
-    public QuizQuestion(Quiz quiz, String type, String prompt, int orderIndex, JsonNode properties) {
+    public QuizQuestion(Quiz quiz, String prompt, int orderIndex) {
         this.quiz = quiz;
-        this.type = type;
         this.prompt = prompt;
         this.orderIndex = orderIndex;
-        this.properties = properties;
     }
 
     @PrePersist

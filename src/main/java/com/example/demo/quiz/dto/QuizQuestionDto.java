@@ -1,9 +1,9 @@
 package com.example.demo.quiz.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.Map;
 
 @Schema(name = "QuizQuestionDto", description = "Payload for individual quiz questions")
 public record QuizQuestionDto(
@@ -34,5 +34,5 @@ public record QuizQuestionDto(
                         "```"
         )
         @NotNull
-        JsonNode properties
+        Map<String, Object> properties
 ) {}

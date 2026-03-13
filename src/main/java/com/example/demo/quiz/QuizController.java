@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/api/quizzes")
+@RequestMapping("/api/quizzes/create")
 @Tag(name = "Quizzes", description = "Endpoints for creating and managing lesson quizzes")
 public class QuizController {
 
@@ -27,7 +27,7 @@ public class QuizController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson. NOTE: properties is meant to handle different question types. Refer to quiz question DTO for info on the question types")
+    @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson.")
     public void createQuiz(@Valid @RequestBody CreateQuizRequest request) {
         quizService.createQuiz(request);
     }
