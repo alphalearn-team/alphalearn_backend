@@ -71,9 +71,36 @@ public class QuizService {
                 throw new IllegalArgumentException("Unknown question type: " + dto.type());
             }
 
+            validateQuestionSpecifics(dto);
+
             quiz.getQuestions().add(question);
         }
 
         return quizRepository.save(quiz);
+    }
+
+    private void validateQuestionSpecifics(QuizQuestionDto dto) {
+        Map<String, Object> props = dto.properties();
+        String type = dto.type();
+
+        if ("multiple-choice".equals(type)) {
+            List<?> options = (List<?>) props.get("options");
+            List<?> correctIds = (List<?>) props.get("correctOptionIds");
+            if (options == null || options.size() < 2) {
+                throw new IllegalArgumentException("Multi-select must have at least 2 options.");
+            }
+            if (correctIds == null || correctIds.isEmpty()) {
+                throw new IllegalArgumentException("Multi-select must have at least one correct option.");
+            }
+        } else if ("single-choice".equals(type)) {
+            List<?> options = (List<?>) props.get("options");
+            String correctId = (String) props.get("correctOptionId");
+            if (options == null || options.size() < 2) {
+                throw new IllegalArgumentException("MCQ must have at least 2 options.");
+            }
+            if (correctId == null || correctId.isBlank()) {
+                throw new IllegalArgumentException("MCQ must have a correct option selected.");
+            }
+        }
     }
 }
