@@ -31,8 +31,6 @@ public class QuizService {
 
         Quiz quiz = new Quiz(
                 lesson,
-                request.title(),
-                request.description(),
                 java.time.OffsetDateTime.now());
 
         List<QuizQuestionDto> requestedQuestions = request.questions();

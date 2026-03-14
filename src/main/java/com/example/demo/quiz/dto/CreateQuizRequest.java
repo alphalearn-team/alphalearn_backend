@@ -15,13 +15,6 @@ public record CreateQuizRequest(
         @NotNull
         UUID lessonPublicId,
 
-        @Schema(description = "The title of the quiz", example = "Chapter 1 Review")
-        @NotBlank
-        String title,
-
-        @Schema(description = "Optional description or instructions for the quiz")
-        String description,
-
         @Schema(description = "List of questions in the quiz; order dictates the final display order")
         @Valid
         @NotEmpty

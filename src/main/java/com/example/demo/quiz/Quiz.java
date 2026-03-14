@@ -43,22 +43,14 @@ public class Quiz {
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
-    @Column(nullable = false)
-    private String title;
-
-    @Column(name = "description")
-    private String description;
-
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<QuizQuestion> questions = new ArrayList<>();
 
-    public Quiz(Lesson lesson, String title, String description, OffsetDateTime createdAt) {
+    public Quiz(Lesson lesson, OffsetDateTime createdAt) {
         this.lesson = lesson;
-        this.title = title;
-        this.description = description;
         this.createdAt = createdAt;
     }
 
