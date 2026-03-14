@@ -17,13 +17,16 @@ public class MeWeeklyQuestController {
 
     private final LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService;
     private final LearnerQuestChallengeUploadService learnerQuestChallengeUploadService;
+    private final LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
 
     public MeWeeklyQuestController(
             LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService,
-            LearnerQuestChallengeUploadService learnerQuestChallengeUploadService
+            LearnerQuestChallengeUploadService learnerQuestChallengeUploadService,
+            LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService
     ) {
         this.learnerWeeklyQuestQueryService = learnerWeeklyQuestQueryService;
         this.learnerQuestChallengeUploadService = learnerQuestChallengeUploadService;
+        this.learnerQuestChallengeSubmissionService = learnerQuestChallengeSubmissionService;
     }
 
     @GetMapping("/current")
@@ -39,5 +42,26 @@ public class MeWeeklyQuestController {
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
         return learnerQuestChallengeUploadService.createUploadInstruction(request, user);
+    }
+
+    @GetMapping("/current/quest-challenge/submission")
+    @Operation(summary = "Get current quest challenge submission", description = "Returns the authenticated learner's saved quest challenge submission for the current active weekly quest, or null when unavailable")
+    public QuestChallengeSubmissionResponse getCurrentQuestChallengeSubmission(
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return learnerQuestChallengeSubmissionService.getCurrentSubmission(user)
+                .map(QuestChallengeSubmissionResponse::from)
+                .orElse(null);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/current/quest-challenge/submission")
+    @Operation(summary = "Save current quest challenge submission", description = "Creates or replaces the authenticated learner's current quest challenge submission for the active weekly quest")
+    public QuestChallengeSubmissionResponse saveQuestChallengeSubmission(
+            @RequestBody QuestChallengeSubmissionRequest request,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return QuestChallengeSubmissionResponse.from(
+                learnerQuestChallengeSubmissionService.saveCurrentSubmission(request.toCommand(), user)
+        );
     }
 }

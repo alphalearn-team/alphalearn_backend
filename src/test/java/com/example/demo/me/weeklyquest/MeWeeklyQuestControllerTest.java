@@ -3,6 +3,7 @@ package com.example.demo.me.weeklyquest;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +34,8 @@ class MeWeeklyQuestControllerTest {
     private LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService;
     @Mock
     private LearnerQuestChallengeUploadService learnerQuestChallengeUploadService;
+    @Mock
+    private LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -44,7 +47,8 @@ class MeWeeklyQuestControllerTest {
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders.standaloneSetup(new MeWeeklyQuestController(
                         learnerWeeklyQuestQueryService,
-                        learnerQuestChallengeUploadService
+                        learnerQuestChallengeUploadService,
+                        learnerQuestChallengeSubmissionService
                 ))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
@@ -107,5 +111,61 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(jsonPath("$.objectKey").value("quest-challenges/assignment/learner/object-evidence.mp4"))
                 .andExpect(jsonPath("$.uploadUrl").value("https://signed-upload-url.example"))
                 .andExpect(jsonPath("$.requiredHeaders.Content-Type").value("video/mp4"));
+    }
+
+    @Test
+    void returnsCurrentQuestChallengeSubmission() throws Exception {
+        QuestChallengeSubmissionView view = new QuestChallengeSubmissionView(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "quest-challenges/assignment/learner/object-evidence.mp4",
+                "https://pub-6ae6c44a993a415fb6d112bbab13f0fc.r2.dev/quest-challenges/assignment/learner/object-evidence.mp4",
+                "video/mp4",
+                "evidence.mp4",
+                1024L,
+                "Learner caption",
+                OffsetDateTime.parse("2026-03-14T10:00:00Z"),
+                OffsetDateTime.parse("2026-03-14T10:05:00Z")
+        );
+
+        when(learnerQuestChallengeSubmissionService.getCurrentSubmission(null)).thenReturn(Optional.of(view));
+
+        mockMvc.perform(get("/api/me/weekly-quest/current/quest-challenge/submission")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.objectKey").value("quest-challenges/assignment/learner/object-evidence.mp4"))
+                .andExpect(jsonPath("$.contentType").value("video/mp4"))
+                .andExpect(jsonPath("$.caption").value("Learner caption"));
+    }
+
+    @Test
+    void savesQuestChallengeSubmission() throws Exception {
+        QuestChallengeSubmissionRequest request = new QuestChallengeSubmissionRequest(
+                "quest-challenges/assignment/learner/object-evidence.mp4",
+                "evidence.mp4",
+                "Learner caption"
+        );
+        QuestChallengeSubmissionView view = new QuestChallengeSubmissionView(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                request.objectKey(),
+                "https://pub-6ae6c44a993a415fb6d112bbab13f0fc.r2.dev/" + request.objectKey(),
+                "video/mp4",
+                request.originalFilename(),
+                1024L,
+                request.caption(),
+                OffsetDateTime.parse("2026-03-14T10:00:00Z"),
+                OffsetDateTime.parse("2026-03-14T10:05:00Z")
+        );
+
+        when(learnerQuestChallengeSubmissionService.saveCurrentSubmission(request.toCommand(), null)).thenReturn(view);
+
+        mockMvc.perform(put("/api/me/weekly-quest/current/quest-challenge/submission")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.originalFilename").value("evidence.mp4"))
+                .andExpect(jsonPath("$.caption").value("Learner caption"))
+                .andExpect(jsonPath("$.fileSizeBytes").value(1024));
     }
 }
