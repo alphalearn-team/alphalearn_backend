@@ -6,7 +6,11 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -19,15 +23,18 @@ public class QuestChallengeStorageService {
     private final R2StorageProperties properties;
     private final QuestChallengeObjectKeyFactory objectKeyFactory;
     private final ObjectProvider<S3Presigner> presignerProvider;
+    private final ObjectProvider<S3Client> s3ClientProvider;
 
     public QuestChallengeStorageService(
             R2StorageProperties properties,
             QuestChallengeObjectKeyFactory objectKeyFactory,
-            ObjectProvider<S3Presigner> presignerProvider
+            ObjectProvider<S3Presigner> presignerProvider,
+            ObjectProvider<S3Client> s3ClientProvider
     ) {
         this.properties = properties;
         this.objectKeyFactory = objectKeyFactory;
         this.presignerProvider = presignerProvider;
+        this.s3ClientProvider = s3ClientProvider;
     }
 
     public String buildObjectKey(UUID assignmentPublicId, UUID learnerId, String originalFilename) {
@@ -46,7 +53,7 @@ public class QuestChallengeStorageService {
     }
 
     public void requireEnabled() {
-        if (!properties.enabled() || presignerProvider.getIfAvailable() == null) {
+        if (!properties.enabled() || presignerProvider.getIfAvailable() == null || s3ClientProvider.getIfAvailable() == null) {
             throw new IllegalStateException("Quest challenge storage is not enabled");
         }
     }
@@ -89,11 +96,45 @@ public class QuestChallengeStorageService {
         return properties.maxUploadSizeBytes();
     }
 
+    public String expectedObjectKeyPrefix(UUID assignmentPublicId, UUID learnerId) {
+        return "quest-challenges/%s/%s/".formatted(assignmentPublicId, learnerId);
+    }
+
+    public StoredObjectMetadata fetchObjectMetadata(String objectKey) {
+        requireEnabled();
+
+        try {
+            S3Client s3Client = s3ClientProvider.getObject();
+            var response = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(properties.bucket())
+                    .key(objectKey)
+                    .build());
+            return new StoredObjectMetadata(
+                    response.contentType(),
+                    response.contentLength(),
+                    buildPublicUrl(objectKey)
+            );
+        } catch (NoSuchKeyException ex) {
+            throw new IllegalArgumentException("Uploaded object was not found", ex);
+        } catch (S3Exception ex) {
+            if (ex.statusCode() == 404) {
+                throw new IllegalArgumentException("Uploaded object was not found", ex);
+            }
+            throw ex;
+        }
+    }
+
     public record PresignedUpload(
             String objectKey,
             String publicUrl,
             String uploadUrl,
             OffsetDateTime expiresAt,
             Map<String, String> requiredHeaders
+    ) {}
+
+    public record StoredObjectMetadata(
+            String contentType,
+            long fileSizeBytes,
+            String publicUrl
     ) {}
 }

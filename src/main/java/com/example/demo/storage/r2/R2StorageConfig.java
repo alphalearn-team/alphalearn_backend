@@ -5,6 +5,7 @@ import java.util.Locale;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,6 +16,27 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties(R2StorageProperties.class)
 public class R2StorageConfig {
+
+    @Bean
+    @ConditionalOnProperty(prefix = "storage.r2", name = "enabled", havingValue = "true")
+    public S3Client r2S3Client(R2StorageProperties properties) {
+        validate(properties);
+
+        AwsBasicCredentials credentials = AwsBasicCredentials.create(
+                properties.accessKey(),
+                properties.secretKey()
+        );
+
+        return S3Client.builder()
+                .endpointOverride(properties.endpoint())
+                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .region(Region.of("auto"))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .chunkedEncodingEnabled(false)
+                        .build())
+                .build();
+    }
 
     @Bean
     @ConditionalOnProperty(prefix = "storage.r2", name = "enabled", havingValue = "true")
