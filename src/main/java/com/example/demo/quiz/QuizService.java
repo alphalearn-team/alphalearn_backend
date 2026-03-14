@@ -44,12 +44,22 @@ public class QuizService {
             if ("multiple-choice".equals(dto.type())) {
                 com.fasterxml.jackson.databind.JsonNode options = objectMapper.valueToTree(props.get("options"));
                 com.fasterxml.jackson.databind.JsonNode correctOptionIds = objectMapper.valueToTree(props.get("correctOptionIds"));
-                question = new MCQQuestion(
+                question = new MultiSelectQuestion(
                         quiz,
                         dto.prompt(),
                         i,
                         options,
                         correctOptionIds
+                );
+            } else if ("single-choice".equals(dto.type())) {
+                com.fasterxml.jackson.databind.JsonNode options = objectMapper.valueToTree(props.get("options"));
+                String correctOptionId = (String) props.get("correctOptionId");
+                question = new MCQQuestion(
+                        quiz,
+                        dto.prompt(),
+                        i,
+                        options,
+                        correctOptionId
                 );
             } else if ("true-false".equals(dto.type())) {
                 boolean correctBoolean = (Boolean) props.get("correctBoolean");

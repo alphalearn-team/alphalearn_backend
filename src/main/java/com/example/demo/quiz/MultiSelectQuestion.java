@@ -16,20 +16,21 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "mcq_questions")
-@DiscriminatorValue("single-choice")
-public class MCQQuestion extends QuizQuestion {
+@Table(name = "multi_select_questions")
+@DiscriminatorValue("multi-select_questions")
+public class MultiSelectQuestion extends QuizQuestion {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "options", columnDefinition = "jsonb", nullable = false)
     private JsonNode options;
 
-    @Column(name = "correct_option_id", nullable = false)
-    private String correctOptionId;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "correct_option_ids", columnDefinition = "jsonb", nullable = false)
+    private JsonNode correctOptionIds;
 
-    public MCQQuestion(Quiz quiz, String prompt, int orderIndex, JsonNode options, String correctOptionId) {
+    public MultiSelectQuestion(Quiz quiz, String prompt, int orderIndex, JsonNode options, JsonNode correctOptionIds) {
         super(quiz, prompt, orderIndex);
         this.options = options;
-        this.correctOptionId = correctOptionId;
+        this.correctOptionIds = correctOptionIds;
     }
 }

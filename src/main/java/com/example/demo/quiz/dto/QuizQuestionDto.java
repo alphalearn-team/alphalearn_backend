@@ -26,6 +26,15 @@ public record QuizQuestionDto(
                         "  \"correctOptionIds\": [\"uuid\"]\n" +
                         "}\n" +
                         "```\n\n" +
+                        "For 'single-choice': \n" +
+                        "```json\n" +
+                        "{\n" +
+                        "  \"options\": [\n" +
+                        "    { \"id\": \"uuid\", \"text\": \"Option A\" }\n" +
+                        "  ],\n" +
+                        "  \"correctOptionId\": \"uuid\"\n" +
+                        "}\n" +
+                        "```\n\n" +
                         "For 'true-false': \n" +
                         "```json\n" +
                         "{\n" +
