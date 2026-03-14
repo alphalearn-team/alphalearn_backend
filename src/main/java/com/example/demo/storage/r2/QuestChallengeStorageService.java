@@ -1,7 +1,14 @@
 package com.example.demo.storage.r2;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -28,6 +35,9 @@ public class QuestChallengeStorageService {
     }
 
     public String buildPublicUrl(String objectKey) {
+        if (properties.normalizedPublicBaseUrl().isBlank()) {
+            return null;
+        }
         return properties.normalizedPublicBaseUrl() + "/" + objectKey;
     }
 
@@ -40,4 +50,50 @@ public class QuestChallengeStorageService {
             throw new IllegalStateException("Quest challenge storage is not enabled");
         }
     }
+
+    public PresignedUpload generatePresignedUpload(
+            UUID assignmentPublicId,
+            UUID learnerId,
+            String originalFilename,
+            String contentType
+    ) {
+        requireEnabled();
+
+        String objectKey = buildObjectKey(assignmentPublicId, learnerId, originalFilename);
+        Duration expiration = Duration.ofMinutes(properties.presignExpiryMinutes());
+        S3Presigner presigner = presignerProvider.getObject();
+
+        PutObjectRequest objectRequest = PutObjectRequest.builder()
+                .bucket(properties.bucket())
+                .key(objectKey)
+                .contentType(contentType)
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(expiration)
+                .putObjectRequest(objectRequest)
+                .build();
+
+        PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
+
+        return new PresignedUpload(
+                objectKey,
+                buildPublicUrl(objectKey),
+                presignedRequest.url().toString(),
+                OffsetDateTime.now(ZoneOffset.UTC).plus(expiration),
+                Map.of("Content-Type", contentType)
+        );
+    }
+
+    public long maxUploadSizeBytes() {
+        return properties.maxUploadSizeBytes();
+    }
+
+    public record PresignedUpload(
+            String objectKey,
+            String publicUrl,
+            String uploadUrl,
+            OffsetDateTime expiresAt,
+            Map<String, String> requiredHeaders
+    ) {}
 }
