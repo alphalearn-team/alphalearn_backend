@@ -22,6 +22,7 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizQuestionDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class QuizServiceTest {
@@ -44,7 +45,7 @@ class QuizServiceTest {
     void createQuizSuccessfullyWithAllTypes() {
         UUID lessonPublicId = UUID.randomUUID();
         Lesson lesson = new Lesson();
-        lesson.setLessonPublicId(lessonPublicId);
+        ReflectionTestUtils.setField(lesson, "publicId", lessonPublicId);
 
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
         when(quizRepository.save(any(Quiz.class))).thenAnswer(invocation -> invocation.getArgument(0));
