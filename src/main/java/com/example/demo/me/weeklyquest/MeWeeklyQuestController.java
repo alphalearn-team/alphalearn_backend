@@ -31,8 +31,10 @@ public class MeWeeklyQuestController {
 
     @GetMapping("/current")
     @Operation(summary = "Get current weekly quest", description = "Returns the current active weekly concept and quest for the authenticated learner, or null when unavailable")
-    public LearnerCurrentWeeklyQuestDto getCurrentWeeklyQuest() {
-        return learnerWeeklyQuestQueryService.getCurrentWeeklyQuest().orElse(null);
+    public LearnerCurrentWeeklyQuestDto getCurrentWeeklyQuest(
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return learnerWeeklyQuestQueryService.getCurrentWeeklyQuest(user).orElse(null);
     }
 
     @PostMapping("/current/quest-challenge/upload")

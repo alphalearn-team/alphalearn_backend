@@ -63,15 +63,27 @@ class MeWeeklyQuestControllerTest {
                         "Video + Caption",
                         "Record a short video and write a caption using the assigned concept.",
                         QuestSubmissionMode.VIDEO_WITH_CAPTION
+                ),
+                new LearnerQuestChallengeSubmissionSummaryDto(
+                        UUID.randomUUID(),
+                        "quest-challenges/assignment/learner/object-evidence.mp4",
+                        "https://pub-6ae6c44a993a415fb6d112bbab13f0fc.r2.dev/quest-challenges/assignment/learner/object-evidence.mp4",
+                        "video/mp4",
+                        "evidence.mp4",
+                        1024L,
+                        "Learner caption",
+                        OffsetDateTime.parse("2026-03-22T01:00:00+08:00"),
+                        OffsetDateTime.parse("2026-03-22T01:05:00+08:00")
                 )
         );
-        when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest()).thenReturn(Optional.of(dto));
+        when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest(null)).thenReturn(Optional.of(dto));
 
         mockMvc.perform(get("/api/me/weekly-quest/current").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weekStartAt").value("2026-03-22T00:00:00+08:00"))
                 .andExpect(jsonPath("$.concept.title").value("fire"))
                 .andExpect(jsonPath("$.quest.title").value("Video + Caption"))
+                .andExpect(jsonPath("$.questChallengeSubmission.originalFilename").value("evidence.mp4"))
                 .andExpect(jsonPath("$.editable").doesNotExist())
                 .andExpect(jsonPath("$.activationSource").doesNotExist())
                 .andExpect(jsonPath("$.createdByAdminId").doesNotExist());
@@ -79,7 +91,7 @@ class MeWeeklyQuestControllerTest {
 
     @Test
     void returnsEmptyBodyWhenNoCurrentWeeklyQuestExists() throws Exception {
-        when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest()).thenReturn(Optional.empty());
+        when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest(null)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/me/weekly-quest/current").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

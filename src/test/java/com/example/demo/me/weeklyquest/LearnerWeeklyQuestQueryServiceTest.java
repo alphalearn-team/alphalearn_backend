@@ -15,6 +15,7 @@ import com.example.demo.weeklyquest.QuestTemplate;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
+import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
 import com.example.demo.weeklyquest.WeeklyQuestWeek;
 import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
 import com.example.demo.weeklyquest.enums.QuestSubmissionMode;
@@ -35,6 +36,8 @@ class LearnerWeeklyQuestQueryServiceTest {
     private WeeklyQuestWeekRepository weeklyQuestWeekRepository;
     @Mock
     private WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
+    @Mock
+    private WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository;
 
     private LearnerWeeklyQuestQueryService service;
 
@@ -45,6 +48,7 @@ class LearnerWeeklyQuestQueryServiceTest {
         service = new LearnerWeeklyQuestQueryService(
                 weeklyQuestWeekRepository,
                 weeklyQuestAssignmentRepository,
+                weeklyQuestChallengeSubmissionRepository,
                 calendarService
         );
     }
@@ -56,12 +60,13 @@ class LearnerWeeklyQuestQueryServiceTest {
         when(weeklyQuestWeekRepository.findByWeekStartAt(week.getWeekStartAt())).thenReturn(Optional.of(week));
         when(weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(1L)).thenReturn(Optional.of(assignment));
 
-        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest();
+        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest(null);
 
         assertThat(result).isPresent();
         assertThat(result.get().weekStartAt()).isEqualTo(week.getWeekStartAt());
         assertThat(result.get().concept().title()).isEqualTo("fire");
         assertThat(result.get().quest().instructionText()).contains("assigned concept");
+        assertThat(result.get().questChallengeSubmission()).isNull();
     }
 
     @Test
@@ -71,7 +76,7 @@ class LearnerWeeklyQuestQueryServiceTest {
         when(weeklyQuestWeekRepository.findByWeekStartAt(week.getWeekStartAt())).thenReturn(Optional.of(week));
         when(weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(2L)).thenReturn(Optional.of(assignment));
 
-        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest();
+        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest(null);
 
         assertThat(result).isPresent();
         assertThat(result.get().quest().title()).isEqualTo("Video + Caption");
@@ -82,7 +87,7 @@ class LearnerWeeklyQuestQueryServiceTest {
         OffsetDateTime currentWeekStartAt = OffsetDateTime.parse("2026-03-22T00:00:00+08:00");
         when(weeklyQuestWeekRepository.findByWeekStartAt(currentWeekStartAt)).thenReturn(Optional.empty());
 
-        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest();
+        Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest(null);
 
         assertThat(result).isEmpty();
     }
