@@ -30,6 +30,7 @@ import org.springframework.context.annotation.Configuration;
         @Tag(name = "Me", description = "Current-user role resolution endpoint"),
         @Tag(name = "Admin Lessons", description = "Lesson moderation endpoints"),
         @Tag(name = "Admin Concepts", description = "Concept management endpoints"),
+        @Tag(name = "Admin Dashboard", description = "Admin dashboard summary endpoints"),
         @Tag(name = "Admin Contributors", description = "Contributor role management endpoints"),
         @Tag(name = "Admin Contributor Applications", description = "Contributor application moderation endpoints"),
         @Tag(name = "Admin Learners", description = "Learner listing endpoints for admins")
