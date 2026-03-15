@@ -15,4 +15,6 @@ public interface ContributorRepository extends JpaRepository<Contributor, UUID> 
     long countByDemotedAtIsNull();
 
     long countByDemotedAtIsNullAndPromotedAtGreaterThanEqual(OffsetDateTime promotedAt);
+
+    long countByDemotedAtIsNullAndPromotedAtGreaterThanEqualAndPromotedAtLessThan(OffsetDateTime startInclusive, OffsetDateTime endExclusive);
 }
