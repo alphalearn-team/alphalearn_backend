@@ -10,4 +10,6 @@ public interface  LearnerRepository extends JpaRepository<Learner, UUID>{
     Optional<Learner> findByPublicId(UUID publicId);
 
     boolean existsByPublicId(UUID publicId);
+
+    long countBy();
 }
