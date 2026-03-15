@@ -1,8 +1,8 @@
-package com.example.demo.admin.dashboard;
+package com.example.demo.admin.dashboard.dto;
 
 import java.util.UUID;
 
-public record AdminDashboardTopConceptDto(
+public record AdminDashboardLowPerformingConceptDto(
         UUID conceptPublicId,
         String title,
         long lessonCount
