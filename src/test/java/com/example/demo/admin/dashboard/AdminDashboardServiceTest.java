@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.example.demo.admin.dashboard.dto.AdminDashboardSummaryDto;
 import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.lesson.LessonRepository;
@@ -92,6 +93,43 @@ class AdminDashboardServiceTest {
         assertThat(result.newContributors()).isZero();
         assertThat(result.topConcepts()).isEmpty();
     }
+
+        @Test
+        void getSummaryWithRangeIncludesOptionalAnalyticsSections() {
+        LessonRepository.ConceptLessonCountView top = topConcept(UUID.randomUUID(), "Fractions", 14L);
+        LessonRepository.ConceptLessonCountView low = topConcept(UUID.randomUUID(), "Geometry", 1L);
+
+        when(lessonRepository.countByDeletedAtIsNull()).thenReturn(30L);
+        when(learnerRepository.countBy()).thenReturn(120L);
+        when(lessonEnrollmentRepository.countBy()).thenReturn(280L);
+        when(contributorRepository.countByDemotedAtIsNullAndPromotedAtGreaterThanEqual(any(OffsetDateTime.class)))
+            .thenReturn(5L);
+        when(lessonRepository.findTopConceptsByLessonCount(any(Pageable.class)))
+            .thenReturn(List.of(top));
+
+        when(lessonRepository.countByDeletedAtIsNullAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+            .thenReturn(3L);
+        when(learnerRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+            .thenReturn(2L);
+        when(lessonEnrollmentRepository.countByFirstCompletedAtGreaterThanEqualAndFirstCompletedAtLessThan(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+            .thenReturn(4L);
+        when(contributorRepository.countByDemotedAtIsNullAndPromotedAtGreaterThanEqualAndPromotedAtLessThan(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+            .thenReturn(1L);
+
+        when(lessonRepository.countByDeletedAtIsNullAndLessonModerationStatus(com.example.demo.lesson.LessonModerationStatus.PENDING))
+            .thenReturn(12L);
+        when(lessonRepository.findLowPerformingConceptsByLessonCount(any(Pageable.class)))
+            .thenReturn(List.of(low));
+
+        AdminDashboardSummaryDto result = adminDashboardService.getSummary("7d", null, null);
+
+        assertThat(result.deltas()).isNotNull();
+        assertThat(result.trends()).isNotEmpty();
+        assertThat(result.alerts()).isNotEmpty();
+        assertThat(result.pendingModerationCount()).isEqualTo(12L);
+        assertThat(result.lowPerformingConcepts()).hasSize(1);
+        assertThat(result.lowPerformingConcepts().get(0).title()).isEqualTo("Geometry");
+        }
 
     private LessonRepository.ConceptLessonCountView topConcept(UUID conceptPublicId, String title, long lessonCount) {
         return new LessonRepository.ConceptLessonCountView() {
