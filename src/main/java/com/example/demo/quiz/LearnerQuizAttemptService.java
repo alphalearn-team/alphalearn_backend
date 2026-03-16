@@ -12,6 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.learner.Learner;
+import com.example.demo.lesson.Lesson;
+import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.quiz.dto.QuizAttemptResponse;
 import com.example.demo.quiz.dto.SubmitQuizAttemptRequest;
 
@@ -51,6 +53,7 @@ public class LearnerQuizAttemptService {
 
         Quiz quiz = quizRepository.findByPublicId(quizPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requirePublicLesson(quiz.getLesson());
 
         List<QuizQuestion> questions = quiz.getQuestions().stream()
                 .sorted(Comparator.comparingInt(QuizQuestion::getOrderIndex))
@@ -83,6 +86,14 @@ public class LearnerQuizAttemptService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
         }
         return user.learner();
+    }
+
+    private void requirePublicLesson(Lesson lesson) {
+        if (lesson == null
+                || lesson.getDeletedAt() != null
+                || lesson.getLessonModerationStatus() != LessonModerationStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Quiz is only available for approved lessons");
+        }
     }
 
     private short toShort(int score) {

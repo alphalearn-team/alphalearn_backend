@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.Lesson;
+import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.quiz.dto.QuizAttemptResponse;
 import com.example.demo.quiz.dto.QuizQuestionAnswerRequest;
 import com.example.demo.quiz.dto.SubmitQuizAttemptRequest;
@@ -201,8 +202,35 @@ class LearnerQuizAttemptServiceTest {
         assertThat(ex.getReason()).contains("Question does not belong to quiz");
     }
 
+    @Test
+    void submitQuizAttemptRejectsQuizWhenLessonIsNotApproved() {
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.UNPUBLISHED);
+        SupabaseAuthUser learnerUser = learnerUser();
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, learnerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Quiz is only available for approved lessons");
+    }
+
     private Quiz buildQuizWithMixedQuestions() {
+        return buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED);
+    }
+
+    private Quiz buildQuizWithMixedQuestions(LessonModerationStatus lessonModerationStatus) {
         Lesson lesson = new Lesson();
+        lesson.setLessonModerationStatus(lessonModerationStatus);
         Quiz quiz = new Quiz(lesson, OffsetDateTime.parse("2026-03-16T10:00:00Z"));
         ReflectionTestUtils.setField(quiz, "quizId", 42);
         ReflectionTestUtils.setField(quiz, "publicId", UUID.randomUUID());
