@@ -247,6 +247,72 @@ class LearnerQuizAttemptServiceTest {
         assertThat(ex.getReason()).isEqualTo("Lesson creators cannot answer their own quiz");
     }
 
+    @Test
+    void contributorCanSubmitQuizAttemptForAnotherContributorsApprovedLesson() {
+        SupabaseAuthUser contributorUser = contributorUser();
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, UUID.randomUUID());
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(quizAttemptRepository.existsByLearner_IdAndQuiz_QuizId(contributorUser.userId(), quiz.getQuizId())).thenReturn(false);
+        when(quizAttemptRepository.save(any(QuizAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        QuizAttemptResponse response = learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, contributorUser);
+
+        assertThat(response.score()).isEqualTo(3);
+        assertThat(response.isFirstAttempt()).isTrue();
+        ArgumentCaptor<QuizAttempt> captor = ArgumentCaptor.forClass(QuizAttempt.class);
+        verify(quizAttemptRepository).save(captor.capture());
+        assertThat(captor.getValue().getLearner()).isEqualTo(contributorUser.learner());
+    }
+
+    @Test
+    void contributorCannotSubmitQuizAttemptForOwnLesson() {
+        SupabaseAuthUser contributorUser = contributorUser();
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, contributorUser.userId());
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, contributorUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Lesson creators cannot answer their own quiz");
+    }
+
+    @Test
+    void unsupportedCallerTypeIsForbidden() {
+        Quiz quiz = buildQuizWithMixedQuestions();
+        SupabaseAuthUser unsupportedUser = new SupabaseAuthUser(UUID.randomUUID(), null, null);
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, unsupportedUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Learner or contributor account required");
+    }
+
     private Quiz buildQuizWithMixedQuestions() {
         return buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, UUID.randomUUID());
     }
@@ -324,6 +390,22 @@ class LearnerQuizAttemptServiceTest {
                 userId,
                 UUID.randomUUID(),
                 "owner-" + userId,
+                OffsetDateTime.parse("2026-03-01T00:00:00Z"),
+                (short) 0
+        );
+        Contributor contributor = new Contributor();
+        contributor.setContributorId(userId);
+        contributor.setLearner(learner);
+        contributor.setPromotedAt(OffsetDateTime.parse("2026-03-02T00:00:00Z"));
+        return new SupabaseAuthUser(userId, learner, contributor);
+    }
+
+    private SupabaseAuthUser contributorUser() {
+        UUID userId = UUID.randomUUID();
+        Learner learner = new Learner(
+                userId,
+                UUID.randomUUID(),
+                "contributor-" + userId,
                 OffsetDateTime.parse("2026-03-01T00:00:00Z"),
                 (short) 0
         );

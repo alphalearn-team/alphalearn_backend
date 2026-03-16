@@ -43,7 +43,7 @@ public class LearnerQuizAttemptService {
             SubmitQuizAttemptRequest request,
             SupabaseAuthUser user
     ) {
-        Learner learner = requireLearner(user);
+        Learner learner = requireQuizParticipant(user);
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
@@ -82,9 +82,12 @@ public class LearnerQuizAttemptService {
         );
     }
 
-    private Learner requireLearner(SupabaseAuthUser user) {
-        if (user == null || !user.isLearner() || user.learner() == null || user.userId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
+    private Learner requireQuizParticipant(SupabaseAuthUser user) {
+        if (user == null || user.userId() == null || (!user.isLearner() && !user.isContributor())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner or contributor account required");
+        }
+        if (user.learner() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Quiz attempts require a learner profile");
         }
         return user.learner();
     }
