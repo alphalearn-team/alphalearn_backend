@@ -54,6 +54,7 @@ public class LearnerQuizAttemptService {
         Quiz quiz = quizRepository.findByPublicId(quizPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
         requirePublicLesson(quiz.getLesson());
+        requireNotLessonOwner(quiz.getLesson(), user);
 
         List<QuizQuestion> questions = quiz.getQuestions().stream()
                 .sorted(Comparator.comparingInt(QuizQuestion::getOrderIndex))
@@ -93,6 +94,17 @@ public class LearnerQuizAttemptService {
                 || lesson.getDeletedAt() != null
                 || lesson.getLessonModerationStatus() != LessonModerationStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Quiz is only available for approved lessons");
+        }
+    }
+
+    private void requireNotLessonOwner(Lesson lesson, SupabaseAuthUser user) {
+        if (lesson != null
+                && lesson.getContributor() != null
+                && lesson.getContributor().getContributorId() != null
+                && user != null
+                && user.userId() != null
+                && lesson.getContributor().getContributorId().equals(user.userId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lesson creators cannot answer their own quiz");
         }
     }
 

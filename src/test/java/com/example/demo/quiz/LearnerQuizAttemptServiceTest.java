@@ -23,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.contributor.Contributor;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonModerationStatus;
@@ -224,13 +225,42 @@ class LearnerQuizAttemptServiceTest {
         assertThat(ex.getReason()).isEqualTo("Quiz is only available for approved lessons");
     }
 
+    @Test
+    void submitQuizAttemptRejectsLessonCreator() {
+        SupabaseAuthUser ownerUser = ownerUser();
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, ownerUser.userId());
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, ownerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Lesson creators cannot answer their own quiz");
+    }
+
     private Quiz buildQuizWithMixedQuestions() {
-        return buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED);
+        return buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, UUID.randomUUID());
     }
 
     private Quiz buildQuizWithMixedQuestions(LessonModerationStatus lessonModerationStatus) {
+        return buildQuizWithMixedQuestions(lessonModerationStatus, UUID.randomUUID());
+    }
+
+    private Quiz buildQuizWithMixedQuestions(LessonModerationStatus lessonModerationStatus, UUID contributorId) {
         Lesson lesson = new Lesson();
         lesson.setLessonModerationStatus(lessonModerationStatus);
+        Contributor contributor = new Contributor();
+        contributor.setContributorId(contributorId);
+        lesson.setContributor(contributor);
         Quiz quiz = new Quiz(lesson, OffsetDateTime.parse("2026-03-16T10:00:00Z"));
         ReflectionTestUtils.setField(quiz, "quizId", 42);
         ReflectionTestUtils.setField(quiz, "publicId", UUID.randomUUID());
@@ -286,5 +316,21 @@ class LearnerQuizAttemptServiceTest {
                 (short) 0
         );
         return new SupabaseAuthUser(learnerId, learner, null);
+    }
+
+    private SupabaseAuthUser ownerUser() {
+        UUID userId = UUID.randomUUID();
+        Learner learner = new Learner(
+                userId,
+                UUID.randomUUID(),
+                "owner-" + userId,
+                OffsetDateTime.parse("2026-03-01T00:00:00Z"),
+                (short) 0
+        );
+        Contributor contributor = new Contributor();
+        contributor.setContributorId(userId);
+        contributor.setLearner(learner);
+        contributor.setPromotedAt(OffsetDateTime.parse("2026-03-02T00:00:00Z"));
+        return new SupabaseAuthUser(userId, learner, contributor);
     }
 }
