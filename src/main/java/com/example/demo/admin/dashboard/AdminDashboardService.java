@@ -61,13 +61,6 @@ public class AdminDashboardService {
 
         @Transactional(readOnly = true)
         public AdminDashboardSummaryDto getSummary(String range, LocalDate startDate, LocalDate endDate) {
-        long lessonsCreated = lessonRepository.countByDeletedAtIsNull();
-        long usersSignedUp = learnerRepository.countBy();
-        long lessonsEnrolled = lessonEnrollmentRepository.countBy();
-
-        OffsetDateTime newContributorsCutoff = OffsetDateTime.now(clock).minusDays(NEW_CONTRIBUTORS_DAYS_WINDOW);
-        long newContributors = contributorRepository.countByDemotedAtIsNullAndPromotedAtGreaterThanEqual(newContributorsCutoff);
-
         List<AdminDashboardTopConceptDto> topConcepts = lessonRepository
                 .findTopConceptsByLessonCount(PageRequest.of(0, DEFAULT_TOP_CONCEPTS_LIMIT))
                 .stream()
@@ -80,6 +73,13 @@ public class AdminDashboardService {
 
                 AnalyticsWindow analyticsWindow = resolveAnalyticsWindow(range, startDate, endDate);
                 if (analyticsWindow == null) {
+                        long lessonsCreated = lessonRepository.countByDeletedAtIsNull();
+                        long usersSignedUp = learnerRepository.countBy();
+                        long lessonsEnrolled = lessonEnrollmentRepository.countBy();
+
+                        OffsetDateTime newContributorsCutoff = OffsetDateTime.now(clock).minusDays(NEW_CONTRIBUTORS_DAYS_WINDOW);
+                        long newContributors = contributorRepository.countByDemotedAtIsNullAndPromotedAtGreaterThanEqual(newContributorsCutoff);
+
                         return new AdminDashboardSummaryDto(
                                         lessonsCreated,
                                         usersSignedUp,
@@ -91,11 +91,9 @@ public class AdminDashboardService {
 
                 MetricCounts currentPeriod = metricCounts(analyticsWindow.startInclusive(), analyticsWindow.endExclusive());
 
-                LocalDate previousStart = analyticsWindow.startDate().minusDays(analyticsWindow.totalDays());
-                LocalDate previousEndInclusive = analyticsWindow.startDate().minusDays(1);
                 MetricCounts previousPeriod = metricCounts(
-                                previousStart.atStartOfDay().atOffset(ZoneOffset.UTC),
-                                previousEndInclusive.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
+                                analyticsWindow.comparisonStartDate().atStartOfDay().atOffset(ZoneOffset.UTC),
+                                analyticsWindow.comparisonEndDate().plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
                 );
 
                 AdminDashboardDeltaDto deltas = new AdminDashboardDeltaDto(
@@ -119,16 +117,21 @@ public class AdminDashboardService {
                 List<AdminDashboardAlertDto> alerts = buildAlerts(pendingModerationCount, lowPerformingConcepts, deltas);
 
         return new AdminDashboardSummaryDto(
-                lessonsCreated,
-                usersSignedUp,
-                lessonsEnrolled,
-                newContributors,
+                                currentPeriod.lessonsCreated(),
+                                currentPeriod.usersSignedUp(),
+                                currentPeriod.lessonsEnrolled(),
+                                currentPeriod.newContributors(),
                                 topConcepts,
                                 deltas,
                                 trends,
                                 alerts,
                                 pendingModerationCount,
-                                lowPerformingConcepts
+                                                                lowPerformingConcepts,
+                                                                analyticsWindow.appliedRange(),
+                                                                analyticsWindow.startDate(),
+                                                                analyticsWindow.endDate(),
+                                                                analyticsWindow.comparisonStartDate(),
+                                                                analyticsWindow.comparisonEndDate()
         );
     }
 
@@ -151,10 +154,24 @@ public class AdminDashboardService {
                 LocalDate resolvedEnd;
 
                 if (hasRange) {
-                        int days = parseRangeDays(range.trim().toLowerCase());
+                        String normalizedRange = range.trim().toLowerCase();
+                        int days = parseRangeDays(normalizedRange);
                         LocalDate today = LocalDate.now(clock);
                         resolvedEnd = today;
                         resolvedStart = today.minusDays(days - 1L);
+                        long totalDays = ChronoUnit.DAYS.between(resolvedStart, resolvedEnd) + 1;
+                        LocalDate comparisonStartDate = resolvedStart.minusDays(totalDays);
+                        LocalDate comparisonEndDate = resolvedStart.minusDays(1);
+                        return new AnalyticsWindow(
+                                        normalizedRange,
+                                        resolvedStart,
+                                        resolvedEnd,
+                                        comparisonStartDate,
+                                        comparisonEndDate,
+                                        resolvedStart.atStartOfDay().atOffset(ZoneOffset.UTC),
+                                        resolvedEnd.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC),
+                                        totalDays
+                        );
                 } else {
                         resolvedStart = startDate;
                         resolvedEnd = endDate;
@@ -165,9 +182,14 @@ public class AdminDashboardService {
                 }
 
                 long totalDays = ChronoUnit.DAYS.between(resolvedStart, resolvedEnd) + 1;
+                LocalDate comparisonStartDate = resolvedStart.minusDays(totalDays);
+                LocalDate comparisonEndDate = resolvedStart.minusDays(1);
                 return new AnalyticsWindow(
+                                "custom",
                                 resolvedStart,
                                 resolvedEnd,
+                                comparisonStartDate,
+                                comparisonEndDate,
                                 resolvedStart.atStartOfDay().atOffset(ZoneOffset.UTC),
                                 resolvedEnd.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC),
                                 totalDays
@@ -278,8 +300,11 @@ public class AdminDashboardService {
         }
 
         private record AnalyticsWindow(
+                        String appliedRange,
                         LocalDate startDate,
                         LocalDate endDate,
+                        LocalDate comparisonStartDate,
+                        LocalDate comparisonEndDate,
                         OffsetDateTime startInclusive,
                         OffsetDateTime endExclusive,
                         long totalDays

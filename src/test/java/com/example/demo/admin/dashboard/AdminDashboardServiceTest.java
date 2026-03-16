@@ -99,11 +99,6 @@ class AdminDashboardServiceTest {
         LessonRepository.ConceptLessonCountView top = topConcept(UUID.randomUUID(), "Fractions", 14L);
         LessonRepository.ConceptLessonCountView low = topConcept(UUID.randomUUID(), "Geometry", 1L);
 
-        when(lessonRepository.countByDeletedAtIsNull()).thenReturn(30L);
-        when(learnerRepository.countBy()).thenReturn(120L);
-        when(lessonEnrollmentRepository.countBy()).thenReturn(280L);
-        when(contributorRepository.countByDemotedAtIsNullAndPromotedAtGreaterThanEqual(any(OffsetDateTime.class)))
-            .thenReturn(5L);
         when(lessonRepository.findTopConceptsByLessonCount(any(Pageable.class)))
             .thenReturn(List.of(top));
 
@@ -123,6 +118,15 @@ class AdminDashboardServiceTest {
 
         AdminDashboardSummaryDto result = adminDashboardService.getSummary("7d", null, null);
 
+        assertThat(result.lessonsCreated()).isEqualTo(3L);
+        assertThat(result.usersSignedUp()).isEqualTo(2L);
+        assertThat(result.lessonsEnrolled()).isEqualTo(4L);
+        assertThat(result.newContributors()).isEqualTo(1L);
+        assertThat(result.appliedRange()).isEqualTo("7d");
+        assertThat(result.startDate()).isEqualTo(java.time.LocalDate.parse("2026-03-09"));
+        assertThat(result.endDate()).isEqualTo(java.time.LocalDate.parse("2026-03-15"));
+        assertThat(result.comparisonStartDate()).isEqualTo(java.time.LocalDate.parse("2026-03-02"));
+        assertThat(result.comparisonEndDate()).isEqualTo(java.time.LocalDate.parse("2026-03-08"));
         assertThat(result.deltas()).isNotNull();
         assertThat(result.trends()).isNotEmpty();
         assertThat(result.alerts()).isNotEmpty();

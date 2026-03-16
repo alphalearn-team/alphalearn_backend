@@ -74,12 +74,22 @@ class AdminDashboardControllerTest {
                 List.of(new AdminDashboardTrendDto("2026-03-01", 2, 1, 4, 1)),
                 List.of(new AdminDashboardAlertDto("PENDING_MODERATION_WARNING", AdminDashboardAlertLevel.WARNING, "Pending moderation count is building up.")),
                 14L,
-                List.of(new AdminDashboardLowPerformingConceptDto(lowConceptId, "Geometry", 1L))
+                List.of(new AdminDashboardLowPerformingConceptDto(lowConceptId, "Geometry", 1L)),
+                "30d",
+                LocalDate.parse("2026-02-14"),
+                LocalDate.parse("2026-03-15"),
+                LocalDate.parse("2026-01-15"),
+                LocalDate.parse("2026-02-13")
             ));
 
             mockMvc.perform(get("/api/admin/dashboard/summary").queryParam("range", "30d"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deltas.lessonsCreated").value(5))
+                .andExpect(jsonPath("$.appliedRange").value("30d"))
+                .andExpect(jsonPath("$.startDate").value("2026-02-14"))
+                .andExpect(jsonPath("$.endDate").value("2026-03-15"))
+                .andExpect(jsonPath("$.comparisonStartDate").value("2026-01-15"))
+                .andExpect(jsonPath("$.comparisonEndDate").value("2026-02-13"))
                 .andExpect(jsonPath("$.trends[0].label").value("2026-03-01"))
                 .andExpect(jsonPath("$.alerts[0].code").value("PENDING_MODERATION_WARNING"))
                 .andExpect(jsonPath("$.pendingModerationCount").value(14))
@@ -89,12 +99,31 @@ class AdminDashboardControllerTest {
             @Test
             void getSummaryWithCustomDatesPassesDatesToService() throws Exception {
             when(adminDashboardService.getSummary(eq(null), eq(LocalDate.parse("2026-03-01")), eq(LocalDate.parse("2026-03-15"))))
-                .thenReturn(new AdminDashboardSummaryDto(1, 1, 1, 1, List.of()));
+                .thenReturn(new AdminDashboardSummaryDto(
+                    1,
+                    1,
+                    1,
+                    1,
+                    List.of(),
+                    null,
+                    List.of(),
+                    List.of(),
+                    null,
+                    List.of(),
+                    "custom",
+                    LocalDate.parse("2026-03-01"),
+                    LocalDate.parse("2026-03-15"),
+                    LocalDate.parse("2026-02-14"),
+                    LocalDate.parse("2026-02-28")
+                ));
 
             mockMvc.perform(get("/api/admin/dashboard/summary")
                     .queryParam("startDate", "2026-03-01")
                     .queryParam("endDate", "2026-03-15"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lessonsCreated").value(1));
+                .andExpect(jsonPath("$.lessonsCreated").value(1))
+                .andExpect(jsonPath("$.appliedRange").value("custom"))
+                .andExpect(jsonPath("$.startDate").value("2026-03-01"))
+                .andExpect(jsonPath("$.endDate").value("2026-03-15"));
             }
 }
