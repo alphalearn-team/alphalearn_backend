@@ -1,14 +1,33 @@
 package com.example.demo.lesson;
 
 import java.util.UUID;
+import java.util.List;
+import java.time.OffsetDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
+
+import com.example.demo.lesson.LessonModerationStatus;
 
 public interface LessonRepository extends JpaRepository<Lesson, Integer> {
+  interface ConceptLessonCountView {
+    UUID getConceptPublicId();
+
+    String getConceptTitle();
+
+    long getLessonCount();
+  }
+
         java.util.Optional<Lesson> findByPublicId(UUID lessonPublicId);
+
+  long countByDeletedAtIsNull();
+
+  long countByDeletedAtIsNullAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(OffsetDateTime startInclusive, OffsetDateTime endExclusive);
+
+  long countByDeletedAtIsNullAndLessonModerationStatus(LessonModerationStatus lessonModerationStatus);
 
         @Query("""
                         select count(distinct l.lessonId)
@@ -36,4 +55,28 @@ public interface LessonRepository extends JpaRepository<Lesson, Integer> {
                           and l.deleted_at is null
                         """, nativeQuery = true)
         java.util.Optional<Lesson> findPublicByPublicId(@Param("publicId") UUID lessonPublicId);
+
+                    @Query("""
+                        select c.publicId as conceptPublicId,
+                               c.title as conceptTitle,
+                               count(distinct l.lessonId) as lessonCount
+                        from Lesson l
+                        join l.concepts c
+                        where l.deletedAt is null
+                        group by c.conceptId, c.publicId, c.title
+                        order by count(distinct l.lessonId) desc, c.title asc
+                        """)
+                    List<ConceptLessonCountView> findTopConceptsByLessonCount(Pageable pageable);
+
+                    @Query("""
+                      select c.publicId as conceptPublicId,
+                           c.title as conceptTitle,
+                           count(distinct l.lessonId) as lessonCount
+                      from Lesson l
+                      join l.concepts c
+                      where l.deletedAt is null
+                      group by c.conceptId, c.publicId, c.title
+                      order by count(distinct l.lessonId) asc, c.title asc
+                      """)
+                    List<ConceptLessonCountView> findLowPerformingConceptsByLessonCount(Pageable pageable);
 }
