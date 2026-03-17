@@ -21,6 +21,7 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
 import com.example.demo.quiz.dto.QuizResponseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @ExtendWith(MockitoExtension.class)
 class QuizQueryServiceTest {
@@ -31,7 +32,7 @@ class QuizQueryServiceTest {
     @Mock
     private LessonLookupService lessonLookupService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private QuizQueryService quizQueryService;
 
