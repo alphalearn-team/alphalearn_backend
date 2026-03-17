@@ -3,6 +3,7 @@ package com.example.demo.me.quiz;
 import java.util.UUID;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,6 +27,15 @@ public class MeQuizController {
 
     public MeQuizController(LearnerQuizAttemptService learnerQuizAttemptService) {
         this.learnerQuizAttemptService = learnerQuizAttemptService;
+    }
+
+    @GetMapping("/{quizPublicId}/attempts/latest")
+    @Operation(summary = "Get latest quiz attempt", description = "Returns the authenticated learner's most recent attempt summary for the quiz")
+    public QuizAttemptResponse getLatestQuizAttempt(
+            @PathVariable UUID quizPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return learnerQuizAttemptService.getLatestQuizAttempt(quizPublicId, user);
     }
 
     @PostMapping("/{quizPublicId}/attempts")
