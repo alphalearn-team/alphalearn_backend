@@ -29,6 +29,15 @@ public class MeQuizController {
         this.learnerQuizAttemptService = learnerQuizAttemptService;
     }
 
+    @GetMapping("/{quizPublicId}/attempts/best")
+    @Operation(summary = "Get best quiz attempt", description = "Returns the authenticated learner's highest-scoring attempt summary for the quiz")
+    public QuizAttemptResponse getBestQuizAttempt(
+            @PathVariable UUID quizPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return learnerQuizAttemptService.getBestQuizAttempt(quizPublicId, user);
+    }
+
     @GetMapping("/{quizPublicId}/attempts/latest")
     @Operation(summary = "Get latest quiz attempt", description = "Returns the authenticated learner's most recent attempt summary for the quiz")
     public QuizAttemptResponse getLatestQuizAttempt(
