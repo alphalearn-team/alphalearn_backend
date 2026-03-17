@@ -73,13 +73,21 @@ public class LearnerQuizAttemptService {
         );
 
         QuizAttempt savedAttempt = quizAttemptRepository.save(attempt);
-        return new QuizAttemptResponse(
-                quiz.getPublicId(),
-                savedAttempt.getAttemptedAt(),
-                savedAttempt.getScore(),
-                submission.totalQuestions(),
-                savedAttempt.isFirstAttempt()
-        );
+        return toResponse(savedAttempt, submission.totalQuestions());
+    }
+
+    @Transactional(readOnly = true)
+    public QuizAttemptResponse getLatestQuizAttempt(UUID quizPublicId, SupabaseAuthUser user) {
+        Learner learner = requireQuizParticipant(user);
+        Quiz quiz = quizRepository.findByPublicId(quizPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requirePublicLesson(quiz.getLesson());
+        requireNotLessonOwner(quiz.getLesson(), user);
+
+        return quizAttemptRepository
+                .findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(learner.getId(), quiz.getQuizId())
+                .map(attempt -> toResponse(attempt, quiz.getQuestions().size()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No quiz attempt found"));
     }
 
     private Learner requireQuizParticipant(SupabaseAuthUser user) {
@@ -116,5 +124,15 @@ public class LearnerQuizAttemptService {
             throw new IllegalStateException("Quiz score is out of range for persistence.");
         }
         return (short) score;
+    }
+
+    private QuizAttemptResponse toResponse(QuizAttempt attempt, int totalQuestions) {
+        return new QuizAttemptResponse(
+                attempt.getQuiz().getPublicId(),
+                attempt.getAttemptedAt(),
+                attempt.getScore(),
+                totalQuestions,
+                attempt.isFirstAttempt()
+        );
     }
 }
