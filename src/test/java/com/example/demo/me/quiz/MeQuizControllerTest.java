@@ -3,6 +3,7 @@ package com.example.demo.me.quiz;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -92,6 +93,49 @@ class MeQuizControllerTest {
                 .andExpect(jsonPath("$.score").value(1))
                 .andExpect(jsonPath("$.totalQuestions").value(1))
                 .andExpect(jsonPath("$.isFirstAttempt").value(true));
+    }
+
+    @Test
+    void getLatestQuizAttemptReturnsAttemptSummary() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser learnerUser = learnerUser();
+        setAuthentication(learnerUser, "ROLE_LEARNER");
+
+        QuizAttemptResponse response = new QuizAttemptResponse(
+                quizPublicId,
+                OffsetDateTime.parse("2026-03-16T12:00:00Z"),
+                3,
+                5,
+                false
+        );
+
+        when(learnerQuizAttemptService.getLatestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/latest", quizPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quizPublicId").value(quizPublicId.toString()))
+                .andExpect(jsonPath("$.score").value(3))
+                .andExpect(jsonPath("$.totalQuestions").value(5))
+                .andExpect(jsonPath("$.isFirstAttempt").value(false));
+    }
+
+    @Test
+    void getLatestQuizAttemptReturnsNotFoundWhenAttemptIsMissing() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser learnerUser = learnerUser();
+        setAuthentication(learnerUser, "ROLE_LEARNER");
+
+        when(learnerQuizAttemptService.getLatestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
+                .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "No quiz attempt found"));
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/latest", quizPublicId))
+                .andExpect(status().isNotFound())
+                .andExpect(result -> {
+                    assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
+                            .isEqualTo("No quiz attempt found");
+                });
     }
 
     @Test

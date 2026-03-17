@@ -117,6 +117,53 @@ class LearnerQuizAttemptServiceTest {
     }
 
     @Test
+    void getLatestQuizAttemptReturnsMostRecentAttempt() {
+        Quiz quiz = buildQuizWithMixedQuestions();
+        SupabaseAuthUser learnerUser = learnerUser();
+        QuizAttempt latestAttempt = new QuizAttempt(
+                quiz,
+                learnerUser.learner(),
+                (short) 2,
+                false,
+                OffsetDateTime.parse("2026-03-16T13:00:00Z")
+        );
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(
+                learnerUser.userId(),
+                quiz.getQuizId()
+        )).thenReturn(java.util.Optional.of(latestAttempt));
+
+        QuizAttemptResponse response = learnerQuizAttemptService.getLatestQuizAttempt(quiz.getPublicId(), learnerUser);
+
+        assertThat(response.quizPublicId()).isEqualTo(quiz.getPublicId());
+        assertThat(response.score()).isEqualTo(2);
+        assertThat(response.totalQuestions()).isEqualTo(3);
+        assertThat(response.isFirstAttempt()).isFalse();
+        assertThat(response.attemptedAt()).isEqualTo(OffsetDateTime.parse("2026-03-16T13:00:00Z"));
+    }
+
+    @Test
+    void getLatestQuizAttemptReturnsNotFoundWhenAttemptDoesNotExist() {
+        Quiz quiz = buildQuizWithMixedQuestions();
+        SupabaseAuthUser learnerUser = learnerUser();
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(
+                learnerUser.userId(),
+                quiz.getQuizId()
+        )).thenReturn(java.util.Optional.empty());
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.getLatestQuizAttempt(quiz.getPublicId(), learnerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ex.getReason()).isEqualTo("No quiz attempt found");
+    }
+
+    @Test
     void submitQuizAttemptRejectsDuplicateQuestionAnswers() {
         Quiz quiz = buildQuizWithMixedQuestions();
         SupabaseAuthUser learnerUser = learnerUser();
