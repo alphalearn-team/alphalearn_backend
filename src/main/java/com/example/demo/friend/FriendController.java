@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +44,18 @@ public class FriendController {
             UUID currentUserPublicId = user.userId();
 
             return friendService.addFriend(currentUserPublicId, friendPublicId);
+    }
+
+    @DeleteMapping("/{friendPublicId}")
+        public void removeFriend(
+                @PathVariable UUID friendPublicId,
+                Authentication authentication
+        ) {
+
+            SupabaseAuthUser authUser = (SupabaseAuthUser) authentication.getPrincipal();
+            Learner currentLearner = authUser.learner();
+
+            friendService.removeFriend(currentLearner, friendPublicId);
     }
 
 }

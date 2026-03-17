@@ -85,4 +85,33 @@ public class FriendService {
             .toList();
     }
 
+    public void removeFriend(Learner currentLearner, UUID friendPublicId) {
+
+        Learner friend = learnerRepository.findByPublicId(friendPublicId)
+                .orElseThrow(() -> new RuntimeException("Friend not found"));
+
+        UUID userId1 = currentLearner.getId();
+        UUID userId2 = friend.getId();
+
+        // prevent removing yourself
+        if (userId1.equals(userId2)) {
+            throw new RuntimeException("You cannot remove yourself");
+        }
+
+        // normalize order (IMPORTANT)
+        if (userId1.compareTo(userId2) > 0) {
+            UUID temp = userId1;
+            userId1 = userId2;
+            userId2 = temp;
+        }
+
+        FriendId friendId = new FriendId(userId1, userId2);
+
+        if (!friendRepository.existsById(friendId)) {
+            throw new RuntimeException("Friendship does not exist");
+        }
+
+        friendRepository.deleteById(friendId);
+    }
+
 }
