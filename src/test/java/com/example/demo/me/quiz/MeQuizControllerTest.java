@@ -121,6 +121,31 @@ class MeQuizControllerTest {
     }
 
     @Test
+    void getBestQuizAttemptReturnsAttemptSummary() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser learnerUser = learnerUser();
+        setAuthentication(learnerUser, "ROLE_LEARNER");
+
+        QuizAttemptResponse response = new QuizAttemptResponse(
+                quizPublicId,
+                OffsetDateTime.parse("2026-03-16T15:00:00Z"),
+                5,
+                5,
+                false
+        );
+
+        when(learnerQuizAttemptService.getBestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/best", quizPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quizPublicId").value(quizPublicId.toString()))
+                .andExpect(jsonPath("$.score").value(5))
+                .andExpect(jsonPath("$.totalQuestions").value(5))
+                .andExpect(jsonPath("$.isFirstAttempt").value(false));
+    }
+
+    @Test
     void getLatestQuizAttemptReturnsNotFoundWhenAttemptIsMissing() throws Exception {
         UUID quizPublicId = UUID.randomUUID();
         SupabaseAuthUser learnerUser = learnerUser();
@@ -130,6 +155,24 @@ class MeQuizControllerTest {
                 .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "No quiz attempt found"));
 
         mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/latest", quizPublicId))
+                .andExpect(status().isNotFound())
+                .andExpect(result -> {
+                    assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
+                            .isEqualTo("No quiz attempt found");
+                });
+    }
+
+    @Test
+    void getBestQuizAttemptReturnsNotFoundWhenAttemptIsMissing() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser learnerUser = learnerUser();
+        setAuthentication(learnerUser, "ROLE_LEARNER");
+
+        when(learnerQuizAttemptService.getBestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
+                .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "No quiz attempt found"));
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/best", quizPublicId))
                 .andExpect(status().isNotFound())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);

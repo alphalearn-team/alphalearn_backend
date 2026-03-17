@@ -90,6 +90,23 @@ public class LearnerQuizAttemptService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No quiz attempt found"));
     }
 
+    @Transactional(readOnly = true)
+    public QuizAttemptResponse getBestQuizAttempt(UUID quizPublicId, SupabaseAuthUser user) {
+        Learner learner = requireQuizParticipant(user);
+        Quiz quiz = quizRepository.findByPublicId(quizPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requirePublicLesson(quiz.getLesson());
+        requireNotLessonOwner(quiz.getLesson(), user);
+
+        return quizAttemptRepository
+                .findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
+                        learner.getId(),
+                        quiz.getQuizId()
+                )
+                .map(attempt -> toResponse(attempt, quiz.getQuestions().size()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No quiz attempt found"));
+    }
+
     private Learner requireQuizParticipant(SupabaseAuthUser user) {
         if (user == null || user.userId() == null || (!user.isLearner() && !user.isContributor())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner or contributor account required");

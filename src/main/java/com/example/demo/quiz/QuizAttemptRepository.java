@@ -10,4 +10,9 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Intege
     boolean existsByLearner_IdAndQuiz_QuizId(UUID learnerId, Integer quizId);
 
     Optional<QuizAttempt> findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(UUID learnerId, Integer quizId);
+
+    Optional<QuizAttempt> findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
+            UUID learnerId,
+            Integer quizId
+    );
 }
