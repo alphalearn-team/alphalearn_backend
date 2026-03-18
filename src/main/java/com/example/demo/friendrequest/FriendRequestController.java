@@ -1,0 +1,33 @@
+package com.example.demo.friendrequest;
+
+import java.util.UUID;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.friendrequest.dto.FriendRequestDTO;
+import com.example.demo.learner.Learner;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/api/friend-requests")
+@RequiredArgsConstructor
+public class FriendRequestController {
+
+    private final FriendRequestService friendRequestService;
+    
+    @PostMapping("/{receiverPublicId}")
+        public FriendRequestDTO sendRequest(
+                @PathVariable UUID receiverPublicId,
+                Authentication auth
+        ) {
+            Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
+            return friendRequestService.sendRequest(currentUser, receiverPublicId);
+    }
+
+}
