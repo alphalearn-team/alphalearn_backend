@@ -1,11 +1,13 @@
 package com.example.demo.friendrequest;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.example.demo.friend.Friend;
 import com.example.demo.friend.FriendId;
 import com.example.demo.friend.FriendRepository;
 import com.example.demo.friendrequest.dto.FriendRequestDTO;
@@ -85,6 +87,113 @@ public class FriendRequestService {
 
         FriendRequest saved = friendRequestRepository.save(request);
         return mapToDTO(saved, currentUser);
+    }
+
+    public List<FriendRequestDTO> getPendingRequests(Learner currentUser) {
+
+        List<FriendRequest> requests =
+                friendRequestRepository.findByReceiverIdAndStatus(
+                        currentUser.getId(),
+                        FriendRequestStatus.PENDING
+                );
+
+        return requests.stream()
+                .map(req -> mapToDTO(req, currentUser))
+                .toList();
+    }
+
+    
+    public List<FriendRequestDTO> getOutgoingRequests(Learner currentUser) {
+
+        List<FriendRequest> requests =
+                friendRequestRepository.findBySenderIdAndStatus(
+                        currentUser.getId(),
+                        FriendRequestStatus.PENDING
+                );
+
+        return requests.stream()
+                .map(req -> mapToDTO(req, currentUser))
+                .toList();
+    }
+
+    public void acceptRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // Only receiver can accept
+        if (!request.getReceiverId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to accept this request");
+        }
+
+        // Must be pending
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Request already handled");
+        }
+
+        // Update status
+        request.setStatus(FriendRequestStatus.APPROVED);
+        request.setRespondedAt(OffsetDateTime.now());
+
+        friendRequestRepository.save(request);
+
+        // CREATE FRIEND
+        FriendId friendId = normalizeFriendId(
+                request.getSenderId(),
+                request.getReceiverId()
+        );
+
+        // safety check (optional but good)
+        if (!friendRepository.existsById(friendId)) {
+
+            Friend friend = Friend.builder()
+                    .userId1(friendId.getUserId1())
+                    .userId2(friendId.getUserId2())
+                    .createdAt(OffsetDateTime.now())
+                    .build();
+
+            friendRepository.save(friend);
+        }
+    }
+
+    public void rejectRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // Only receiver can reject
+        if (!request.getReceiverId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to reject this request");
+        }
+
+        // Must be pending
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Request already handled");
+        }
+
+        // Update status
+        request.setStatus(FriendRequestStatus.REJECTED);
+        request.setRespondedAt(OffsetDateTime.now());
+
+        friendRequestRepository.save(request);
+    }
+
+    public void cancelRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // 🔥 Only sender can cancel
+        if (!request.getSenderId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to cancel this request");
+        }
+
+        // 🔥 Only pending can be cancelled
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Only pending requests can be cancelled");
+        }
+
+        friendRequestRepository.delete(request);
     }
 
 }
