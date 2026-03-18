@@ -101,4 +101,19 @@ public class FriendRequestService {
                 .toList();
     }
 
+    
+    public List<FriendRequestDTO> getOutgoingRequests(Learner currentUser) {
+
+        List<FriendRequest> requests =
+                friendRequestRepository.findBySenderIdAndStatus(
+                        currentUser.getId(),
+                        FriendRequestStatus.PENDING
+                );
+
+        return requests.stream()
+                .map(req -> mapToDTO(req, currentUser))
+                .toList();
+    }
+
+
 }

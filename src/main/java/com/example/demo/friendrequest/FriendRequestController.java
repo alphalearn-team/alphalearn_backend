@@ -38,4 +38,11 @@ public class FriendRequestController {
             return friendRequestService.getPendingRequests(currentUser);
     }
 
+        @GetMapping("/outgoing")
+        public List<FriendRequestDTO> getOutgoing(Authentication auth) {
+
+            Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
+
+            return friendRequestService.getOutgoingRequests(currentUser);
+    }
 }
