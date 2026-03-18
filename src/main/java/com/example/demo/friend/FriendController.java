@@ -33,16 +33,4 @@ public class FriendController {
         return friendService.getFriends(learner);
     }
 
-    @PostMapping("/{friendPublicId}")
-        public Friend addFriend(
-                @PathVariable UUID friendPublicId,
-                Authentication authentication
-        ) {
-
-            SupabaseAuthUser user = (SupabaseAuthUser) authentication.getPrincipal();
-            UUID currentUserPublicId = user.userId();
-
-            return friendService.addFriend(currentUserPublicId, friendPublicId);
-    }
-
 }
