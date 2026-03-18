@@ -1,6 +1,7 @@
 package com.example.demo.friendrequest;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -85,6 +86,19 @@ public class FriendRequestService {
 
         FriendRequest saved = friendRequestRepository.save(request);
         return mapToDTO(saved, currentUser);
+    }
+
+    public List<FriendRequestDTO> getPendingRequests(Learner currentUser) {
+
+        List<FriendRequest> requests =
+                friendRequestRepository.findByReceiverIdAndStatus(
+                        currentUser.getId(),
+                        FriendRequestStatus.PENDING
+                );
+
+        return requests.stream()
+                .map(req -> mapToDTO(req, currentUser))
+                .toList();
     }
 
 }
