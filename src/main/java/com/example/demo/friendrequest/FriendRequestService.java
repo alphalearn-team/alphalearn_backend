@@ -178,4 +178,22 @@ public class FriendRequestService {
         friendRequestRepository.save(request);
     }
 
+    public void cancelRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // 🔥 Only sender can cancel
+        if (!request.getSenderId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to cancel this request");
+        }
+
+        // 🔥 Only pending can be cancelled
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Only pending requests can be cancelled");
+        }
+
+        friendRequestRepository.delete(request);
+    }
+
 }
