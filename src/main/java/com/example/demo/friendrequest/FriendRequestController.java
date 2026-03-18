@@ -3,11 +3,13 @@ package com.example.demo.friendrequest;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.config.SupabaseAuthUser;
@@ -44,5 +46,29 @@ public class FriendRequestController {
             Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
 
             return friendRequestService.getOutgoingRequests(currentUser);
+    }
+
+    @PostMapping("/{requestId}/accept")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void acceptRequest(
+            @PathVariable Long requestId,
+            Authentication auth
+    ) {
+
+        Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
+
+        friendRequestService.acceptRequest(currentUser, requestId);
+    }
+
+    @PostMapping("/{requestId}/reject")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void rejectRequest(
+            @PathVariable Long requestId,
+            Authentication auth
+    ) {
+
+        Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
+
+        friendRequestService.rejectRequest(currentUser, requestId);
     }
 }

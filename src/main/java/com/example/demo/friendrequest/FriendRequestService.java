@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.example.demo.friend.Friend;
 import com.example.demo.friend.FriendId;
 import com.example.demo.friend.FriendRepository;
 import com.example.demo.friendrequest.dto.FriendRequestDTO;
@@ -115,5 +116,66 @@ public class FriendRequestService {
                 .toList();
     }
 
+    public void acceptRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // Only receiver can accept
+        if (!request.getReceiverId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to accept this request");
+        }
+
+        // Must be pending
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Request already handled");
+        }
+
+        // Update status
+        request.setStatus(FriendRequestStatus.APPROVED);
+        request.setRespondedAt(OffsetDateTime.now());
+
+        friendRequestRepository.save(request);
+
+        // CREATE FRIEND
+        FriendId friendId = normalizeFriendId(
+                request.getSenderId(),
+                request.getReceiverId()
+        );
+
+        // safety check (optional but good)
+        if (!friendRepository.existsById(friendId)) {
+
+            Friend friend = Friend.builder()
+                    .userId1(friendId.getUserId1())
+                    .userId2(friendId.getUserId2())
+                    .createdAt(OffsetDateTime.now())
+                    .build();
+
+            friendRepository.save(friend);
+        }
+    }
+
+    public void rejectRequest(Learner currentUser, Long requestId) {
+
+        FriendRequest request = friendRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        // Only receiver can reject
+        if (!request.getReceiverId().equals(currentUser.getId())) {
+            throw new RuntimeException("Not authorized to reject this request");
+        }
+
+        // Must be pending
+        if (request.getStatus() != FriendRequestStatus.PENDING) {
+            throw new RuntimeException("Request already handled");
+        }
+
+        // Update status
+        request.setStatus(FriendRequestStatus.REJECTED);
+        request.setRespondedAt(OffsetDateTime.now());
+
+        friendRequestRepository.save(request);
+    }
 
 }
