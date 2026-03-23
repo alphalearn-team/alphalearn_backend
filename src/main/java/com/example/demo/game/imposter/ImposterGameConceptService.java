@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ImposterGameConceptService {
@@ -26,6 +28,10 @@ public class ImposterGameConceptService {
                 .stream()
                 .filter(concept -> !excludedConceptPublicIds.contains(concept.getPublicId()))
                 .toList();
+
+        if (availableConcepts.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No imposter game concepts are available");
+        }
 
         Concept selectedConcept = availableConcepts.get(ThreadLocalRandom.current().nextInt(availableConcepts.size()));
 
