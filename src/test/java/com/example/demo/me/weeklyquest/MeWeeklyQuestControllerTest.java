@@ -47,6 +47,8 @@ class MeWeeklyQuestControllerTest {
     private LearnerQuestChallengeUploadService learnerQuestChallengeUploadService;
     @Mock
     private LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
+        @Mock
+        private LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -60,7 +62,8 @@ class MeWeeklyQuestControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new MeWeeklyQuestController(
                         learnerWeeklyQuestQueryService,
                         learnerQuestChallengeUploadService,
-                        learnerQuestChallengeSubmissionService
+                        learnerQuestChallengeSubmissionService,
+                        learnerQuestChallengeFeedQueryService
                 ))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -199,6 +202,55 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(jsonPath("$.originalFilename").value("evidence.mp4"))
                 .andExpect(jsonPath("$.caption").value("Learner caption"))
                 .andExpect(jsonPath("$.fileSizeBytes").value(1024));
+    }
+
+    @Test
+    void returnsFriendsQuestChallengeFeed() throws Exception {
+        FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(
+                List.of(new FriendQuestChallengeFeedItemDto(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "friend-one",
+                        UUID.randomUUID(),
+                        "Algebra",
+                        UUID.randomUUID(),
+                        "https://example.com/media.mp4",
+                        "video/mp4",
+                        "media.mp4",
+                        "Great challenge this week",
+                        OffsetDateTime.parse("2026-03-24T09:00:00Z")
+                )),
+                0,
+                20,
+                false
+        );
+
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(any(), eq(0), eq(20))).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quest/friends/feed")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.items[0].learnerUsername").value("friend-one"))
+                .andExpect(jsonPath("$.items[0].conceptTitle").value("Algebra"));
+    }
+
+    @Test
+    void returnsBadRequestWhenFeedPageIsInvalid() throws Exception {
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(any(), eq(-1), eq(20)))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "page must be greater than or equal to 0"
+                ));
+
+        mockMvc.perform(get("/api/me/weekly-quest/friends/feed")
+                        .queryParam("page", "-1")
+                        .queryParam("size", "20"))
+                .andExpect(status().isBadRequest());
     }
 
     private void setAuthentication(SupabaseAuthUser user) {
