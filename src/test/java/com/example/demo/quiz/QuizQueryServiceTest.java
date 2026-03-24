@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
+import com.example.demo.contributor.Contributor;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
 import com.example.demo.quiz.dto.QuizResponseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,6 +67,8 @@ class QuizQueryServiceTest {
         assertThat(result.get(0).quizPublicId()).isEqualTo(newerQuiz.getPublicId());
         assertThat(result.get(1).quizPublicId()).isEqualTo(olderQuiz.getPublicId());
         assertThat(result).extracting(QuizResponseDto::lessonPublicId).containsOnly(lessonPublicId);
+        assertThat(result).extracting(QuizResponseDto::lessonTitle).containsOnly("Test Lesson");
+        assertThat(result).extracting(QuizResponseDto::contributorId).containsOnly(newerQuiz.getLesson().getContributor().getContributorId());
 
         List<QuizQuestionResponseDto> newerQuestions = result.get(0).questions();
         assertThat(newerQuestions).extracting(QuizQuestionResponseDto::orderIndex).containsExactly(0, 1, 2);
@@ -110,6 +113,12 @@ class QuizQueryServiceTest {
 
     private Quiz quiz(UUID quizPublicId, OffsetDateTime createdAt, List<QuizQuestion> questions) {
         Lesson lesson = new Lesson();
+        lesson.setTitle("Test Lesson");
+        Contributor contributor = new Contributor();
+        // Use a fixed UUID for consistency in tests
+        contributor.setContributorId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        lesson.setContributor(contributor);
+        
         Quiz quiz = new Quiz(lesson, createdAt);
         ReflectionTestUtils.setField(quiz, "publicId", quizPublicId);
         quiz.setQuestions(new ArrayList<>(questions));
