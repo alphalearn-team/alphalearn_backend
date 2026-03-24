@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,16 +19,29 @@ public class MeWeeklyQuestController {
     private final LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService;
     private final LearnerQuestChallengeUploadService learnerQuestChallengeUploadService;
     private final LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
+        private final LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService;
 
     public MeWeeklyQuestController(
             LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService,
             LearnerQuestChallengeUploadService learnerQuestChallengeUploadService,
-            LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService
+                        LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService,
+                        LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService
     ) {
         this.learnerWeeklyQuestQueryService = learnerWeeklyQuestQueryService;
         this.learnerQuestChallengeUploadService = learnerQuestChallengeUploadService;
         this.learnerQuestChallengeSubmissionService = learnerQuestChallengeSubmissionService;
+                this.learnerQuestChallengeFeedQueryService = learnerQuestChallengeFeedQueryService;
     }
+
+        @GetMapping("/friends/feed")
+        @Operation(summary = "Get friends quest challenge feed", description = "Returns paginated quest challenge submissions from the authenticated learner's friends")
+        public FriendQuestChallengeFeedDto getFriendsQuestChallengeFeed(
+                        @AuthenticationPrincipal SupabaseAuthUser user,
+                        @RequestParam(required = false) Integer page,
+                        @RequestParam(required = false) Integer size
+        ) {
+                return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size);
+        }
 
     @GetMapping("/current")
     @Operation(summary = "Get current weekly quest", description = "Returns the current active weekly concept and quest for the authenticated learner, or null when unavailable")
