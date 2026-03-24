@@ -26,6 +26,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.example.demo.quiz.QuizQueryService;
+import com.example.demo.quiz.dto.QuizResponseDto;
 
 @RestController
 @RequestMapping("/api/lessons")
@@ -33,9 +35,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 public class LessonController {
 
     private final LessonService lessonService;
+    private final QuizQueryService quizQueryService;
 
-    public LessonController(LessonService lessonService) {
+    public LessonController(LessonService lessonService, QuizQueryService quizQueryService) {
         this.lessonService = lessonService;
+        this.quizQueryService = quizQueryService;
     }
 
     @GetMapping
@@ -75,6 +79,9 @@ public class LessonController {
             @RequestBody CreateLessonRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
+        if (Boolean.TRUE.equals(request.submit())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please add at least one quiz before publishing.");
+        }
         return lessonService.createLesson(request, user);
     }
 
@@ -97,9 +104,13 @@ public class LessonController {
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
+        List<QuizResponseDto> quizzes = quizQueryService.getQuizzesForLesson(lessonPublicId);
+        if (quizzes.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please add at least one quiz before publishing.");
+        }
         return lessonService.submitLesson(lessonPublicId, user);
     }
-
+    
     @PostMapping("/{lessonPublicId}/unpublish")
     @Operation(summary = "Unpublish lesson", description = "Sets moderation status to UNPUBLISHED")
     public LessonDetailDto unpublishLesson(
