@@ -14,6 +14,12 @@ public record QuizResponseDto(
         @Schema(description = "Lesson public UUID")
         UUID lessonPublicId,
 
+        @Schema(description = "Contributor user UUID (lesson owner)")
+        UUID contributorId,
+
+        @Schema(description = "Lesson title")
+        String lessonTitle,
+
         @Schema(description = "Quiz creation timestamp")
         OffsetDateTime createdAt,
 

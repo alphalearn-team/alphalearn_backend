@@ -47,10 +47,14 @@ class QuizControllerTest {
         UUID quizPublicId = UUID.randomUUID();
         UUID questionPublicId = UUID.randomUUID();
 
+        UUID contributorId = UUID.randomUUID();
+
         when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of(
                 new QuizResponseDto(
                         quizPublicId,
                         lessonPublicId,
+                        contributorId,
+                        "Test Lesson",
                         OffsetDateTime.parse("2026-03-16T10:15:30Z"),
                         List.of(
                                 new QuizQuestionResponseDto(
@@ -61,7 +65,8 @@ class QuizControllerTest {
                                         List.of(
                                                 new QuizOptionDto("1", "3"),
                                                 new QuizOptionDto("2", "4")
-                                        )
+                                        ),
+                                        List.of("2")
                                 )
                         )
                 )

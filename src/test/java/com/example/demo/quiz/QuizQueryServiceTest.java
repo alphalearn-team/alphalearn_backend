@@ -75,14 +75,20 @@ class QuizQueryServiceTest {
         assertThat(newerQuestions.get(0).options())
                 .extracting(option -> option.text())
                 .containsExactly("3", "4");
+        assertThat(newerQuestions.get(0).correctAnswerIds()).containsExactly("b");
+
         assertThat(newerQuestions.get(1).options())
                 .extracting(option -> option.text())
                 .containsExactly("2", "3", "5");
+        assertThat(newerQuestions.get(1).correctAnswerIds()).containsExactly("a", "b", "c");
+
         assertThat(newerQuestions.get(2).options())
                 .extracting(option -> option.id() + ":" + option.text())
                 .containsExactly("true:True", "false:False");
+        assertThat(newerQuestions.get(2).correctAnswerIds()).containsExactly("true");
 
         String json = objectMapper.writeValueAsString(result);
+        assertThat(json).contains("correctAnswerIds");
         assertThat(json).doesNotContain("correctOptionId");
         assertThat(json).doesNotContain("correctOptionIds");
         assertThat(json).doesNotContain("correctBoolean");

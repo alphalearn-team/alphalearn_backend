@@ -20,5 +20,8 @@ public record QuizQuestionResponseDto(
         int orderIndex,
 
         @Schema(description = "Options visible to learners")
-        List<QuizOptionDto> options
+        List<QuizOptionDto> options,
+
+        @Schema(description = "IDs of the correct answer option(s). Revealed after submission.")
+        List<String> correctAnswerIds
 ) {}
