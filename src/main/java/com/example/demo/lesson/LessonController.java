@@ -98,7 +98,7 @@ public class LessonController {
     @PostMapping("/{lessonPublicId}/submit")
     @Operation(
             summary = "Submit lesson for review",
-            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may reject immediately for detected policy violations; otherwise the lesson remains in PENDING for manual admin review."
+            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may reject immediately for detected policy violations; otherwise the lesson remains in PENDING for manual admin review. Note: This throws a 400 error if the lesson does not have a quiz attached to it"
     )
     public LessonDetailDto submitLesson(
             @PathVariable UUID lessonPublicId,
