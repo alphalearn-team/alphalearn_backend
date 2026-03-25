@@ -1,6 +1,8 @@
 package com.example.demo.quiz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -49,11 +51,10 @@ class QuizControllerTest {
 
         UUID contributorId = UUID.randomUUID();
 
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of(
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
                 new QuizResponseDto(
                         quizPublicId,
                         lessonPublicId,
-                        contributorId,
                         "Test Lesson",
                         OffsetDateTime.parse("2026-03-16T10:15:30Z"),
                         List.of(
@@ -68,7 +69,8 @@ class QuizControllerTest {
                                         ),
                                         List.of("2")
                                 )
-                        )
+                        ),
+                        true
                 )
         ));
 
@@ -88,7 +90,7 @@ class QuizControllerTest {
     void getQuizzesForLessonReturnsEmptyArrayWhenLessonHasNoQuizzes() throws Exception {
         UUID lessonPublicId = UUID.randomUUID();
 
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of());
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/quizzes/{lessonPublicId}", lessonPublicId))
                 .andExpect(status().isOk())
@@ -99,7 +101,7 @@ class QuizControllerTest {
     void getQuizzesForLessonReturnsNotFoundWhenLessonDoesNotExist() throws Exception {
         UUID lessonPublicId = UUID.randomUUID();
 
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenThrow(
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenThrow(
                 new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Lesson not found")
         );
 

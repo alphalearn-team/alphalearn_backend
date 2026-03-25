@@ -61,14 +61,14 @@ class QuizQueryServiceTest {
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId))
                 .thenReturn(List.of(newerQuiz, olderQuiz));
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).quizPublicId()).isEqualTo(newerQuiz.getPublicId());
         assertThat(result.get(1).quizPublicId()).isEqualTo(olderQuiz.getPublicId());
         assertThat(result).extracting(QuizResponseDto::lessonPublicId).containsOnly(lessonPublicId);
         assertThat(result).extracting(QuizResponseDto::lessonTitle).containsOnly("Test Lesson");
-        assertThat(result).extracting(QuizResponseDto::contributorId).containsOnly(newerQuiz.getLesson().getContributor().getContributorId());
+        assertThat(result).extracting(QuizResponseDto::canAttempt).containsOnly(true);
 
         List<QuizQuestionResponseDto> newerQuestions = result.get(0).questions();
         assertThat(newerQuestions).extracting(QuizQuestionResponseDto::orderIndex).containsExactly(0, 1, 2);
@@ -106,7 +106,7 @@ class QuizQueryServiceTest {
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId)).thenReturn(List.of());
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
 
         assertThat(result).isEmpty();
     }

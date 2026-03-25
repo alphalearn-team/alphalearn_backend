@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.quiz.dto.QuizOptionDto;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
@@ -38,20 +40,27 @@ public class QuizQueryService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuizResponseDto> getQuizzesForLesson(UUID lessonPublicId) {
-        lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+    public List<QuizResponseDto> getQuizzesForLesson(UUID lessonPublicId, SupabaseAuthUser user) {
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+
+        boolean isOwner = user != null
+                && user.userId() != null
+                && lesson.getContributor() != null
+                && lesson.getContributor().getContributorId().equals(user.userId());
+
+        boolean canAttempt = !isOwner;
 
         return quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId).stream()
                 .map(quiz -> new QuizResponseDto(
                         quiz.getPublicId(),
                         lessonPublicId,
-                        quiz.getLesson().getContributor().getContributorId(),
                         quiz.getLesson().getTitle(),
                         quiz.getCreatedAt(),
                         quiz.getQuestions().stream()
                                 .sorted(Comparator.comparingInt(QuizQuestion::getOrderIndex))
                                 .map(this::toQuestionResponse)
-                                .toList()
+                                .toList(),
+                        canAttempt
                 ))
                 .toList();
     }

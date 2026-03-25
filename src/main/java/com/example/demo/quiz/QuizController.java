@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizResponseDto;
 
@@ -35,8 +37,10 @@ public class QuizController {
 
     @GetMapping("/{lessonPublicId}")
     @Operation(summary = "List quizzes for lesson", description = "Returns learner-safe quizzes for the specified lesson.")
-    public List<QuizResponseDto> getQuizzesForLesson(@PathVariable UUID lessonPublicId) {
-        return quizQueryService.getQuizzesForLesson(lessonPublicId);
+    public List<QuizResponseDto> getQuizzesForLesson(
+            @PathVariable UUID lessonPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user) {
+        return quizQueryService.getQuizzesForLesson(lessonPublicId, user);
     }
 
     @PostMapping("/create")
