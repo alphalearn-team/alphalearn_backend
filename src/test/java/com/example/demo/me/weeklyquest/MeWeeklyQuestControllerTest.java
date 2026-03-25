@@ -49,6 +49,8 @@ class MeWeeklyQuestControllerTest {
     private LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
         @Mock
         private LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService;
+        @Mock
+        private QuestHistoryQueryService questHistoryQueryService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -60,10 +62,11 @@ class MeWeeklyQuestControllerTest {
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders.standaloneSetup(new MeWeeklyQuestController(
-                        learnerWeeklyQuestQueryService,
-                        learnerQuestChallengeUploadService,
-                        learnerQuestChallengeSubmissionService,
-                        learnerQuestChallengeFeedQueryService
+                learnerWeeklyQuestQueryService,
+                learnerQuestChallengeUploadService,
+                learnerQuestChallengeSubmissionService,
+                learnerQuestChallengeFeedQueryService,
+                questHistoryQueryService
                 ))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -251,6 +254,59 @@ class MeWeeklyQuestControllerTest {
                         .queryParam("page", "-1")
                         .queryParam("size", "20"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsMyQuestHistory() throws Exception {
+        QuestHistoryDto response = new QuestHistoryDto(
+                List.of(new QuestHistoryItemDto(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        "learner",
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        OffsetDateTime.parse("2026-03-23T00:00:00Z"),
+                        UUID.randomUUID(),
+                        "Algebra",
+                        "https://example.com/media.mp4",
+                        "video/mp4",
+                        "media.mp4",
+                        "caption",
+                        OffsetDateTime.parse("2026-03-24T09:00:00Z"),
+                        com.example.demo.weeklyquest.enums.SubmissionVisibility.PUBLIC
+                )),
+                0,
+                20,
+                false
+        );
+
+        when(questHistoryQueryService.getMyHistory(any(), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quest/history")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].learnerUsername").value("learner"))
+                .andExpect(jsonPath("$.items[0].visibility").value("PUBLIC"));
+    }
+
+    @Test
+    void returnsFriendQuestHistory() throws Exception {
+        UUID friendPublicId = UUID.randomUUID();
+        QuestHistoryDto response = new QuestHistoryDto(List.of(), 0, 20, false);
+
+        when(questHistoryQueryService.getFriendHistory(any(), eq(friendPublicId), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quest/friends/{friendPublicId}/history", friendPublicId)
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
     }
 
     private void setAuthentication(SupabaseAuthUser user) {
