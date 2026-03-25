@@ -104,7 +104,7 @@ public class LessonController {
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        List<QuizResponseDto> quizzes = quizQueryService.getQuizzesForLesson(lessonPublicId);
+        List<QuizResponseDto> quizzes = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
         if (quizzes.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please add at least one quiz before publishing.");
         }

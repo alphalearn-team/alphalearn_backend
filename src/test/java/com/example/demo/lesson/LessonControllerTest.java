@@ -1,5 +1,6 @@
 package com.example.demo.lesson;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,7 +69,9 @@ class LessonControllerTest {
         SupabaseAuthUser user = contributorUser(ownerId);
         setAuthentication(user);
         
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of(new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, ownerId, "title", OffsetDateTime.now(), List.of())));
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
+                new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, "title", OffsetDateTime.now(), List.of(), true)
+        ));
 
         when(lessonService.submitLesson(lessonPublicId, user)).thenThrow(new ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,
@@ -91,7 +94,9 @@ class LessonControllerTest {
         SupabaseAuthUser user = contributorUser(ownerId);
         setAuthentication(user);
         
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of(new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, ownerId, "title", OffsetDateTime.now(), List.of())));
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
+                new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, "title", OffsetDateTime.now(), List.of(), true)
+        ));
 
         when(lessonService.submitLesson(lessonPublicId, user)).thenThrow(new ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,
@@ -114,7 +119,7 @@ class LessonControllerTest {
         SupabaseAuthUser user = contributorUser(ownerId);
         setAuthentication(user);
 
-        when(quizQueryService.getQuizzesForLesson(lessonPublicId)).thenReturn(List.of());
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of());
 
         mockMvc.perform(post("/api/lessons/{lessonPublicId}/submit", lessonPublicId))
                 .andExpect(status().isBadRequest())
