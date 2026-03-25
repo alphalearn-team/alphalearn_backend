@@ -1,8 +1,11 @@
 package com.example.demo.weeklyquest;
 
 import com.example.demo.learner.Learner;
+import com.example.demo.weeklyquest.enums.SubmissionVisibility;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -15,6 +18,8 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -65,10 +70,18 @@ public class WeeklyQuestChallengeSubmission {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, columnDefinition = "quest_submission_visibility")
+    private SubmissionVisibility visibility;
+
     @PrePersist
     void assignPublicIdIfMissing() {
         if (publicId == null) {
             publicId = UUID.randomUUID();
+        }
+        if (visibility == null) {
+            visibility = SubmissionVisibility.PUBLIC;
         }
     }
 }
