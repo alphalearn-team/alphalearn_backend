@@ -20,7 +20,7 @@ public class OllamaLessonAutoModerationService implements LessonAutoModerationSe
 
     @Override
     public LessonModerationResult moderate(Lesson lesson) {
-        System.out.println("🔥 AUTO MODERATION TRIGGERED");
+        System.out.println("AUTO MODERATION TRIGGERED");
 
         String content = extractContent(lesson);
 
@@ -29,7 +29,7 @@ public class OllamaLessonAutoModerationService implements LessonAutoModerationSe
         return mapToLessonModerationResult(aiResult);
     }
 
-    // 🔥 STEP 4 — Extract content (fits your system)
+    // STEP 4 — Extract content (fits your system)
     private String extractContent(Lesson lesson) {
         StringBuilder sb = new StringBuilder();
 
@@ -51,7 +51,7 @@ public class OllamaLessonAutoModerationService implements LessonAutoModerationSe
         return sb.toString();
     }
 
-    // 🔥 STEP 5 — Map AI → YOUR system
+    // STEP 5 — Map AI → YOUR system
     private LessonModerationResult mapToLessonModerationResult(ModerationResult ai) {
 
         LessonModerationDecision decision;
