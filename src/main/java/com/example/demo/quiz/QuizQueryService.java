@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.contributor.Contributor;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.quiz.dto.QuizOptionDto;
