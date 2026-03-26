@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.friendship.request.dto.CreateFriendRequestRequest;
@@ -35,17 +36,23 @@ public class FriendRequestController {
             @RequestBody CreateFriendRequestRequest request,
             Authentication auth
     ) {
-            Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
-            return friendRequestService.sendRequest(currentUser, request.receiverPublicId());
+            Learner currentUser = requireLearner(auth);
+            return friendRequestService.sendRequest(currentUser, request == null ? null : request.receiverPublicId());
     }
 
     @GetMapping
     public List<FriendRequestDTO> getRequests(
-            @RequestParam FriendRequestDirection direction,
+            @RequestParam String direction,
             Authentication auth
     ) {
-            Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
-            return switch (direction) {
+            Learner currentUser = requireLearner(auth);
+            FriendRequestDirection parsedDirection;
+            try {
+                parsedDirection = FriendRequestDirection.fromQueryValue(direction);
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+            }
+            return switch (parsedDirection) {
                 case INCOMING -> friendRequestService.getPendingRequests(currentUser);
                 case OUTGOING -> friendRequestService.getOutgoingRequests(currentUser);
             };
@@ -58,8 +65,8 @@ public class FriendRequestController {
             @RequestBody UpdateFriendRequestStatusRequest request,
             Authentication auth
     ) {
-        Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
-        friendRequestService.updateRequestStatus(currentUser, requestId, request.status());
+        Learner currentUser = requireLearner(auth);
+        friendRequestService.updateRequestStatus(currentUser, requestId, request == null ? null : request.status());
     }
 
     @DeleteMapping("/{requestId}")
@@ -68,9 +75,14 @@ public class FriendRequestController {
             @PathVariable Long requestId,
             Authentication auth
     ) {
-
-        Learner currentUser = ((SupabaseAuthUser) auth.getPrincipal()).learner();
-
+        Learner currentUser = requireLearner(auth);
         friendRequestService.cancelRequest(currentUser, requestId);
+    }
+
+    private Learner requireLearner(Authentication auth) {
+        if (auth == null || !(auth.getPrincipal() instanceof SupabaseAuthUser authUser) || authUser.learner() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
+        }
+        return authUser.learner();
     }
 }
