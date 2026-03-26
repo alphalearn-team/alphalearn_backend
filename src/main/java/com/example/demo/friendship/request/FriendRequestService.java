@@ -11,6 +11,7 @@ import com.example.demo.friendship.friend.Friend;
 import com.example.demo.friendship.friend.FriendId;
 import com.example.demo.friendship.friend.FriendRepository;
 import com.example.demo.friendship.request.dto.FriendRequestDTO;
+import com.example.demo.friendship.shared.OrderedUuidPair;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 
@@ -25,10 +26,8 @@ public class FriendRequestService {
     private final FriendRepository friendRepository;
 
     private FriendId normalizeFriendId(UUID id1, UUID id2) {
-        if (id1.compareTo(id2) > 0) {
-            return new FriendId(id2, id1);
-        }
-        return new FriendId(id1, id2);
+        OrderedUuidPair pair = OrderedUuidPair.of(id1, id2);
+        return new FriendId(pair.first(), pair.second());
     }
 
     private FriendRequestDTO mapToDTO(FriendRequest req, Learner currentUser) {

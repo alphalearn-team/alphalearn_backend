@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.example.demo.friendship.friend.dto.FriendPublicDTO;
+import com.example.demo.friendship.shared.OrderedUuidPair;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 
@@ -59,14 +60,8 @@ public class FriendService {
             throw new RuntimeException("You cannot remove yourself");
         }
 
-        // normalize order (IMPORTANT)
-        if (userId1.compareTo(userId2) > 0) {
-            UUID temp = userId1;
-            userId1 = userId2;
-            userId2 = temp;
-        }
-
-        FriendId friendId = new FriendId(userId1, userId2);
+        OrderedUuidPair pair = OrderedUuidPair.of(userId1, userId2);
+        FriendId friendId = new FriendId(pair.first(), pair.second());
 
         if (!friendRepository.existsById(friendId)) {
             throw new RuntimeException("Friendship does not exist");
