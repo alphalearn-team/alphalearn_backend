@@ -7,6 +7,7 @@ import com.example.demo.learner.LearnerRepository;
 import com.example.demo.quest.weekly.QuestHistoryProjection;
 import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmissionRepository;
 import com.example.demo.quest.weekly.enums.SubmissionVisibility;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +23,8 @@ public class QuestHistoryQueryService {
 
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 50;
+    private static final OffsetDateTime MIN_SUBMITTED_AT = OffsetDateTime.parse("1970-01-01T00:00:00Z");
+    private static final OffsetDateTime MAX_SUBMITTED_AT = OffsetDateTime.parse("9999-12-31T23:59:59Z");
     private static final List<SubmissionVisibility> FRIEND_VISIBLE = List.of(
             SubmissionVisibility.PUBLIC,
             SubmissionVisibility.FRIENDS
@@ -43,11 +46,41 @@ public class QuestHistoryQueryService {
 
     @Transactional(readOnly = true)
     public QuestHistoryDto getMyHistory(SupabaseAuthUser user, Integer page, Integer size, List<UUID> weekPublicIds) {
+        return getMyHistory(user, page, size, weekPublicIds, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public QuestHistoryDto getMyHistory(
+            SupabaseAuthUser user,
+            Integer page,
+            Integer size,
+            List<UUID> weekPublicIds,
+            OffsetDateTime submittedFrom,
+            OffsetDateTime submittedTo
+    ) {
         UUID learnerId = requireLearnerId(user);
         Pageable pageable = resolvePageable(page, size);
-        Slice<QuestHistoryProjection> slice = hasWeeks(weekPublicIds)
-                ? submissionRepository.findMyQuestHistoryByWeekPublicIds(learnerId, weekPublicIds, pageable)
-                : submissionRepository.findMyQuestHistory(learnerId, pageable);
+        validateSubmittedAtRange(submittedFrom, submittedTo);
+        OffsetDateTime resolvedSubmittedFrom = submittedFrom == null ? MIN_SUBMITTED_AT : submittedFrom;
+        OffsetDateTime resolvedSubmittedTo = submittedTo == null ? MAX_SUBMITTED_AT : submittedTo;
+
+        Slice<QuestHistoryProjection> slice;
+        if (hasWeeks(weekPublicIds)) {
+            slice = hasSubmittedAtFilter(submittedFrom, submittedTo)
+                    ? submissionRepository.findMyQuestHistoryByWeekPublicIdsAndSubmittedAtRange(
+                            learnerId,
+                            weekPublicIds,
+                    resolvedSubmittedFrom,
+                    resolvedSubmittedTo,
+                            pageable
+                    )
+                    : submissionRepository.findMyQuestHistoryByWeekPublicIds(learnerId, weekPublicIds, pageable);
+        } else {
+            slice = hasSubmittedAtFilter(submittedFrom, submittedTo)
+                ? submissionRepository.findMyQuestHistoryBySubmittedAtRange(learnerId, resolvedSubmittedFrom, resolvedSubmittedTo, pageable)
+                    : submissionRepository.findMyQuestHistory(learnerId, pageable);
+        }
+
         return toDto(slice, pageable);
     }
 
@@ -59,6 +92,19 @@ public class QuestHistoryQueryService {
             Integer size,
             List<UUID> weekPublicIds
     ) {
+        return getFriendHistory(user, friendPublicId, page, size, weekPublicIds, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public QuestHistoryDto getFriendHistory(
+            SupabaseAuthUser user,
+            UUID friendPublicId,
+            Integer page,
+            Integer size,
+            List<UUID> weekPublicIds,
+            OffsetDateTime submittedFrom,
+            OffsetDateTime submittedTo
+    ) {
         UUID learnerId = requireLearnerId(user);
         Learner friend = learnerRepository.findByPublicId(friendPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Friend learner not found"));
@@ -68,9 +114,34 @@ public class QuestHistoryQueryService {
         }
 
         Pageable pageable = resolvePageable(page, size);
-        Slice<QuestHistoryProjection> slice = hasWeeks(weekPublicIds)
-                ? submissionRepository.findFriendQuestHistoryByWeekPublicIds(friend.getId(), FRIEND_VISIBLE, weekPublicIds, pageable)
-                : submissionRepository.findFriendQuestHistory(friend.getId(), FRIEND_VISIBLE, pageable);
+        validateSubmittedAtRange(submittedFrom, submittedTo);
+        OffsetDateTime resolvedSubmittedFrom = submittedFrom == null ? MIN_SUBMITTED_AT : submittedFrom;
+        OffsetDateTime resolvedSubmittedTo = submittedTo == null ? MAX_SUBMITTED_AT : submittedTo;
+
+        Slice<QuestHistoryProjection> slice;
+        if (hasWeeks(weekPublicIds)) {
+            slice = hasSubmittedAtFilter(submittedFrom, submittedTo)
+                    ? submissionRepository.findFriendQuestHistoryByWeekPublicIdsAndSubmittedAtRange(
+                            friend.getId(),
+                            FRIEND_VISIBLE,
+                            weekPublicIds,
+                    resolvedSubmittedFrom,
+                    resolvedSubmittedTo,
+                            pageable
+                    )
+                    : submissionRepository.findFriendQuestHistoryByWeekPublicIds(friend.getId(), FRIEND_VISIBLE, weekPublicIds, pageable);
+        } else {
+            slice = hasSubmittedAtFilter(submittedFrom, submittedTo)
+                    ? submissionRepository.findFriendQuestHistoryBySubmittedAtRange(
+                            friend.getId(),
+                            FRIEND_VISIBLE,
+                    resolvedSubmittedFrom,
+                    resolvedSubmittedTo,
+                            pageable
+                    )
+                    : submissionRepository.findFriendQuestHistory(friend.getId(), FRIEND_VISIBLE, pageable);
+        }
+
         return toDto(slice, pageable);
     }
 
@@ -114,6 +185,16 @@ public class QuestHistoryQueryService {
 
     private boolean hasWeeks(List<UUID> weekPublicIds) {
         return weekPublicIds != null && !weekPublicIds.isEmpty();
+    }
+
+    private boolean hasSubmittedAtFilter(OffsetDateTime submittedFrom, OffsetDateTime submittedTo) {
+        return submittedFrom != null || submittedTo != null;
+    }
+
+    private void validateSubmittedAtRange(OffsetDateTime submittedFrom, OffsetDateTime submittedTo) {
+        if (submittedFrom != null && submittedTo != null && submittedFrom.isAfter(submittedTo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submittedFrom must be less than or equal to submittedTo");
+        }
     }
 
     private QuestHistoryDto toDto(Slice<QuestHistoryProjection> slice, Pageable pageable) {
