@@ -1,4 +1,4 @@
-package com.example.demo.friend;
+package com.example.demo.friendship.friend;
 
 import java.util.List;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.config.SupabaseAuthUser;
-import com.example.demo.friend.dto.FriendPublicDTO;
+import com.example.demo.friendship.friend.dto.FriendPublicDTO;
 import com.example.demo.learner.Learner;
 
 import lombok.RequiredArgsConstructor;

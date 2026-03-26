@@ -1,4 +1,4 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -7,10 +7,10 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.friend.Friend;
-import com.example.demo.friend.FriendId;
-import com.example.demo.friend.FriendRepository;
-import com.example.demo.friendrequest.dto.FriendRequestDTO;
+import com.example.demo.friendship.friend.Friend;
+import com.example.demo.friendship.friend.FriendId;
+import com.example.demo.friendship.friend.FriendRepository;
+import com.example.demo.friendship.request.dto.FriendRequestDTO;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 

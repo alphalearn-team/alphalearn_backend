@@ -1,11 +1,11 @@
-package com.example.demo.friend;
+package com.example.demo.friendship.friend;
 
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.friend.dto.FriendPublicDTO;
+import com.example.demo.friendship.friend.dto.FriendPublicDTO;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 

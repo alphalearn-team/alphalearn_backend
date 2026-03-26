@@ -1,9 +1,9 @@
-package com.example.demo.friendrequest.dto;
+package com.example.demo.friendship.request.dto;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import com.example.demo.friendrequest.FriendRequestStatus;
+import com.example.demo.friendship.request.FriendRequestStatus;
 
 public record FriendRequestDTO(
     Long requestId,

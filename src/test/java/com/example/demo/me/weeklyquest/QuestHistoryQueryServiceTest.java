@@ -7,7 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.example.demo.config.SupabaseAuthUser;
-import com.example.demo.friend.FriendRepository;
+import com.example.demo.friendship.friend.FriendRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.weeklyquest.QuestHistoryProjection;

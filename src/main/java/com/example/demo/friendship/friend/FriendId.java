@@ -1,4 +1,4 @@
-package com.example.demo.friend;
+package com.example.demo.friendship.friend;
 
 import java.io.Serializable;
 import java.util.UUID;

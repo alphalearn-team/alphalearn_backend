@@ -1,4 +1,4 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.util.List;
 import java.util.Optional;

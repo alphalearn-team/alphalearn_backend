@@ -1,4 +1,4 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.util.List;
 import java.util.UUID;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.config.SupabaseAuthUser;
-import com.example.demo.friendrequest.dto.FriendRequestDTO;
+import com.example.demo.friendship.request.dto.FriendRequestDTO;
 import com.example.demo.learner.Learner;
 
 import lombok.RequiredArgsConstructor;
