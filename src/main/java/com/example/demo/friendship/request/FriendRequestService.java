@@ -123,6 +123,18 @@ public class FriendRequestService {
                 .toList();
     }
 
+    public void updateRequestStatus(Learner currentUser, Long requestId, FriendRequestStatus status) {
+        if (status == FriendRequestStatus.APPROVED) {
+            acceptRequest(currentUser, requestId);
+            return;
+        }
+        if (status == FriendRequestStatus.REJECTED) {
+            rejectRequest(currentUser, requestId);
+            return;
+        }
+        throw new RuntimeException("Only APPROVED or REJECTED are supported");
+    }
+
     @Transactional
     public void acceptRequest(Learner currentUser, Long requestId) {
 
