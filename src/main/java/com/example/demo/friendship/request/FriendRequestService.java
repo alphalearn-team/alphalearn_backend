@@ -59,6 +59,9 @@ public class FriendRequestService {
         if (receiverPublicId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "receiverPublicId is required");
         }
+        if (currentUser != null && receiverPublicId.equals(currentUser.getPublicId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot send request to yourself");
+        }
 
         Learner receiver = learnerRepository.findByPublicId(receiverPublicId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
