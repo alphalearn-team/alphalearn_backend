@@ -1,5 +1,6 @@
 package com.example.demo.lesson;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +34,7 @@ import com.example.demo.config.SupabaseAuthenticationToken;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.quiz.QuizQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,13 +43,16 @@ class LessonControllerTest {
     @Mock
     private LessonService lessonService;
 
+    @Mock
+    private QuizQueryService quizQueryService;
+
     private MockMvc mockMvc;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new LessonController(lessonService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new LessonController(lessonService, quizQueryService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -63,6 +68,10 @@ class LessonControllerTest {
         UUID lessonPublicId = UUID.randomUUID();
         SupabaseAuthUser user = contributorUser(ownerId);
         setAuthentication(user);
+        
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
+                new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, "title", OffsetDateTime.now(), List.of(), true)
+        ));
 
         when(lessonService.submitLesson(lessonPublicId, user)).thenThrow(new ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,
@@ -84,6 +93,10 @@ class LessonControllerTest {
         UUID lessonPublicId = UUID.randomUUID();
         SupabaseAuthUser user = contributorUser(ownerId);
         setAuthentication(user);
+        
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
+                new com.example.demo.quiz.dto.QuizResponseDto(UUID.randomUUID(), lessonPublicId, "title", OffsetDateTime.now(), List.of(), true)
+        ));
 
         when(lessonService.submitLesson(lessonPublicId, user)).thenThrow(new ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,
@@ -96,6 +109,24 @@ class LessonControllerTest {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
                     assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
                             .isEqualTo("Only UNPUBLISHED or REJECTED lessons can be submitted for review.");
+                });
+    }
+
+    @Test
+    void submitLessonReturnsBadRequestWhenNoQuiz() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        SupabaseAuthUser user = contributorUser(ownerId);
+        setAuthentication(user);
+
+        when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of());
+
+        mockMvc.perform(post("/api/lessons/{lessonPublicId}/submit", lessonPublicId))
+                .andExpect(status().isBadRequest())
+                .andExpect(result -> {
+                    assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
+                            .isEqualTo("Please add at least one quiz before publishing.");
                 });
     }
 

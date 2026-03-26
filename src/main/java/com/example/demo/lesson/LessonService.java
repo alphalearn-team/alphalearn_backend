@@ -48,6 +48,7 @@ public class LessonService {
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final LessonSectionService lessonSectionService;
     private final ObjectMapper objectMapper;
+
     public LessonService(
             LessonRepository lessonRepository,
             ContributorRepository contributorRepository,
@@ -58,8 +59,7 @@ public class LessonService {
             LessonListQueryService lessonListQueryService,
             LessonModerationRecordRepository lessonModerationRecordRepository,
             LessonSectionService lessonSectionService,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper) {
         this.lessonRepository = lessonRepository;
         this.contributorRepository = contributorRepository;
         this.conceptRepository = conceptRepository;
@@ -75,15 +75,13 @@ public class LessonService {
     @Transactional(readOnly = true)
     public List<LessonContributorSummaryDto> getMyAuthoredLessons(
             UUID ownerUserId,
-            List<UUID> conceptPublicIds
-    ) {
+            List<UUID> conceptPublicIds) {
         List<Integer> conceptIds = resolveConceptIdsByPublicIds(conceptPublicIds);
         List<Lesson> lessons = lessonListQueryService.findLessons(new LessonListCriteria(
                 conceptIds,
                 ownerUserId,
                 null,
-                LessonListAudience.CONTRIBUTOR
-        ));
+                LessonListAudience.CONTRIBUTOR));
 
         return lessons.stream()
                 .map(this::toContributorSummaryDto)
@@ -97,8 +95,7 @@ public class LessonService {
                 conceptIds,
                 null,
                 null,
-                LessonListAudience.PUBLIC
-        ));
+                LessonListAudience.PUBLIC));
         return lessons.stream()
                 .map(this::toPublicSummaryDto)
                 .toList();
@@ -137,16 +134,14 @@ public class LessonService {
         if (title == null || conceptPublicIds.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title and conceptPublicIds are required"
-            );
+                    "title and conceptPublicIds are required");
         }
 
         // Require at least content OR sections
         if (!hasContent && !hasSections) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Either content or sections must be provided"
-            );
+                    "Either content or sections must be provided");
         }
 
         if (contributorId == null) {
@@ -166,8 +161,7 @@ public class LessonService {
                     .orElse(null);
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "Concept not found" + (missingConceptPublicId == null ? "" : ": " + missingConceptPublicId)
-            );
+                    "Concept not found" + (missingConceptPublicId == null ? "" : ": " + missingConceptPublicId));
         }
 
         boolean submit = Boolean.TRUE.equals(request.submit());
@@ -176,8 +170,7 @@ public class LessonService {
                 hasContent ? objectMapper.valueToTree(content) : null,
                 LessonModerationStatus.UNPUBLISHED,
                 contributor,
-                OffsetDateTime.now()
-        );
+                OffsetDateTime.now());
         lesson.getConcepts().addAll(concepts);
 
         Lesson saved = lessonRepository.save(lesson);
@@ -211,16 +204,14 @@ public class LessonService {
         if (title == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "title is required"
-            );
+                    "title is required");
         }
 
         // Require at least content OR sections
         if (!hasContent && !hasSections) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Either content or sections must be provided"
-            );
+                    "Either content or sections must be provided");
         }
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
@@ -240,8 +231,8 @@ public class LessonService {
 
         Lesson saved = (previousStatus == LessonModerationStatus.APPROVED
                 || previousStatus == LessonModerationStatus.PENDING)
-                ? lessonModerationWorkflowService.submitForReview(lesson)
-                : lessonRepository.save(lesson);
+                        ? lessonModerationWorkflowService.submitForReview(lesson)
+                        : lessonRepository.save(lesson);
         return toDetailDto(saved);
     }
 
@@ -264,8 +255,7 @@ public class LessonService {
         if (status != LessonModerationStatus.UNPUBLISHED && status != LessonModerationStatus.REJECTED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
-            );
+                    "Only UNPUBLISHED or REJECTED lessons can be submitted for review.");
         }
 
         Lesson saved = lessonModerationWorkflowService.submitForReview(lesson);
@@ -345,8 +335,7 @@ public class LessonService {
                     .orElse(null);
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "Concept not found" + (missingPublicId == null ? "" : ": " + missingPublicId)
-            );
+                    "Concept not found" + (missingPublicId == null ? "" : ": " + missingPublicId));
         }
 
         return concepts.stream()
@@ -361,8 +350,7 @@ public class LessonService {
                 lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt()
-        );
+                lesson.getCreatedAt());
     }
 
     private LessonContributorSummaryDto toContributorSummaryDto(Lesson lesson) {
@@ -373,8 +361,7 @@ public class LessonService {
                 lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt()
-        );
+                lesson.getCreatedAt());
     }
 
     private LessonDetailDto toDetailDto(Lesson lesson) {
@@ -385,9 +372,9 @@ public class LessonService {
         LessonModerationRecord latestAdminRecord = lessonModerationRecordRepository
                 .findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(lesson, LessonModerationDecisionSource.ADMIN)
                 .orElse(null);
-        
+
         List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
-        
+
         return new LessonDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -402,14 +389,13 @@ public class LessonService {
                 latestModeratedAt(latestRecord),
                 adminRejectionReason(latestAdminRecord),
                 lessonSectionService.toSectionDtos(sections),
-                sections.size()
-        );
+                sections.size());
     }
 
     private LessonPublicDetailDto toPublicDetailDto(Lesson lesson) {
         LessonDetailBase base = toDetailBase(lesson);
         List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
-        
+
         return new LessonPublicDetailDto(
                 base.lessonPublicId(),
                 base.title(),
@@ -419,8 +405,7 @@ public class LessonService {
                 base.author(),
                 base.createdAt(),
                 lessonSectionService.toSectionDtos(sections),
-                sections.size()
-        );
+                sections.size());
     }
 
     private LessonDetailBase toDetailBase(Lesson lesson) {
@@ -431,15 +416,15 @@ public class LessonService {
                 lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt()
-        );
+                lesson.getCreatedAt());
     }
 
     private List<String> latestModerationReasons(LessonModerationRecord latestRecord) {
         if (latestRecord == null || latestRecord.getReasons() == null || latestRecord.getReasons().isNull()) {
             return List.of();
         }
-        return objectMapper.convertValue(latestRecord.getReasons(), new TypeReference<List<String>>() {});
+        return objectMapper.convertValue(latestRecord.getReasons(), new TypeReference<List<String>>() {
+        });
     }
 
     private String latestModerationEventType(LessonModerationRecord latestRecord) {
@@ -467,8 +452,8 @@ public class LessonService {
             List<UUID> conceptPublicIds,
             List<LessonConceptSummaryDto> concepts,
             LessonAuthorDto author,
-            OffsetDateTime createdAt
-    ) {}
+            OffsetDateTime createdAt) {
+    }
 
     private void requireContributorUser(SupabaseAuthUser user) {
         if (user == null || !user.isContributor()) {

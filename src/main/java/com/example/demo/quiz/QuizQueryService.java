@@ -7,6 +7,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.contributor.Contributor;
+import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.quiz.dto.QuizOptionDto;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
@@ -38,54 +41,78 @@ public class QuizQueryService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuizResponseDto> getQuizzesForLesson(UUID lessonPublicId) {
-        lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+    public List<QuizResponseDto> getQuizzesForLesson(UUID lessonPublicId, SupabaseAuthUser user) {
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+
+        boolean isOwner = user != null
+                && user.userId() != null
+                && lesson.getContributor() != null
+                && lesson.getContributor().getContributorId().equals(user.userId());
+
+        boolean canAttempt = !isOwner;
 
         return quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId).stream()
                 .map(quiz -> new QuizResponseDto(
                         quiz.getPublicId(),
                         lessonPublicId,
+                        quiz.getLesson().getTitle(),
                         quiz.getCreatedAt(),
                         quiz.getQuestions().stream()
                                 .sorted(Comparator.comparingInt(QuizQuestion::getOrderIndex))
                                 .map(this::toQuestionResponse)
-                                .toList()
+                                .toList(),
+                        canAttempt
                 ))
                 .toList();
     }
 
     private QuizQuestionResponseDto toQuestionResponse(QuizQuestion question) {
+        // Use a more robust check that handles Hibernate proxies if any
+        String type = "unknown";
+        List<QuizOptionDto> options = List.of();
+        List<String> correctIds = List.of();
+
         if (question instanceof MCQQuestion mcqQuestion) {
-            return new QuizQuestionResponseDto(
-                    question.getPublicId(),
-                    "single-choice",
-                    question.getPrompt(),
-                    question.getOrderIndex(),
-                    readOptions(mcqQuestion.getOptions())
-            );
+            type = "single-choice";
+            options = readOptions(mcqQuestion.getOptions());
+            if (mcqQuestion.getCorrectOptionId() != null) {
+                correctIds = List.of(mcqQuestion.getCorrectOptionId());
+            }
+        } else if (question instanceof MultiSelectQuestion multiSelectQuestion) {
+            type = "multiple-choice";
+            options = readOptions(multiSelectQuestion.getOptions());
+            correctIds = extractIdsFromJson(multiSelectQuestion.getCorrectOptionIds());
+        } else if (question instanceof TrueFalseQuestion trueFalseQuestion) {
+            type = "true-false";
+            options = TRUE_FALSE_OPTIONS;
+            correctIds = List.of(Boolean.toString(trueFalseQuestion.isCorrectBoolean()));
         }
 
-        if (question instanceof MultiSelectQuestion multiSelectQuestion) {
-            return new QuizQuestionResponseDto(
-                    question.getPublicId(),
-                    "multiple-choice",
-                    question.getPrompt(),
-                    question.getOrderIndex(),
-                    readOptions(multiSelectQuestion.getOptions())
-            );
-        }
+        return new QuizQuestionResponseDto(
+                question.getPublicId(),
+                type,
+                question.getPrompt(),
+                question.getOrderIndex(),
+                options,
+                correctIds
+        );
+    }
 
-        if (question instanceof TrueFalseQuestion) {
-            return new QuizQuestionResponseDto(
-                    question.getPublicId(),
-                    "true-false",
-                    question.getPrompt(),
-                    question.getOrderIndex(),
-                    TRUE_FALSE_OPTIONS
-            );
+    private List<String> extractIdsFromJson(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return List.of();
         }
-
-        throw new IllegalStateException("Unsupported quiz question type: " + question.getClass().getName());
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (JsonNode item : node) {
+            if (item.isTextual()) {
+                ids.add(item.asText());
+            } else if (item.isObject() && item.has("id")) {
+                ids.add(item.get("id").asText());
+            } else {
+                ids.add(item.asText());
+            }
+        }
+        return ids;
     }
 
     private List<QuizOptionDto> readOptions(JsonNode optionsNode) {

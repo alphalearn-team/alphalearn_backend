@@ -211,6 +211,38 @@ class LearnerQuizAttemptServiceTest {
     }
 
     @Test
+    void getLatestQuizAttemptRejectsLessonCreator() {
+        SupabaseAuthUser ownerUser = ownerUser();
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, ownerUser.userId());
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.getLatestQuizAttempt(quiz.getPublicId(), ownerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Lesson creators cannot answer their own quiz");
+    }
+
+    @Test
+    void getBestQuizAttemptRejectsLessonCreator() {
+        SupabaseAuthUser ownerUser = ownerUser();
+        Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, ownerUser.userId());
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.getBestQuizAttempt(quiz.getPublicId(), ownerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Lesson creators cannot answer their own quiz");
+    }
+
+    @Test
     void submitQuizAttemptRejectsDuplicateQuestionAnswers() {
         Quiz quiz = buildQuizWithMixedQuestions();
         SupabaseAuthUser learnerUser = learnerUser();
