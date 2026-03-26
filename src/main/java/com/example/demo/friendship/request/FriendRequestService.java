@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.friendship.friend.Friend;
 import com.example.demo.friendship.friend.FriendId;
@@ -70,11 +71,18 @@ public class FriendRequestService {
         }
 
         // existing request?
-        Optional<FriendRequest> existing =
-                friendRequestRepository.findBySenderIdAndReceiverId(senderId, receiverId);
+        Optional<FriendRequest> existingOutgoingPending = friendRequestRepository
+                .findBySenderIdAndReceiverIdAndStatus(senderId, receiverId, FriendRequestStatus.PENDING);
 
-        if (existing.isPresent()) {
+        if (existingOutgoingPending.isPresent()) {
             throw new RuntimeException("Request already sent");
+        }
+
+        Optional<FriendRequest> existingIncomingPending = friendRequestRepository
+                .findBySenderIdAndReceiverIdAndStatus(receiverId, senderId, FriendRequestStatus.PENDING);
+
+        if (existingIncomingPending.isPresent()) {
+            throw new RuntimeException("Incoming request already pending");
         }
 
         FriendRequest request = FriendRequest.builder()
@@ -115,6 +123,7 @@ public class FriendRequestService {
                 .toList();
     }
 
+    @Transactional
     public void acceptRequest(Learner currentUser, Long requestId) {
 
         FriendRequest request = friendRequestRepository.findById(requestId)
