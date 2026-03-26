@@ -3,9 +3,11 @@ package com.example.demo.me.weeklyquest;
 import com.example.demo.config.SupabaseAuthUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,8 +24,8 @@ public class MeWeeklyQuestController {
     private final LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService;
     private final LearnerQuestChallengeUploadService learnerQuestChallengeUploadService;
     private final LearnerQuestChallengeSubmissionService learnerQuestChallengeSubmissionService;
-        private final LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService;
-        private final QuestHistoryQueryService questHistoryQueryService;
+    private final LearnerQuestChallengeFeedQueryService learnerQuestChallengeFeedQueryService;
+    private final QuestHistoryQueryService questHistoryQueryService;
 
     public MeWeeklyQuestController(
             LearnerWeeklyQuestQueryService learnerWeeklyQuestQueryService,
@@ -40,36 +42,43 @@ public class MeWeeklyQuestController {
     }
 
     @GetMapping("/friends/feed")
-    @Operation(summary = "Get friends quest challenge feed", description = "Returns paginated quest challenge submissions from the authenticated learner's friends")
+    @Operation(summary = "Get friends quest challenge feed", description = "Returns paginated quest challenge submissions from the authenticated learner's friends. Supports optional filtering by week IDs and submitted time range.")
     public FriendQuestChallengeFeedDto getFriendsQuestChallengeFeed(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) List<UUID> weekPublicIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedTo
     ) {
-        return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size);
+        return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size, weekPublicIds, submittedFrom, submittedTo);
     }
 
     @GetMapping("/history")
-    @Operation(summary = "Get my quest history", description = "Returns paginated weekly quest submissions of the authenticated learner")
+    @Operation(summary = "Get my quest history", description = "Returns paginated weekly quest submissions of the authenticated learner. Supports optional filtering by week IDs and submitted time range.")
     public QuestHistoryDto getMyQuestHistory(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) List<UUID> weekPublicIds
+            @RequestParam(required = false) List<UUID> weekPublicIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedTo
     ) {
-        return questHistoryQueryService.getMyHistory(user, page, size, weekPublicIds);
+        return questHistoryQueryService.getMyHistory(user, page, size, weekPublicIds, submittedFrom, submittedTo);
     }
 
     @GetMapping("/friends/{friendPublicId}/history")
-    @Operation(summary = "Get friend quest history", description = "Returns paginated weekly quest submissions of a friend with friend/public visibility")
+    @Operation(summary = "Get friend quest history", description = "Returns paginated weekly quest submissions of a friend with friend/public visibility. Supports optional filtering by week IDs and submitted time range.")
     public QuestHistoryDto getFriendQuestHistory(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @PathVariable UUID friendPublicId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) List<UUID> weekPublicIds
+            @RequestParam(required = false) List<UUID> weekPublicIds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedTo
     ) {
-        return questHistoryQueryService.getFriendHistory(user, friendPublicId, page, size, weekPublicIds);
+        return questHistoryQueryService.getFriendHistory(user, friendPublicId, page, size, weekPublicIds, submittedFrom, submittedTo);
     }
 
     @GetMapping("/current")
