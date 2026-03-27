@@ -53,16 +53,16 @@ class FriendRequestServiceTest {
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
                 sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
+                receiver.getId()
         )).thenReturn(Optional.empty());
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
                 receiver.getId(),
-                sender.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.of(FriendRequest.builder().build()));
+                sender.getId()
+        )).thenReturn(Optional.of(FriendRequest.builder()
+                .status(FriendRequestStatus.PENDING)
+                .build()));
 
         assertThatThrownBy(() -> service.sendRequest(sender, receiver.getPublicId()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -122,11 +122,12 @@ class FriendRequestServiceTest {
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
                 sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.of(FriendRequest.builder().build()));
+                receiver.getId()
+        )).thenReturn(Optional.of(FriendRequest.builder()
+                .status(FriendRequestStatus.PENDING)
+                .build()));
 
         assertThatThrownBy(() -> service.sendRequest(sender, receiver.getPublicId()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -137,22 +138,87 @@ class FriendRequestServiceTest {
     }
 
     @Test
-    void sendRequestAllowsResendAfterRejected() {
+    void sendRequestReopensRejectedRequestForSameDirectedPair() {
         Learner sender = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "sender");
         Learner receiver = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "receiver");
+        FriendRequest rejected = FriendRequest.builder()
+                .friendRequestId(77L)
+                .senderId(sender.getId())
+                .receiverId(receiver.getId())
+                .status(FriendRequestStatus.REJECTED)
+                .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                .respondedAt(OffsetDateTime.parse("2026-03-02T00:00:00Z"))
+                .build();
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
                 sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.empty());
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                receiver.getId(),
+                receiver.getId()
+        )).thenReturn(Optional.of(rejected));
+        when(friendRequestRepository.save(rejected)).thenReturn(rejected);
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+
+        FriendRequestDTO response = service.sendRequest(sender, receiver.getPublicId());
+
+        assertThat(response.requestId()).isEqualTo(77L);
+        assertThat(response.otherUserPublicId()).isEqualTo(receiver.getPublicId());
+        assertThat(response.status()).isEqualTo(FriendRequestStatus.PENDING);
+        assertThat(rejected.getRespondedAt()).isNull();
+    }
+
+    @Test
+    void sendRequestReopensApprovedRequestAfterFriendshipRemoval() {
+        Learner sender = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "sender");
+        Learner receiver = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "receiver");
+        FriendRequest approved = FriendRequest.builder()
+                .friendRequestId(88L)
+                .senderId(sender.getId())
+                .receiverId(receiver.getId())
+                .status(FriendRequestStatus.APPROVED)
+                .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                .respondedAt(OffsetDateTime.parse("2026-03-02T00:00:00Z"))
+                .build();
+
+        when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
+        when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
                 sender.getId(),
-                FriendRequestStatus.PENDING
+                receiver.getId()
+        )).thenReturn(Optional.of(approved));
+        when(friendRequestRepository.save(approved)).thenReturn(approved);
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+
+        FriendRequestDTO response = service.sendRequest(sender, receiver.getPublicId());
+
+        assertThat(response.requestId()).isEqualTo(88L);
+        assertThat(response.status()).isEqualTo(FriendRequestStatus.PENDING);
+        assertThat(approved.getRespondedAt()).isNull();
+    }
+
+    @Test
+    void sendRequestCreatesNewRowWhenOnlyHandledReverseRequestExists() {
+        Learner sender = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "sender");
+        Learner receiver = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "receiver");
+        FriendRequest reverseRejected = FriendRequest.builder()
+                .friendRequestId(55L)
+                .senderId(receiver.getId())
+                .receiverId(sender.getId())
+                .status(FriendRequestStatus.REJECTED)
+                .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                .respondedAt(OffsetDateTime.parse("2026-03-02T00:00:00Z"))
+                .build();
+
+        when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
+        when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
+                sender.getId(),
+                receiver.getId()
         )).thenReturn(Optional.empty());
+        when(friendRequestRepository.findBySenderIdAndReceiverId(
+                receiver.getId(),
+                sender.getId()
+        )).thenReturn(Optional.of(reverseRejected));
         when(friendRequestRepository.save(any(FriendRequest.class))).thenAnswer(invocation -> {
             FriendRequest value = invocation.getArgument(0, FriendRequest.class);
             value.setFriendRequestId(99L);
@@ -163,7 +229,6 @@ class FriendRequestServiceTest {
         FriendRequestDTO response = service.sendRequest(sender, receiver.getPublicId());
 
         assertThat(response.requestId()).isEqualTo(99L);
-        assertThat(response.otherUserPublicId()).isEqualTo(receiver.getPublicId());
         assertThat(response.status()).isEqualTo(FriendRequestStatus.PENDING);
     }
 

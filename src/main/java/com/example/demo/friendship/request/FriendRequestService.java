@@ -33,6 +33,13 @@ public class FriendRequestService {
         return new FriendId(pair.first(), pair.second());
     }
 
+    private FriendRequest reopenRequest(FriendRequest request) {
+        request.setStatus(FriendRequestStatus.PENDING);
+        request.setCreatedAt(OffsetDateTime.now());
+        request.setRespondedAt(null);
+        return friendRequestRepository.save(request);
+    }
+
     private FriendRequestDTO mapToDTO(FriendRequest req, Learner currentUser) {
 
         UUID otherUserId;
@@ -79,18 +86,21 @@ public class FriendRequestService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already friends");
         }
 
-        // existing request?
-        Optional<FriendRequest> existingOutgoingPending = friendRequestRepository
-                .findBySenderIdAndReceiverIdAndStatus(senderId, receiverId, FriendRequestStatus.PENDING);
+        Optional<FriendRequest> existingOutgoing = friendRequestRepository
+                .findBySenderIdAndReceiverId(senderId, receiverId);
 
-        if (existingOutgoingPending.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already sent");
+        if (existingOutgoing.isPresent()) {
+            FriendRequest request = existingOutgoing.get();
+            if (request.getStatus() == FriendRequestStatus.PENDING) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already sent");
+            }
+            return mapToDTO(reopenRequest(request), currentUser);
         }
 
-        Optional<FriendRequest> existingIncomingPending = friendRequestRepository
-                .findBySenderIdAndReceiverIdAndStatus(receiverId, senderId, FriendRequestStatus.PENDING);
+        Optional<FriendRequest> existingIncoming = friendRequestRepository
+                .findBySenderIdAndReceiverId(receiverId, senderId);
 
-        if (existingIncomingPending.isPresent()) {
+        if (existingIncoming.isPresent() && existingIncoming.get().getStatus() == FriendRequestStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Incoming request already pending");
         }
 
