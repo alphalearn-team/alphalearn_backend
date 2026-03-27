@@ -1,4 +1,4 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +10,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface FriendRequestRepository extends JpaRepository<FriendRequest, Long> {
 
     Optional<FriendRequest> findBySenderIdAndReceiverId(UUID senderId, UUID receiverId);
+
+    Optional<FriendRequest> findBySenderIdAndReceiverIdAndStatus(
+            UUID senderId,
+            UUID receiverId,
+            FriendRequestStatus status
+    );
 
     List<FriendRequest> findByReceiverIdAndStatus(UUID receiverId, FriendRequestStatus status);
 
