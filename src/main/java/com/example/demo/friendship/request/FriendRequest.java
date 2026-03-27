@@ -1,4 +1,4 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

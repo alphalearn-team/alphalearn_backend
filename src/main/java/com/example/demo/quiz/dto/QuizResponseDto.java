@@ -14,9 +14,15 @@ public record QuizResponseDto(
         @Schema(description = "Lesson public UUID")
         UUID lessonPublicId,
 
+        @Schema(description = "Lesson title")
+        String lessonTitle,
+
         @Schema(description = "Quiz creation timestamp")
         OffsetDateTime createdAt,
 
         @Schema(description = "Questions in display order")
-        List<QuizQuestionResponseDto> questions
+        List<QuizQuestionResponseDto> questions,
+
+        @Schema(description = "Whether the current user can attempt this quiz")
+        boolean canAttempt
 ) {}

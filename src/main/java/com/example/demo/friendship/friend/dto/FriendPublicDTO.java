@@ -1,4 +1,4 @@
-package com.example.demo.friend.dto;
+package com.example.demo.friendship.friend.dto;
 
 import java.util.UUID;
 

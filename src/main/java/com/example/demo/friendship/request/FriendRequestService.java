@@ -1,16 +1,20 @@
-package com.example.demo.friendrequest;
+package com.example.demo.friendship.request;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-import com.example.demo.friend.Friend;
-import com.example.demo.friend.FriendId;
-import com.example.demo.friend.FriendRepository;
-import com.example.demo.friendrequest.dto.FriendRequestDTO;
+import com.example.demo.friendship.friend.Friend;
+import com.example.demo.friendship.friend.FriendId;
+import com.example.demo.friendship.friend.FriendRepository;
+import com.example.demo.friendship.request.dto.FriendRequestDTO;
+import com.example.demo.friendship.shared.OrderedUuidPair;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 
@@ -25,10 +29,8 @@ public class FriendRequestService {
     private final FriendRepository friendRepository;
 
     private FriendId normalizeFriendId(UUID id1, UUID id2) {
-        if (id1.compareTo(id2) > 0) {
-            return new FriendId(id2, id1);
-        }
-        return new FriendId(id1, id2);
+        OrderedUuidPair pair = OrderedUuidPair.of(id1, id2);
+        return new FriendId(pair.first(), pair.second());
     }
 
     private FriendRequestDTO mapToDTO(FriendRequest req, Learner currentUser) {
@@ -42,7 +44,7 @@ public class FriendRequestService {
         }
 
         Learner otherUser = learnerRepository.findById(otherUserId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return new FriendRequestDTO(
                 req.getFriendRequestId(),
@@ -54,28 +56,42 @@ public class FriendRequestService {
     }
 
     public FriendRequestDTO sendRequest(Learner currentUser, UUID receiverPublicId) {
+        if (receiverPublicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "receiverPublicId is required");
+        }
+        if (currentUser != null && receiverPublicId.equals(currentUser.getPublicId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot send request to yourself");
+        }
+
         Learner receiver = learnerRepository.findByPublicId(receiverPublicId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         UUID senderId = currentUser.getId();
         UUID receiverId = receiver.getId();
 
         if (senderId.equals(receiverId)) {
-            throw new RuntimeException("Cannot send request to yourself");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot send request to yourself");
         }
 
         // already friends?
         FriendId friendId = normalizeFriendId(senderId, receiverId);
         if (friendRepository.existsById(friendId)) {
-            throw new RuntimeException("Already friends");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Already friends");
         }
 
         // existing request?
-        Optional<FriendRequest> existing =
-                friendRequestRepository.findBySenderIdAndReceiverId(senderId, receiverId);
+        Optional<FriendRequest> existingOutgoingPending = friendRequestRepository
+                .findBySenderIdAndReceiverIdAndStatus(senderId, receiverId, FriendRequestStatus.PENDING);
 
-        if (existing.isPresent()) {
-            throw new RuntimeException("Request already sent");
+        if (existingOutgoingPending.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already sent");
+        }
+
+        Optional<FriendRequest> existingIncomingPending = friendRequestRepository
+                .findBySenderIdAndReceiverIdAndStatus(receiverId, senderId, FriendRequestStatus.PENDING);
+
+        if (existingIncomingPending.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Incoming request already pending");
         }
 
         FriendRequest request = FriendRequest.builder()
@@ -116,19 +132,35 @@ public class FriendRequestService {
                 .toList();
     }
 
+    public void updateRequestStatus(Learner currentUser, Long requestId, FriendRequestStatus status) {
+        if (status == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status is required");
+        }
+        if (status == FriendRequestStatus.APPROVED) {
+            acceptRequest(currentUser, requestId);
+            return;
+        }
+        if (status == FriendRequestStatus.REJECTED) {
+            rejectRequest(currentUser, requestId);
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only APPROVED or REJECTED are supported");
+    }
+
+    @Transactional
     public void acceptRequest(Learner currentUser, Long requestId) {
 
         FriendRequest request = friendRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
 
         // Only receiver can accept
         if (!request.getReceiverId().equals(currentUser.getId())) {
-            throw new RuntimeException("Not authorized to accept this request");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to accept this request");
         }
 
         // Must be pending
         if (request.getStatus() != FriendRequestStatus.PENDING) {
-            throw new RuntimeException("Request already handled");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already handled");
         }
 
         // Update status
@@ -159,16 +191,16 @@ public class FriendRequestService {
     public void rejectRequest(Learner currentUser, Long requestId) {
 
         FriendRequest request = friendRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
 
         // Only receiver can reject
         if (!request.getReceiverId().equals(currentUser.getId())) {
-            throw new RuntimeException("Not authorized to reject this request");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to reject this request");
         }
 
         // Must be pending
         if (request.getStatus() != FriendRequestStatus.PENDING) {
-            throw new RuntimeException("Request already handled");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already handled");
         }
 
         // Update status
@@ -181,16 +213,16 @@ public class FriendRequestService {
     public void cancelRequest(Learner currentUser, Long requestId) {
 
         FriendRequest request = friendRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
 
         // 🔥 Only sender can cancel
         if (!request.getSenderId().equals(currentUser.getId())) {
-            throw new RuntimeException("Not authorized to cancel this request");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to cancel this request");
         }
 
         // 🔥 Only pending can be cancelled
         if (request.getStatus() != FriendRequestStatus.PENDING) {
-            throw new RuntimeException("Only pending requests can be cancelled");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be cancelled");
         }
 
         friendRequestRepository.delete(request);

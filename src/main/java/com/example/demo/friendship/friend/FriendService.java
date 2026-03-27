@@ -1,11 +1,14 @@
-package com.example.demo.friend;
+package com.example.demo.friendship.friend;
 
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import com.example.demo.friend.dto.FriendPublicDTO;
+import com.example.demo.friendship.friend.dto.FriendPublicDTO;
+import com.example.demo.friendship.shared.OrderedUuidPair;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 
@@ -35,7 +38,7 @@ public class FriendService {
                 }
 
                 Learner friendLearner = learnerRepository.findById(friendId)
-                        .orElseThrow(() -> new RuntimeException("Friend not found"));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Friend not found"));
 
                 return new FriendPublicDTO(
                         friendLearner.getPublicId(),
@@ -47,29 +50,26 @@ public class FriendService {
     }
 
     public void removeFriend(Learner currentLearner, UUID friendPublicId) {
+        if (friendPublicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "friendPublicId is required");
+        }
 
         Learner friend = learnerRepository.findByPublicId(friendPublicId)
-                .orElseThrow(() -> new RuntimeException("Friend not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Friend not found"));
 
         UUID userId1 = currentLearner.getId();
         UUID userId2 = friend.getId();
 
         // prevent removing yourself
         if (userId1.equals(userId2)) {
-            throw new RuntimeException("You cannot remove yourself");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot remove yourself");
         }
 
-        // normalize order (IMPORTANT)
-        if (userId1.compareTo(userId2) > 0) {
-            UUID temp = userId1;
-            userId1 = userId2;
-            userId2 = temp;
-        }
-
-        FriendId friendId = new FriendId(userId1, userId2);
+        OrderedUuidPair pair = OrderedUuidPair.of(userId1, userId2);
+        FriendId friendId = new FriendId(pair.first(), pair.second());
 
         if (!friendRepository.existsById(friendId)) {
-            throw new RuntimeException("Friendship does not exist");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Friendship does not exist");
         }
 
         friendRepository.deleteById(friendId);

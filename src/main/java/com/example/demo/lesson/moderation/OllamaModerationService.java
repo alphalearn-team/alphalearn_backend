@@ -55,18 +55,28 @@ public class OllamaModerationService {
 
     private String buildPrompt(String content) {
         return """
-                You are a strict content moderator for an educational platform.
+                You are a content moderator for a student educational platform.
 
-                Evaluate the following lesson content based on:
-                - Harmful content
-                - Offensive language
-                - Irrelevant or low-quality content
+                Your goal is to be LENIENT and only reject clearly inappropriate content.
 
-                Respond ONLY in JSON:
+                Rules:
+                - APPROVE most educational or neutral content, even if it is simple, incomplete, or not very high quality
+                - REJECT only if the content contains:
+                - profanity, hate speech, or offensive language
+                - harmful, dangerous, or inappropriate content
+                - If unsure, choose NEEDS_REVIEW instead of rejecting
+
+                Do NOT reject content just because it is:
+                - short
+                - basic or low quality
+                - unfinished
+                - repetitive
+
+                Respond ONLY in valid JSON:
 
                 {
-                  "status": "APPROVED | REJECTED | NEEDS_REVIEW",
-                  "reason": "short explanation"
+                "status": "APPROVED | REJECTED | NEEDS_REVIEW",
+                "reason": "short explanation"
                 }
 
                 Lesson:
