@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,26 +46,45 @@ public class LessonModerationWorkflowService {
 
     @Transactional
     public Lesson submitForReview(Lesson lesson) {
+            lesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
+            Lesson savedLesson = lessonRepository.save(lesson);
+
+            //run async instead of blocking
+            runAutoModerationAsync(savedLesson.getPublicId());
+
+            return savedLesson;
+        
+    }
+
+    @Async
+    public void runAutoModerationAsync(UUID lessonPublicId) {
+        Lesson lesson = lessonRepository.findByPublicId(lessonPublicId)
+                .orElseThrow(() -> new RuntimeException("Lesson not found"));
         try {
+            System.out.println("Running async moderation");
             LessonModerationResult result = lessonAutoModerationService.moderate(lesson);
             LessonModerationStatus resultingStatus = toResultingStatus(result.decision());
             lesson.setLessonModerationStatus(resultingStatus);
             Lesson savedLesson = lessonRepository.save(lesson);
-            lessonModerationRecordRepository.save(toAutoRecord(savedLesson, result, resultingStatus));
-            return savedLesson;
+            lessonModerationRecordRepository.save(
+                    toAutoRecord(savedLesson, result, resultingStatus)
+            );
         } catch (RuntimeException ex) {
+            // YOUR ORIGINAL LOG (slightly adapted)
             log.warn(
-                    "Automatic moderation failed for lessonPublicId={} contributorId={} provider={} exceptionType={} message={}",
+                    "Async moderation failed for lessonPublicId={} contributorId={} provider={} exceptionType={} message={}",
                     lesson.getPublicId(),
                     lesson.getContributor() == null ? null : lesson.getContributor().getContributorId(),
                     lessonAutoModerationService.getClass().getSimpleName(),
                     ex.getClass().getSimpleName(),
                     ex.getMessage()
             );
+            // fallback behavior
             lesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
             Lesson savedLesson = lessonRepository.save(lesson);
-            lessonModerationRecordRepository.save(toAutoFailureRecord(savedLesson, ex));
-            return savedLesson;
+            lessonModerationRecordRepository.save(
+                    toAutoFailureRecord(savedLesson, ex)
+            );
         }
     }
 
