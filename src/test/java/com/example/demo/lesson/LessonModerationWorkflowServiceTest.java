@@ -195,7 +195,7 @@ class LessonModerationWorkflowServiceTest {
 
     private Lesson lessonWithStatus(LessonModerationStatus status) {
         Lesson lesson = new Lesson();
-        lesson.setPublicId(UUID.randomUUID());
+        assignPublicId(lesson, UUID.randomUUID());
         lesson.setTitle("Lesson title");
         lesson.setLessonModerationStatus(status);
         lesson.setCreatedAt(OffsetDateTime.now());
@@ -205,5 +205,15 @@ class LessonModerationWorkflowServiceTest {
         contributor.setPromotedAt(OffsetDateTime.now());
         lesson.setContributor(contributor);
         return lesson;
+    }
+
+    private void assignPublicId(Lesson lesson, UUID publicId) {
+        try {
+            java.lang.reflect.Field field = Lesson.class.getDeclaredField("publicId");
+            field.setAccessible(true);
+            field.set(lesson, publicId);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to set publicId", e);
+        }
     }
 }
