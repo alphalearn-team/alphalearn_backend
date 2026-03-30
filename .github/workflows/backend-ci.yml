@@ -7,7 +7,7 @@ on:
 
 jobs:
   verify:
-    name: Test and Validate Docker Build
+    name: Backend CI
     runs-on: ubuntu-latest
 
     steps:
