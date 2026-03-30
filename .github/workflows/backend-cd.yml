@@ -24,11 +24,9 @@ jobs:
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
-          APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
         run: |
           test -n "$AWS_REGION" || (echo "AWS_REGION is required" && exit 1)
           test -n "$ECR_REPOSITORY_URI" || (echo "ECR_REPOSITORY_URI is required" && exit 1)
-          test -n "$APP_RUNNER_SERVICE_ARN" || (echo "APP_RUNNER_SERVICE_ARN is required" && exit 1)
 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -52,6 +50,11 @@ jobs:
             ${{ steps.image.outputs.latest_tag }}
 
       - name: Trigger App Runner deployment
+        if: ${{ vars.APP_RUNNER_SERVICE_ARN != '' }}
         run: aws apprunner start-deployment --service-arn "$APP_RUNNER_SERVICE_ARN"
         env:
           APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
+
+      - name: Skip App Runner deployment
+        if: ${{ vars.APP_RUNNER_SERVICE_ARN == '' }}
+        run: echo "Skipping App Runner deployment because APP_RUNNER_SERVICE_ARN is not configured yet."
