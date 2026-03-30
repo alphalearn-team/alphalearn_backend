@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+target
+docker/backend.env
+docker/frontend.env
+node_modules
+*.log
+*.DS_Store
+status.txt
+compile.log
+README.md
