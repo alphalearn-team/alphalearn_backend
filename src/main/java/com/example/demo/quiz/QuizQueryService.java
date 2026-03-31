@@ -11,12 +11,15 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
+import com.example.demo.lessonenrollment.LessonEnrollmentService;
 import com.example.demo.quiz.dto.QuizOptionDto;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
 import com.example.demo.quiz.dto.QuizResponseDto;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class QuizQueryService {
@@ -28,15 +31,18 @@ public class QuizQueryService {
 
     private final QuizRepository quizRepository;
     private final LessonLookupService lessonLookupService;
+    private final LessonEnrollmentService lessonEnrollmentService;
     private final ObjectMapper objectMapper;
 
     public QuizQueryService(
             QuizRepository quizRepository,
             LessonLookupService lessonLookupService,
+            LessonEnrollmentService lessonEnrollmentService,
             ObjectMapper objectMapper
     ) {
         this.quizRepository = quizRepository;
         this.lessonLookupService = lessonLookupService;
+        this.lessonEnrollmentService = lessonEnrollmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -49,7 +55,14 @@ public class QuizQueryService {
                 && lesson.getContributor() != null
                 && lesson.getContributor().getContributorId().equals(user.userId());
 
-        boolean canAttempt = !isOwner;
+        boolean isEnrolled = user != null && user.userId() != null
+                && lessonEnrollmentService.isEnrolled(user.userId(), lessonPublicId);
+
+        if (!isOwner && !isEnrolled) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You must be enrolled in the lesson to view its quizzes.");
+        }
+
+        boolean canAttempt = !isOwner && isEnrolled;
 
         return quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId).stream()
                 .map(quiz -> new QuizResponseDto(

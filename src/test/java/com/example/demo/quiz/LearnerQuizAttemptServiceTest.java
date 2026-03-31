@@ -41,6 +41,9 @@ class LearnerQuizAttemptServiceTest {
     @Mock
     private QuizAttemptRepository quizAttemptRepository;
 
+    @Mock
+    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private LearnerQuizAttemptService learnerQuizAttemptService;
@@ -51,8 +54,10 @@ class LearnerQuizAttemptServiceTest {
                 quizRepository,
                 quizAttemptRepository,
                 new QuizAttemptSubmissionValidator(),
-                new QuizAttemptScoringService()
+                new QuizAttemptScoringService(),
+                lessonEnrollmentService
         );
+        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
     }
 
     @Test
@@ -61,6 +66,7 @@ class LearnerQuizAttemptServiceTest {
         SupabaseAuthUser learnerUser = learnerUser();
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.existsByLearner_IdAndQuiz_QuizId(learnerUser.userId(), quiz.getQuizId())).thenReturn(false);
         when(quizAttemptRepository.save(any(QuizAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -93,6 +99,7 @@ class LearnerQuizAttemptServiceTest {
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
         when(quizAttemptRepository.save(any(QuizAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.existsByLearner_IdAndQuiz_QuizId(learnerUser.userId(), quiz.getQuizId()))
                 .thenReturn(false, true);
 
@@ -129,6 +136,7 @@ class LearnerQuizAttemptServiceTest {
         );
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(
                 learnerUser.userId(),
                 quiz.getQuizId()
@@ -149,6 +157,7 @@ class LearnerQuizAttemptServiceTest {
         SupabaseAuthUser learnerUser = learnerUser();
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(
                 learnerUser.userId(),
                 quiz.getQuizId()
@@ -176,6 +185,7 @@ class LearnerQuizAttemptServiceTest {
         );
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
                 learnerUser.userId(),
                 quiz.getQuizId()
@@ -196,6 +206,7 @@ class LearnerQuizAttemptServiceTest {
         SupabaseAuthUser learnerUser = learnerUser();
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
                 learnerUser.userId(),
                 quiz.getQuizId()
@@ -379,6 +390,7 @@ class LearnerQuizAttemptServiceTest {
         Quiz quiz = buildQuizWithMixedQuestions(LessonModerationStatus.APPROVED, UUID.randomUUID());
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(contributorUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
         when(quizAttemptRepository.existsByLearner_IdAndQuiz_QuizId(contributorUser.userId(), quiz.getQuizId())).thenReturn(false);
         when(quizAttemptRepository.save(any(QuizAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -437,6 +449,29 @@ class LearnerQuizAttemptServiceTest {
 
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(ex.getReason()).isEqualTo("Learner or contributor account required");
+    }
+
+    @Test
+    void submitQuizAttemptRequiresEnrollment() {
+        Quiz quiz = buildQuizWithMixedQuestions();
+        SupabaseAuthUser learnerUser = learnerUser();
+
+        when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(false);
+
+        SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("mcq-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 1), List.of("multi-a", "multi-b")),
+                new QuizQuestionAnswerRequest(questionPublicId(quiz, 2), List.of("true"))
+        ));
+
+        ResponseStatusException ex = assertThrows(
+                ResponseStatusException.class,
+                () -> learnerQuizAttemptService.submitQuizAttempt(quiz.getPublicId(), request, learnerUser)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("You must be enrolled in the lesson to access quizzes");
     }
 
     private Quiz buildQuizWithMixedQuestions() {

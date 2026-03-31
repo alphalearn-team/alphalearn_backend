@@ -1,6 +1,7 @@
 package com.example.demo.quiz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,19 +34,23 @@ class QuizQueryServiceTest {
     @Mock
     private LessonLookupService lessonLookupService;
 
+    @Mock
+    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private QuizQueryService quizQueryService;
 
     @BeforeEach
     void setUp() {
-        quizQueryService = new QuizQueryService(quizRepository, lessonLookupService, objectMapper);
+        quizQueryService = new QuizQueryService(quizRepository, lessonLookupService, lessonEnrollmentService, objectMapper);
     }
 
     @Test
     void getQuizzesForLessonReturnsLearnerSafeDtosWithOrderedQuizzesAndQuestions() throws Exception {
         UUID lessonPublicId = UUID.randomUUID();
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
+        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
 
         Quiz olderQuiz = quiz(
                 UUID.randomUUID(),
@@ -104,6 +109,7 @@ class QuizQueryServiceTest {
     void getQuizzesForLessonReturnsEmptyListWhenLessonHasNoQuizzes() {
         UUID lessonPublicId = UUID.randomUUID();
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
+        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId)).thenReturn(List.of());
 
         List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);

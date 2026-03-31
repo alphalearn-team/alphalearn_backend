@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.concept.Concept;
+import com.example.demo.lessonenrollment.LessonEnrollmentService;
 import com.example.demo.concept.ConceptRepository;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.contributor.ContributorRepository;
@@ -47,6 +48,7 @@ public class LessonService {
     private final LessonListQueryService lessonListQueryService;
     private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final LessonSectionService lessonSectionService;
+    private final LessonEnrollmentService lessonEnrollmentService;
     private final ObjectMapper objectMapper;
 
     public LessonService(
@@ -59,6 +61,7 @@ public class LessonService {
             LessonListQueryService lessonListQueryService,
             LessonModerationRecordRepository lessonModerationRecordRepository,
             LessonSectionService lessonSectionService,
+            LessonEnrollmentService lessonEnrollmentService,
             ObjectMapper objectMapper) {
         this.lessonRepository = lessonRepository;
         this.contributorRepository = contributorRepository;
@@ -69,6 +72,7 @@ public class LessonService {
         this.lessonListQueryService = lessonListQueryService;
         this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.lessonSectionService = lessonSectionService;
+        this.lessonEnrollmentService = lessonEnrollmentService;
         this.objectMapper = objectMapper;
     }
 
@@ -112,7 +116,9 @@ public class LessonService {
         }
 
         Lesson publicLesson = lessonLookupService.findPublicByPublicIdOrThrow(lessonPublicId);
-        return toPublicDetailDto(publicLesson);
+        boolean enrolled = user != null && user.userId() != null
+                && lessonEnrollmentService.isEnrolled(user.userId(), lessonPublicId);
+        return toPublicDetailDto(publicLesson, enrolled);
     }
 
     @Transactional
@@ -392,9 +398,11 @@ public class LessonService {
                 sections.size());
     }
 
-    private LessonPublicDetailDto toPublicDetailDto(Lesson lesson) {
+    private LessonPublicDetailDto toPublicDetailDto(Lesson lesson, boolean enrolled) {
         LessonDetailBase base = toDetailBase(lesson);
-        List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
+        List<LessonSection> sections = enrolled 
+                ? lessonSectionService.getSectionsForLesson(lesson) 
+                : List.of();
 
         return new LessonPublicDetailDto(
                 base.lessonPublicId(),
@@ -405,7 +413,8 @@ public class LessonService {
                 base.author(),
                 base.createdAt(),
                 lessonSectionService.toSectionDtos(sections),
-                sections.size());
+                sections.size(),
+                enrolled);
     }
 
     private LessonDetailBase toDetailBase(Lesson lesson) {

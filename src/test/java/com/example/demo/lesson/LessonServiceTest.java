@@ -64,6 +64,9 @@ class LessonServiceTest {
     @Mock
     private LessonSectionService lessonSectionService;
 
+    @Mock
+    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+
     private LessonService lessonService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -80,6 +83,7 @@ class LessonServiceTest {
                 lessonListQueryService,
                 lessonModerationRecordRepository,
                 lessonSectionService,
+                lessonEnrollmentService,
                 objectMapper);
     }
 

@@ -1,6 +1,7 @@
 package com.example.demo.learner;
 
 import java.time.OffsetDateTime;
+import lombok.*;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -12,7 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Getter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
