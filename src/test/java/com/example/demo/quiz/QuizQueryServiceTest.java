@@ -66,7 +66,8 @@ class QuizQueryServiceTest {
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId))
                 .thenReturn(List.of(newerQuiz, olderQuiz));
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
+        com.example.demo.config.SupabaseAuthUser user = new com.example.demo.config.SupabaseAuthUser(UUID.randomUUID(), null, null);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).quizPublicId()).isEqualTo(newerQuiz.getPublicId());
@@ -111,8 +112,9 @@ class QuizQueryServiceTest {
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
         when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId)).thenReturn(List.of());
+        com.example.demo.config.SupabaseAuthUser user = new com.example.demo.config.SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
 
         assertThat(result).isEmpty();
     }

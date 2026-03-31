@@ -57,7 +57,6 @@ class LearnerQuizAttemptServiceTest {
                 new QuizAttemptScoringService(),
                 lessonEnrollmentService
         );
-        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
     }
 
     @Test
@@ -302,6 +301,7 @@ class LearnerQuizAttemptServiceTest {
         SupabaseAuthUser learnerUser = learnerUser();
 
         when(quizRepository.findByPublicId(quiz.getPublicId())).thenReturn(java.util.Optional.of(quiz));
+        when(lessonEnrollmentService.isEnrolled(learnerUser.userId(), quiz.getLesson().getPublicId())).thenReturn(true);
 
         SubmitQuizAttemptRequest request = new SubmitQuizAttemptRequest(List.of(
                 new QuizQuestionAnswerRequest(questionPublicId(quiz, 0), List.of("not-an-option")),

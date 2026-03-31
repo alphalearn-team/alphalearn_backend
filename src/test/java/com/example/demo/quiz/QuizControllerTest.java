@@ -49,8 +49,6 @@ class QuizControllerTest {
         UUID quizPublicId = UUID.randomUUID();
         UUID questionPublicId = UUID.randomUUID();
 
-        UUID contributorId = UUID.randomUUID();
-
         when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of(
                 new QuizResponseDto(
                         quizPublicId,
