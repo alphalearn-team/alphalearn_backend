@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -29,9 +28,13 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.CascadeType;
+import lombok.Setter;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @JsonIgnoreProperties({"profile"}) //temporary fix to prevent loop, to review in the future
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "lessons")
