@@ -27,17 +27,20 @@ public class ImposterGameConceptService {
     private final ImposterGameLobbyRepository imposterGameLobbyRepository;
     private final ImposterMonthlyPackRepository imposterMonthlyPackRepository;
     private final ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
+    private final ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
 
     public ImposterGameConceptService(
             ConceptRepository conceptRepository,
             ImposterGameLobbyRepository imposterGameLobbyRepository,
             ImposterMonthlyPackRepository imposterMonthlyPackRepository,
-            ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository
+            ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
+            ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService
     ) {
         this.conceptRepository = conceptRepository;
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
+        this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
     }
 
     public ImposterAssignedConceptDto assignNextConcept(NextImposterConceptRequest request) {
@@ -46,6 +49,20 @@ public class ImposterGameConceptService {
 
     public ImposterAssignedConceptDto assignNextConcept(SupabaseAuthUser user, NextImposterConceptRequest request) {
         Set<java.util.UUID> excludedConceptPublicIds = normalizeExcludedConceptPublicIds(request);
+        UUID lobbyPublicId = request == null ? null : request.lobbyPublicId();
+
+        if (lobbyPublicId != null) {
+            ImposterGameLobby lobby = requireLobbyOwnedBy(user, lobbyPublicId);
+            if (lobby.getConceptPoolMode() == ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK) {
+                java.util.Optional<ImposterAssignedConceptDto> featuredConcept = resolveFeaturedConceptForLobby(
+                        lobby,
+                        excludedConceptPublicIds
+                );
+                if (featuredConcept.isPresent()) {
+                    return featuredConcept.get();
+                }
+            }
+        }
 
         List<Concept> availableConcepts = resolveCandidateConcepts(user, request)
                 .stream()
@@ -70,16 +87,7 @@ public class ImposterGameConceptService {
             return conceptRepository.findAll();
         }
 
-        if (user == null || user.userId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authentication required for lobby concepts");
-        }
-
-        ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicId(lobbyPublicId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found"));
-
-        if (!user.userId().equals(lobby.getHostLearnerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only lobby host can request concepts for this private lobby");
-        }
+        ImposterGameLobby lobby = requireLobbyOwnedBy(user, lobbyPublicId);
 
         if (lobby.getConceptPoolMode() == ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL) {
             return conceptRepository.findAll();
@@ -99,6 +107,34 @@ public class ImposterGameConceptService {
                 .stream()
                 .map(row -> row.getConcept())
                 .toList();
+    }
+
+    private ImposterGameLobby requireLobbyOwnedBy(SupabaseAuthUser user, UUID lobbyPublicId) {
+        if (user == null || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authentication required for lobby concepts");
+        }
+
+        ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicId(lobbyPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found"));
+
+        if (!user.userId().equals(lobby.getHostLearnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only lobby host can request concepts for this private lobby");
+        }
+
+        return lobby;
+    }
+
+    private java.util.Optional<ImposterAssignedConceptDto> resolveFeaturedConceptForLobby(
+            ImposterGameLobby lobby,
+            Set<UUID> excludedConceptPublicIds
+    ) {
+        if (lobby.getPinnedYearMonth() == null || lobby.getPinnedYearMonth().isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        return imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept(lobby.getPinnedYearMonth())
+                .filter(concept -> !excludedConceptPublicIds.contains(concept.getPublicId()))
+                .map(concept -> new ImposterAssignedConceptDto(concept.getPublicId(), concept.getTitle()));
     }
 
     private Set<java.util.UUID> normalizeExcludedConceptPublicIds(NextImposterConceptRequest request) {

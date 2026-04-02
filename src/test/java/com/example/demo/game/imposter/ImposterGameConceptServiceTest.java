@@ -43,6 +43,9 @@ class ImposterGameConceptServiceTest {
     @Mock
     private ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
 
+    @Mock
+    private ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+
     @Test
     void assignsRandomConceptOutsideExcludedSet() {
         Concept firstConcept = concept("alpha");
@@ -123,6 +126,8 @@ class ImposterGameConceptServiceTest {
 
         Concept firstPackConcept = concept("delta");
         Concept secondPackConcept = concept("gamma");
+        when(imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept("2026-04"))
+                .thenReturn(Optional.empty());
         when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(55L)).thenReturn(List.of(
                 packConcept(pack, firstPackConcept, (short) 1),
                 packConcept(pack, secondPackConcept, (short) 2)
@@ -159,6 +164,63 @@ class ImposterGameConceptServiceTest {
     }
 
     @Test
+    void prioritizesWeeklyFeaturedConceptForCurrentMonthLobby() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK, "2026-04");
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        Concept featuredConcept = concept("featured");
+        when(imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept("2026-04"))
+                .thenReturn(Optional.of(featuredConcept));
+
+        ImposterGameConceptService service = service();
+
+        ImposterAssignedConceptDto result = service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(), lobbyPublicId)
+        );
+
+        assertThat(result.conceptPublicId()).isEqualTo(featuredConcept.getPublicId());
+        assertThat(result.word()).isEqualTo(featuredConcept.getTitle());
+    }
+
+    @Test
+    void fallsBackToMonthlyPoolWhenFeaturedConceptIsExcluded() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK, "2026-04");
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        ImposterMonthlyPack pack = new ImposterMonthlyPack();
+        ReflectionTestUtils.setField(pack, "id", 77L);
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
+
+        Concept featuredConcept = concept("featured");
+        Concept backupConcept = concept("backup");
+        when(imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept("2026-04"))
+                .thenReturn(Optional.of(featuredConcept));
+        when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(77L)).thenReturn(List.of(
+                packConcept(pack, featuredConcept, (short) 1),
+                packConcept(pack, backupConcept, (short) 2)
+        ));
+
+        ImposterGameConceptService service = service();
+
+        ImposterAssignedConceptDto result = service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(featuredConcept.getPublicId()), lobbyPublicId)
+        );
+
+        assertThat(result.conceptPublicId()).isEqualTo(backupConcept.getPublicId());
+        assertThat(result.word()).isEqualTo(backupConcept.getTitle());
+    }
+
+    @Test
     void rejectsWhenExclusionsExhaustPinnedMonthlyPack() {
         UUID lobbyPublicId = UUID.randomUUID();
         UUID hostUserId = UUID.randomUUID();
@@ -172,6 +234,8 @@ class ImposterGameConceptServiceTest {
         when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
 
         Concept onlyPackConcept = concept("solo-pack");
+        when(imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept("2026-04"))
+                .thenReturn(Optional.of(onlyPackConcept));
         when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(99L)).thenReturn(List.of(
                 packConcept(pack, onlyPackConcept, (short) 1)
         ));
@@ -191,7 +255,8 @@ class ImposterGameConceptServiceTest {
                 conceptRepository,
                 imposterGameLobbyRepository,
                 imposterMonthlyPackRepository,
-                imposterMonthlyPackConceptRepository
+                imposterMonthlyPackConceptRepository,
+                imposterWeeklyFeaturedConceptService
         );
     }
 
