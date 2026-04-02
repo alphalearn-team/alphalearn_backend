@@ -1,6 +1,7 @@
 package com.example.demo.quiz;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,19 +34,23 @@ class QuizQueryServiceTest {
     @Mock
     private LessonLookupService lessonLookupService;
 
+    @Mock
+    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private QuizQueryService quizQueryService;
 
     @BeforeEach
     void setUp() {
-        quizQueryService = new QuizQueryService(quizRepository, lessonLookupService, objectMapper);
+        quizQueryService = new QuizQueryService(quizRepository, lessonLookupService, lessonEnrollmentService, objectMapper);
     }
 
     @Test
     void getQuizzesForLessonReturnsLearnerSafeDtosWithOrderedQuizzesAndQuestions() throws Exception {
         UUID lessonPublicId = UUID.randomUUID();
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
+        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
 
         Quiz olderQuiz = quiz(
                 UUID.randomUUID(),
@@ -61,7 +66,8 @@ class QuizQueryServiceTest {
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId))
                 .thenReturn(List.of(newerQuiz, olderQuiz));
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
+        com.example.demo.config.SupabaseAuthUser user = new com.example.demo.config.SupabaseAuthUser(UUID.randomUUID(), null, null);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).quizPublicId()).isEqualTo(newerQuiz.getPublicId());
@@ -104,9 +110,11 @@ class QuizQueryServiceTest {
     void getQuizzesForLessonReturnsEmptyListWhenLessonHasNoQuizzes() {
         UUID lessonPublicId = UUID.randomUUID();
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(new Lesson());
+        when(lessonEnrollmentService.isEnrolled(any(), any())).thenReturn(true);
         when(quizRepository.findByLesson_PublicIdOrderByCreatedAtDesc(lessonPublicId)).thenReturn(List.of());
+        com.example.demo.config.SupabaseAuthUser user = new com.example.demo.config.SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, null);
+        List<QuizResponseDto> result = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
 
         assertThat(result).isEmpty();
     }
