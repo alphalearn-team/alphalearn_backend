@@ -112,8 +112,14 @@ public class AdminImposterMonthlyPackService {
         ImposterMonthlyPack pack = imposterMonthlyPackRepository.findByYearMonth(normalizedYearMonth)
                 .orElseGet(() -> createMonthlyPack(normalizedYearMonth));
 
-        imposterMonthlyPackConceptRepository.deleteByPack_Id(pack.getId());
         imposterMonthlyPackWeeklyFeatureRepository.deleteByPack_Id(pack.getId());
+        imposterMonthlyPackWeeklyFeatureRepository.flush();
+
+        imposterMonthlyPackConceptRepository.deleteByPack_Id(pack.getId());
+        imposterMonthlyPackConceptRepository.flush();
+
+        // Force old rows to clear before re-inserting same slot_index values (1..20).
+        imposterMonthlyPackRepository.flush();
 
         List<ImposterMonthlyPackConcept> conceptRows = java.util.stream.IntStream.range(0, orderedConcepts.size())
                 .mapToObj(index -> {

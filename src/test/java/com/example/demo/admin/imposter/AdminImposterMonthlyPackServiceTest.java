@@ -2,6 +2,8 @@ package com.example.demo.admin.imposter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -195,8 +198,16 @@ class AdminImposterMonthlyPackServiceTest {
 
         AdminImposterMonthlyPackDto result = service.upsertMonthlyPack("2026-04", request);
 
-        verify(imposterMonthlyPackConceptRepository).deleteByPack_Id(300L);
-        verify(imposterMonthlyPackWeeklyFeatureRepository).deleteByPack_Id(300L);
+        InOrder inOrder = inOrder(
+                imposterMonthlyPackWeeklyFeatureRepository,
+                imposterMonthlyPackConceptRepository,
+                imposterMonthlyPackRepository
+        );
+        inOrder.verify(imposterMonthlyPackWeeklyFeatureRepository).deleteByPack_Id(300L);
+        inOrder.verify(imposterMonthlyPackWeeklyFeatureRepository).flush();
+        inOrder.verify(imposterMonthlyPackConceptRepository).deleteByPack_Id(300L);
+        inOrder.verify(imposterMonthlyPackConceptRepository).flush();
+        inOrder.verify(imposterMonthlyPackRepository).flush();
 
         ArgumentCaptor<List<ImposterMonthlyPackConcept>> conceptRowsCaptor = ArgumentCaptor.forClass(List.class);
         verify(imposterMonthlyPackConceptRepository).saveAll(conceptRowsCaptor.capture());
@@ -222,6 +233,51 @@ class AdminImposterMonthlyPackServiceTest {
         assertThat(result.yearMonth()).isEqualTo("2026-04");
         assertThat(result.concepts()).hasSize(20);
         assertThat(result.weeklyFeaturedConceptPublicIds()).containsExactlyElementsOf(featuredIds);
+    }
+
+    @Test
+    void allowsResavingSameMonthWithoutSlotCollision() {
+        List<UUID> firstConceptIds = randomIds(20);
+        List<UUID> firstFeaturedIds = List.of(
+                firstConceptIds.get(0),
+                firstConceptIds.get(1),
+                firstConceptIds.get(2),
+                firstConceptIds.get(3)
+        );
+        List<UUID> secondConceptIds = randomIds(20);
+        List<UUID> secondFeaturedIds = List.of(
+                secondConceptIds.get(19),
+                secondConceptIds.get(18),
+                secondConceptIds.get(17),
+                secondConceptIds.get(16)
+        );
+
+        when(conceptRepository.findAllByPublicIdIn(firstConceptIds)).thenReturn(firstConceptIds.stream()
+                .map(this::conceptWithPublicId)
+                .toList());
+        when(conceptRepository.findAllByPublicIdIn(secondConceptIds)).thenReturn(secondConceptIds.stream()
+                .map(this::conceptWithPublicId)
+                .toList());
+
+        ImposterMonthlyPack existingPack = pack(300L, "2026-04");
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(existingPack));
+
+        AdminImposterMonthlyPackDto firstSave = service.upsertMonthlyPack(
+                "2026-04",
+                new UpsertAdminImposterMonthlyPackRequest(firstConceptIds, firstFeaturedIds)
+        );
+        AdminImposterMonthlyPackDto secondSave = service.upsertMonthlyPack(
+                "2026-04",
+                new UpsertAdminImposterMonthlyPackRequest(secondConceptIds, secondFeaturedIds)
+        );
+
+        assertThat(firstSave.weeklyFeaturedConceptPublicIds()).containsExactlyElementsOf(firstFeaturedIds);
+        assertThat(secondSave.weeklyFeaturedConceptPublicIds()).containsExactlyElementsOf(secondFeaturedIds);
+        verify(imposterMonthlyPackWeeklyFeatureRepository, times(2)).deleteByPack_Id(300L);
+        verify(imposterMonthlyPackWeeklyFeatureRepository, times(2)).flush();
+        verify(imposterMonthlyPackConceptRepository, times(2)).deleteByPack_Id(300L);
+        verify(imposterMonthlyPackConceptRepository, times(2)).flush();
+        verify(imposterMonthlyPackRepository, times(2)).flush();
     }
 
     @Test
