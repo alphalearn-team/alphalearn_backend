@@ -21,6 +21,11 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Validate DB env
         env:
           DB_URL: ${{ secrets.DB_URL }}
@@ -37,6 +42,17 @@ jobs:
             echo "DB_URL must start with jdbc:postgresql://"
             exit 1
           fi
+
+      - name: Apply pending Supabase migrations
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+        run: |
+          CI_DB_URL="${DB_URL#jdbc:}"
+          if [ "$CI_DB_URL" = "$DB_URL" ]; then
+            echo "DB_URL must start with jdbc:"
+            exit 1
+          fi
+          npx supabase migration up --db-url "$CI_DB_URL"
 
       - name: Build and run tests
         env:
