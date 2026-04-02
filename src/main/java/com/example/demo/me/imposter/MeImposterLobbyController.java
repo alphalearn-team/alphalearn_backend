@@ -4,6 +4,7 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,7 +52,7 @@ public class MeImposterLobbyController {
 
     @PostMapping("/private/{lobbyPublicId}/leave")
     @Operation(summary = "Leave private imposter lobby", description = "Learner leaves a private imposter lobby before the game starts")
-    public PrivateImposterLobbyStateDto leavePrivateLobby(
+    public LeavePrivateImposterLobbyResponse leavePrivateLobby(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @PathVariable UUID lobbyPublicId
     ) {

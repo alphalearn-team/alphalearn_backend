@@ -13,9 +13,11 @@ import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepo
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import java.time.Clock;
@@ -162,7 +164,7 @@ public class LearnerImposterLobbyService {
     }
 
     @Transactional
-    public PrivateImposterLobbyStateDto leavePrivateLobby(SupabaseAuthUser user, UUID lobbyPublicId) {
+    public LeavePrivateImposterLobbyResponse leavePrivateLobby(SupabaseAuthUser user, UUID lobbyPublicId) {
         requireLearner(user);
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId);
         ensureViewerIsMember(lobby, user.userId());
@@ -181,7 +183,30 @@ public class LearnerImposterLobbyService {
         member.setLeftAt(OffsetDateTime.now(clock));
         imposterGameLobbyMemberRepository.saveAndFlush(member);
 
-        return buildLobbyState(lobby, user.userId());
+        if (!user.userId().equals(lobby.getHostLearnerId())) {
+            return new LeavePrivateImposterLobbyResponse(
+                    PrivateImposterLobbyLeaveResult.LEFT,
+                    buildLobbyState(lobby, user.userId())
+            );
+        }
+
+        List<ImposterGameLobbyMember> remainingActiveMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (remainingActiveMembers.isEmpty()) {
+            imposterGameLobbyRepository.delete(lobby);
+            return new LeavePrivateImposterLobbyResponse(
+                    PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED,
+                    null
+            );
+        }
+
+        UUID nextHostLearnerId = remainingActiveMembers.get(0).getLearnerId();
+        lobby.setHostLearnerId(nextHostLearnerId);
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+        return new LeavePrivateImposterLobbyResponse(
+                PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST,
+                buildLobbyState(savedLobby, user.userId())
+        );
     }
 
     @Transactional
