@@ -1,10 +1,13 @@
 package com.example.demo.admin.imposter;
 
 import com.example.demo.admin.imposter.dto.AdminImposterMonthlyPackDto;
+import com.example.demo.admin.imposter.dto.UpsertAdminImposterMonthlyPackRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,5 +32,14 @@ public class AdminImposterMonthlyPackController {
     @Operation(summary = "Get current monthly imposter pack", description = "Returns the current UTC month pack or an exists=false scaffold when the month is not configured")
     public AdminImposterMonthlyPackDto getCurrentMonthlyPack() {
         return adminImposterMonthlyPackService.getCurrentMonthlyPack();
+    }
+
+    @PutMapping("/monthly-packs/{yearMonth}")
+    @Operation(summary = "Create or update monthly imposter pack", description = "Upserts a month pack with exactly 20 concepts and 4 weekly featured concept slots")
+    public AdminImposterMonthlyPackDto upsertMonthlyPack(
+            @PathVariable String yearMonth,
+            @RequestBody UpsertAdminImposterMonthlyPackRequest request
+    ) {
+        return adminImposterMonthlyPackService.upsertMonthlyPack(yearMonth, request);
     }
 }
