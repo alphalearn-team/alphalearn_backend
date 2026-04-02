@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public record PrivateImposterLobbyDto(
         UUID publicId,
+        String lobbyCode,
         boolean isPrivate,
         ImposterLobbyConceptPoolMode conceptPoolMode,
         String pinnedYearMonth,
@@ -15,6 +16,7 @@ public record PrivateImposterLobbyDto(
     public static PrivateImposterLobbyDto from(ImposterGameLobby lobby) {
         return new PrivateImposterLobbyDto(
                 lobby.getPublicId(),
+                lobby.getLobbyCode(),
                 lobby.isPrivateLobby(),
                 lobby.getConceptPoolMode(),
                 lobby.getPinnedYearMonth(),

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.imposter.lobby.ImposterGameLobby;
+import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
@@ -39,6 +40,9 @@ class LearnerImposterLobbyServiceTest {
     private ImposterGameLobbyRepository imposterGameLobbyRepository;
 
     @Mock
+    private ImposterLobbyCodeGenerator imposterLobbyCodeGenerator;
+
+    @Mock
     private ImposterMonthlyPackRepository imposterMonthlyPackRepository;
 
     @Mock
@@ -51,17 +55,19 @@ class LearnerImposterLobbyServiceTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-04-02T00:00:00Z"), ZoneOffset.UTC);
         service = new LearnerImposterLobbyService(
                 imposterGameLobbyRepository,
+                imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
                 fixedClock
         );
-        lenient().when(imposterGameLobbyRepository.save(any(ImposterGameLobby.class))).thenAnswer(invocation -> {
+        lenient().when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class))).thenAnswer(invocation -> {
             ImposterGameLobby lobby = invocation.getArgument(0);
             if (lobby.getPublicId() == null) {
                 ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
             }
             return lobby;
         });
+        lenient().when(imposterLobbyCodeGenerator.generate()).thenReturn("ABCD2345");
     }
 
     @Test
@@ -74,6 +80,7 @@ class LearnerImposterLobbyServiceTest {
         );
 
         assertThat(result.publicId()).isNotNull();
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
         assertThat(result.isPrivate()).isTrue();
         assertThat(result.conceptPoolMode()).isEqualTo(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
         assertThat(result.pinnedYearMonth()).isNull();
@@ -99,6 +106,7 @@ class LearnerImposterLobbyServiceTest {
         );
 
         assertThat(result.publicId()).isNotNull();
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
         assertThat(result.conceptPoolMode()).isEqualTo(ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK);
         assertThat(result.pinnedYearMonth()).isEqualTo("2026-04");
     }

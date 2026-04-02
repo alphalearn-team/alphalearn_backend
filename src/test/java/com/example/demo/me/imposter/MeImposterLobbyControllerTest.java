@@ -48,6 +48,7 @@ class MeImposterLobbyControllerTest {
         when(learnerImposterLobbyService.createPrivateLobby(any(), eq(request)))
                 .thenReturn(new PrivateImposterLobbyDto(
                         lobbyPublicId,
+                        "ABCD2345",
                         true,
                         ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK,
                         "2026-04",
@@ -59,6 +60,7 @@ class MeImposterLobbyControllerTest {
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.lobbyCode").value("ABCD2345"))
                 .andExpect(jsonPath("$.isPrivate").value(true))
                 .andExpect(jsonPath("$.conceptPoolMode").value("CURRENT_MONTH_PACK"))
                 .andExpect(jsonPath("$.pinnedYearMonth").value("2026-04"));
