@@ -6,10 +6,20 @@ import static org.mockito.Mockito.when;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.imposter.dto.ImposterAssignedConceptDto;
 import com.example.demo.game.imposter.dto.NextImposterConceptRequest;
+import com.example.demo.game.imposter.lobby.ImposterGameLobby;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
+import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
+import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
+import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
+import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
+import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
+import com.example.demo.learner.Learner;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,13 +34,22 @@ class ImposterGameConceptServiceTest {
     @Mock
     private ConceptRepository conceptRepository;
 
+    @Mock
+    private ImposterGameLobbyRepository imposterGameLobbyRepository;
+
+    @Mock
+    private ImposterMonthlyPackRepository imposterMonthlyPackRepository;
+
+    @Mock
+    private ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
+
     @Test
     void assignsRandomConceptOutsideExcludedSet() {
         Concept firstConcept = concept("alpha");
         Concept secondConcept = concept("beta");
         when(conceptRepository.findAll()).thenReturn(List.of(firstConcept, secondConcept));
 
-        ImposterGameConceptService service = new ImposterGameConceptService(conceptRepository);
+        ImposterGameConceptService service = service();
 
         ImposterAssignedConceptDto result = service.assignNextConcept(
                 new NextImposterConceptRequest(List.of(firstConcept.getPublicId()))
@@ -44,7 +63,7 @@ class ImposterGameConceptServiceTest {
     void rejectsWhenNoConceptsAreAvailable() {
         when(conceptRepository.findAll()).thenReturn(List.of());
 
-        ImposterGameConceptService service = new ImposterGameConceptService(conceptRepository);
+        ImposterGameConceptService service = service();
 
         assertThatThrownBy(() -> service.assignNextConcept(new NextImposterConceptRequest(List.of())))
                 .isInstanceOf(ResponseStatusException.class)
@@ -56,13 +75,124 @@ class ImposterGameConceptServiceTest {
         Concept onlyConcept = concept("solo");
         when(conceptRepository.findAll()).thenReturn(List.of(onlyConcept));
 
-        ImposterGameConceptService service = new ImposterGameConceptService(conceptRepository);
+        ImposterGameConceptService service = service();
 
         assertThatThrownBy(() -> service.assignNextConcept(
                 new NextImposterConceptRequest(List.of(onlyConcept.getPublicId()))
         ))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("No imposter game concepts are available");
+    }
+
+    @Test
+    void usesFullConceptPoolWhenLobbyModeIsFullPool() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        Concept firstConcept = concept("alpha");
+        Concept secondConcept = concept("beta");
+        when(conceptRepository.findAll()).thenReturn(List.of(firstConcept, secondConcept));
+
+        ImposterGameConceptService service = service();
+
+        ImposterAssignedConceptDto result = service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(firstConcept.getPublicId()), lobbyPublicId)
+        );
+
+        assertThat(result.conceptPublicId()).isEqualTo(secondConcept.getPublicId());
+        assertThat(result.word()).isEqualTo("beta");
+    }
+
+    @Test
+    void usesPinnedMonthlyPackWhenLobbyModeIsCurrentMonth() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK, "2026-04");
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        ImposterMonthlyPack pack = new ImposterMonthlyPack();
+        ReflectionTestUtils.setField(pack, "id", 55L);
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
+
+        Concept firstPackConcept = concept("delta");
+        Concept secondPackConcept = concept("gamma");
+        when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(55L)).thenReturn(List.of(
+                packConcept(pack, firstPackConcept, (short) 1),
+                packConcept(pack, secondPackConcept, (short) 2)
+        ));
+
+        ImposterGameConceptService service = service();
+
+        ImposterAssignedConceptDto result = service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(firstPackConcept.getPublicId()), lobbyPublicId)
+        );
+
+        assertThat(result.conceptPublicId()).isEqualTo(secondPackConcept.getPublicId());
+        assertThat(result.word()).isEqualTo("gamma");
+    }
+
+    @Test
+    void rejectsWhenNonHostRequestsLobbyConcept() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser otherUser = learnerAuthUser(UUID.randomUUID());
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                otherUser,
+                new NextImposterConceptRequest(List.of(), lobbyPublicId)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Only lobby host can request concepts");
+    }
+
+    @Test
+    void rejectsWhenExclusionsExhaustPinnedMonthlyPack() {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK, "2026-04");
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        ImposterMonthlyPack pack = new ImposterMonthlyPack();
+        ReflectionTestUtils.setField(pack, "id", 99L);
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
+
+        Concept onlyPackConcept = concept("solo-pack");
+        when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(99L)).thenReturn(List.of(
+                packConcept(pack, onlyPackConcept, (short) 1)
+        ));
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(onlyPackConcept.getPublicId()), lobbyPublicId)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("No imposter game concepts are available");
+    }
+
+    private ImposterGameConceptService service() {
+        return new ImposterGameConceptService(
+                conceptRepository,
+                imposterGameLobbyRepository,
+                imposterMonthlyPackRepository,
+                imposterMonthlyPackConceptRepository
+        );
     }
 
     private Concept concept(String title) {
@@ -72,5 +202,34 @@ class ImposterGameConceptServiceTest {
         concept.setDescription(title + " description");
         concept.setCreatedAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"));
         return concept;
+    }
+
+    private ImposterGameLobby lobby(UUID hostLearnerId, ImposterLobbyConceptPoolMode mode, String pinnedYearMonth) {
+        ImposterGameLobby lobby = new ImposterGameLobby();
+        ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+        lobby.setHostLearnerId(hostLearnerId);
+        lobby.setPrivateLobby(true);
+        lobby.setConceptPoolMode(mode);
+        lobby.setPinnedYearMonth(pinnedYearMonth);
+        lobby.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        return lobby;
+    }
+
+    private ImposterMonthlyPackConcept packConcept(ImposterMonthlyPack pack, Concept concept, short slot) {
+        ImposterMonthlyPackConcept row = new ImposterMonthlyPackConcept();
+        row.setPack(pack);
+        row.setConcept(concept);
+        row.setSlotIndex(slot);
+        return row;
+    }
+
+    private SupabaseAuthUser learnerAuthUser(UUID userId) {
+        Learner learner = new Learner();
+        learner.setId(userId);
+        learner.setPublicId(UUID.randomUUID());
+        learner.setUsername("learner-" + userId.toString().substring(0, 8));
+        learner.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        learner.setTotalPoints((short) 0);
+        return new SupabaseAuthUser(userId, learner, null);
     }
 }
