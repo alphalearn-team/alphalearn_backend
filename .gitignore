@@ -40,6 +40,9 @@ application-local.properties
 .env.production
 docker/backend.env
 
+### Node ###
+node_modules/
+
 ### OS files ###
 .DS_Store
 MOCKDATA.md
