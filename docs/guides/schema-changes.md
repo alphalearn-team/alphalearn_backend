@@ -41,6 +41,23 @@ npx supabase migration list
 
 `migration up` applies only migrations that are not yet recorded in migration history.
 
+## Seed Data (Baseline Rows)
+
+The name for "make sure some data is already in the DB" is **seeding**.
+
+This repo uses:
+
+- `supabase/seed.sql` for baseline local data (for example concepts, local bootstrap rows).
+- `supabase/migrations/*.sql` for schema and durable data changes that should travel with migrations.
+
+Run seed manually on current local DB (without reset):
+
+```bash
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/seed.sql
+```
+
+`db reset` will also run `seed.sql` automatically because `[db.seed]` is enabled in `supabase/config.toml`.
+
 ## Make Schema Changes Locally
 
 ### Option A: SQL-first
