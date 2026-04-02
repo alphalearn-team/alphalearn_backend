@@ -2,6 +2,8 @@ package com.example.demo.me.imposter;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,5 +34,14 @@ public class MeImposterLobbyController {
             @RequestBody CreatePrivateImposterLobbyRequest request
     ) {
         return learnerImposterLobbyService.createPrivateLobby(user, request);
+    }
+
+    @PostMapping("/private/join")
+    @Operation(summary = "Join private imposter lobby by code", description = "Learner joins an existing private imposter lobby using an invite code")
+    public JoinedPrivateImposterLobbyDto joinPrivateLobby(
+            @AuthenticationPrincipal SupabaseAuthUser user,
+            @RequestBody JoinPrivateImposterLobbyRequest request
+    ) {
+        return learnerImposterLobbyService.joinPrivateLobby(user, request);
     }
 }
