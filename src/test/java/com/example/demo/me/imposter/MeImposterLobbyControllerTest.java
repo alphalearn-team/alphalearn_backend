@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
@@ -21,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class MeImposterLobbyControllerTest {
@@ -64,5 +68,45 @@ class MeImposterLobbyControllerTest {
                 .andExpect(jsonPath("$.isPrivate").value(true))
                 .andExpect(jsonPath("$.conceptPoolMode").value("CURRENT_MONTH_PACK"))
                 .andExpect(jsonPath("$.pinnedYearMonth").value("2026-04"));
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsJoinedLobby() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("ABCD2345");
+
+        when(learnerImposterLobbyService.joinPrivateLobby(any(), eq(request)))
+                .thenReturn(new JoinedPrivateImposterLobbyDto(
+                        lobbyPublicId,
+                        "ABCD2345",
+                        true,
+                        ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL,
+                        null,
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z"),
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z"),
+                        false
+                ));
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.lobbyCode").value("ABCD2345"))
+                .andExpect(jsonPath("$.alreadyMember").value(false))
+                .andExpect(jsonPath("$.joinedAt").value("2026-04-02T00:00:00Z"));
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsBadRequestWhenServiceRejects() throws Exception {
+        JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("  ");
+
+        when(learnerImposterLobbyService.joinPrivateLobby(any(), eq(request)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "lobbyCode is required"));
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isBadRequest());
     }
 }

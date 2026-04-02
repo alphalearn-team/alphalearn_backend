@@ -3,13 +3,17 @@ package com.example.demo.me.imposter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.imposter.lobby.ImposterGameLobby;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyMember;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
@@ -19,6 +23,8 @@ import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConc
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import java.time.Clock;
 import java.time.Instant;
@@ -43,6 +49,9 @@ class LearnerImposterLobbyServiceTest {
     private ImposterGameLobbyRepository imposterGameLobbyRepository;
 
     @Mock
+    private ImposterGameLobbyMemberRepository imposterGameLobbyMemberRepository;
+
+    @Mock
     private ImposterLobbyCodeGenerator imposterLobbyCodeGenerator;
 
     @Mock
@@ -58,6 +67,7 @@ class LearnerImposterLobbyServiceTest {
         Clock fixedClock = Clock.fixed(Instant.parse("2026-04-02T00:00:00Z"), ZoneOffset.UTC);
         service = new LearnerImposterLobbyService(
                 imposterGameLobbyRepository,
+                imposterGameLobbyMemberRepository,
                 imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
@@ -70,6 +80,8 @@ class LearnerImposterLobbyServiceTest {
             }
             return lobby;
         });
+        lenient().when(imposterGameLobbyMemberRepository.saveAndFlush(any(ImposterGameLobbyMember.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(imposterLobbyCodeGenerator.generate()).thenReturn("ABCD2345");
     }
 
@@ -88,6 +100,7 @@ class LearnerImposterLobbyServiceTest {
         assertThat(result.conceptPoolMode()).isEqualTo(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
         assertThat(result.pinnedYearMonth()).isNull();
         assertThat(result.createdAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(any(ImposterGameLobbyMember.class));
     }
 
     @Test
@@ -165,6 +178,112 @@ class LearnerImposterLobbyServiceTest {
         verify(imposterGameLobbyRepository, times(2)).saveAndFlush(any(ImposterGameLobby.class));
     }
 
+    @Test
+    void createPrivateLobbyPropagatesWhenHostMembershipInsertFails() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterGameLobbyMemberRepository.saveAndFlush(any(ImposterGameLobbyMember.class)))
+                .thenThrow(new RuntimeException("membership insert failed"));
+
+        assertThatThrownBy(() -> service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL)
+        ))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("membership insert failed");
+    }
+
+    @Test
+    void joinPrivateLobbyCreatesMembershipForValidCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.empty());
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        assertThat(result.alreadyMember()).isFalse();
+        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(any(ImposterGameLobbyMember.class));
+    }
+
+    @Test
+    void joinPrivateLobbyNormalizesLobbyCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.empty());
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("  abcd2345  ")
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        verify(imposterGameLobbyRepository).findByLobbyCode(eq("ABCD2345"));
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsExistingMembershipIdempotently() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        ImposterGameLobbyMember member = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.of(member));
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        );
+
+        assertThat(result.alreadyMember()).isTrue();
+        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-01T12:00:00Z"));
+        verify(imposterGameLobbyMemberRepository, never()).saveAndFlush(any(ImposterGameLobbyMember.class));
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsNotFoundWhenLobbyCodeMissing() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Imposter lobby not found");
+    }
+
+    @Test
+    void joinPrivateLobbyRejectsMissingLobbyCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("   ")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("lobbyCode is required");
+    }
+
+    @Test
+    void joinPrivateLobbyRejectsWhenUserIsNotLearner() {
+        SupabaseAuthUser notLearner = new SupabaseAuthUser(UUID.randomUUID(), null, null);
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                notLearner,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Learner account required");
+    }
+
     private SupabaseAuthUser learnerAuthUser() {
         UUID userId = UUID.randomUUID();
         Learner learner = new Learner();
@@ -174,5 +293,25 @@ class LearnerImposterLobbyServiceTest {
         learner.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
         learner.setTotalPoints((short) 0);
         return new SupabaseAuthUser(userId, learner, null);
+    }
+
+    private ImposterGameLobby lobby(String lobbyCode) {
+        ImposterGameLobby lobby = new ImposterGameLobby();
+        ReflectionTestUtils.setField(lobby, "id", 11L);
+        ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+        lobby.setLobbyCode(lobbyCode);
+        lobby.setPrivateLobby(true);
+        lobby.setConceptPoolMode(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
+        lobby.setCreatedAt(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        lobby.setHostLearnerId(UUID.randomUUID());
+        return lobby;
+    }
+
+    private ImposterGameLobbyMember existingMember(ImposterGameLobby lobby, UUID learnerId, String joinedAt) {
+        ImposterGameLobbyMember member = new ImposterGameLobbyMember();
+        member.setLobby(lobby);
+        member.setLearnerId(learnerId);
+        member.setJoinedAt(OffsetDateTime.parse(joinedAt));
+        return member;
     }
 }
