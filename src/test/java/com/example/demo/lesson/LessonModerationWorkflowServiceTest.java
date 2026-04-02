@@ -3,11 +3,13 @@ package com.example.demo.lesson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,7 @@ class LessonModerationWorkflowServiceTest {
     @Test
     void submitForReviewRoutesAutoApprovedLessonToPendingAndWritesAutoApprovedRecord() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
+        when(lessonRepository.findByPublicId(lesson.getPublicId())).thenReturn(Optional.of(lesson));
         when(lessonAutoModerationService.moderate(lesson)).thenReturn(new LessonModerationResult(
                 LessonModerationDecision.APPROVE,
                 List.of("Looks good"),
@@ -62,11 +65,13 @@ class LessonModerationWorkflowServiceTest {
                 java.util.Map.of("decision", "APPROVE"),
                 OffsetDateTime.parse("2026-03-03T10:15:30Z")
         ));
-        when(lessonRepository.save(lesson)).thenReturn(lesson);
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Lesson saved = service.submitForReview(lesson);
 
         assertThat(saved.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.PENDING);
+        verify(lessonRepository, times(2)).save(any(Lesson.class));
+        verify(lessonRepository).findByPublicId(lesson.getPublicId());
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
         verify(lessonModerationRecordRepository).save(captor.capture());
         LessonModerationRecord record = captor.getValue();
@@ -80,6 +85,7 @@ class LessonModerationWorkflowServiceTest {
     @Test
     void submitForReviewRejectsLessonAndWritesAutoRejectedRecord() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
+        when(lessonRepository.findByPublicId(lesson.getPublicId())).thenReturn(Optional.of(lesson));
         when(lessonAutoModerationService.moderate(lesson)).thenReturn(new LessonModerationResult(
                 LessonModerationDecision.REJECT,
                 List.of("Rejected keyword detected: hate"),
@@ -87,11 +93,13 @@ class LessonModerationWorkflowServiceTest {
                 null,
                 OffsetDateTime.now()
         ));
-        when(lessonRepository.save(lesson)).thenReturn(lesson);
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.submitForReview(lesson);
 
         assertThat(lesson.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.REJECTED);
+        verify(lessonRepository, times(2)).save(any(Lesson.class));
+        verify(lessonRepository).findByPublicId(lesson.getPublicId());
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
         verify(lessonModerationRecordRepository).save(captor.capture());
         assertThat(captor.getValue().getEventType()).isEqualTo(LessonModerationEventType.AUTO_REJECTED);
@@ -100,6 +108,7 @@ class LessonModerationWorkflowServiceTest {
     @Test
     void submitForReviewFlagsLessonAndLeavesItPending() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
+        when(lessonRepository.findByPublicId(lesson.getPublicId())).thenReturn(Optional.of(lesson));
         when(lessonAutoModerationService.moderate(lesson)).thenReturn(new LessonModerationResult(
                 LessonModerationDecision.FLAG,
                 List.of("Flagged keyword detected: unsafe"),
@@ -107,11 +116,13 @@ class LessonModerationWorkflowServiceTest {
                 null,
                 OffsetDateTime.now()
         ));
-        when(lessonRepository.save(lesson)).thenReturn(lesson);
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.submitForReview(lesson);
 
         assertThat(lesson.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.PENDING);
+        verify(lessonRepository, times(2)).save(any(Lesson.class));
+        verify(lessonRepository).findByPublicId(lesson.getPublicId());
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
         verify(lessonModerationRecordRepository).save(captor.capture());
         assertThat(captor.getValue().getEventType()).isEqualTo(LessonModerationEventType.AUTO_FLAGGED);
@@ -120,12 +131,15 @@ class LessonModerationWorkflowServiceTest {
     @Test
     void submitForReviewFallsBackToPendingWhenModerationFails() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
+        when(lessonRepository.findByPublicId(lesson.getPublicId())).thenReturn(Optional.of(lesson));
         when(lessonAutoModerationService.moderate(lesson)).thenThrow(new IllegalStateException("provider timeout"));
-        when(lessonRepository.save(lesson)).thenReturn(lesson);
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.submitForReview(lesson);
 
         assertThat(lesson.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.PENDING);
+        verify(lessonRepository, times(2)).save(any(Lesson.class));
+        verify(lessonRepository).findByPublicId(lesson.getPublicId());
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
         verify(lessonModerationRecordRepository).save(captor.capture());
         LessonModerationRecord record = captor.getValue();
@@ -181,6 +195,7 @@ class LessonModerationWorkflowServiceTest {
 
     private Lesson lessonWithStatus(LessonModerationStatus status) {
         Lesson lesson = new Lesson();
+        assignPublicId(lesson, UUID.randomUUID());
         lesson.setTitle("Lesson title");
         lesson.setLessonModerationStatus(status);
         lesson.setCreatedAt(OffsetDateTime.now());
@@ -190,5 +205,15 @@ class LessonModerationWorkflowServiceTest {
         contributor.setPromotedAt(OffsetDateTime.now());
         lesson.setContributor(contributor);
         return lesson;
+    }
+
+    private void assignPublicId(Lesson lesson, UUID publicId) {
+        try {
+            java.lang.reflect.Field field = Lesson.class.getDeclaredField("publicId");
+            field.setAccessible(true);
+            field.set(lesson, publicId);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to set publicId", e);
+        }
     }
 }
