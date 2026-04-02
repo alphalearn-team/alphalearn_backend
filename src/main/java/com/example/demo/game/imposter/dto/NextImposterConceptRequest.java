@@ -5,9 +5,14 @@ import java.util.UUID;
 
 public record NextImposterConceptRequest(
         List<UUID> excludedConceptPublicIds,
-        UUID lobbyPublicId
+        UUID lobbyPublicId,
+        String lobbyCode
 ) {
     public NextImposterConceptRequest(List<UUID> excludedConceptPublicIds) {
-        this(excludedConceptPublicIds, null);
+        this(excludedConceptPublicIds, null, null);
+    }
+
+    public NextImposterConceptRequest(List<UUID> excludedConceptPublicIds, UUID lobbyPublicId) {
+        this(excludedConceptPublicIds, lobbyPublicId, null);
     }
 }
