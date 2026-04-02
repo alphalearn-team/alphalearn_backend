@@ -380,7 +380,8 @@ class LearnerImposterLobbyServiceTest {
 
         assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED);
         assertThat(result.lobbyState()).isNull();
-        verify(imposterGameLobbyRepository).delete(lobby);
+        verify(imposterGameLobbyMemberRepository).delete(hostMember);
+        verify(imposterGameLobbyRepository).deleteById(11L);
     }
 
     @Test

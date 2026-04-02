@@ -193,7 +193,18 @@ public class LearnerImposterLobbyService {
         List<ImposterGameLobbyMember> remainingActiveMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         if (remainingActiveMembers.isEmpty()) {
-            imposterGameLobbyRepository.delete(lobby);
+            // No one remains in lobby, so clean up both the leaving membership and lobby row.
+            imposterGameLobbyMemberRepository.delete(member);
+            try {
+                imposterGameLobbyRepository.deleteById(lobby.getId());
+                imposterGameLobbyRepository.flush();
+            } catch (DataIntegrityViolationException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Unable to close lobby because it is still referenced by active game data",
+                        ex
+                );
+            }
             return new LeavePrivateImposterLobbyResponse(
                     PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED,
                     null
