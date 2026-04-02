@@ -4,20 +4,14 @@
 
 - Java 21
 - Docker Desktop or OrbStack (must be running)
-- Node.js 20+ (used only to run Supabase CLI with `npx`)
+- Supabase CLI
 
-## 2) Install Supabase CLI (project-local)
+## 2) Install Supabase CLI
 
-Install once in this repo:
-
-```bash
-npm install -D supabase
-```
-
-Then you can run:
+Install Supabase CLI globally on your machine, then verify:
 
 ```bash
-npx supabase --version
+supabase --version
 ```
 
 ## 3) Create local env files
@@ -32,13 +26,13 @@ cp .env.example .env.local
 Check status first:
 
 ```bash
-npx supabase status
+supabase status
 ```
 
 If not running, start it:
 
 ```bash
-npx supabase start
+supabase start
 ```
 
 Run status again and copy values from the output:
@@ -63,7 +57,7 @@ Optional JWT fallback (only if you intentionally use HMAC fallback):
 ### Option A (recommended for first-time setup): clean reset
 
 ```bash
-npx supabase db reset
+supabase db reset
 ```
 
 This rebuilds local DB from all migrations and runs `supabase/seed.sql` automatically.
@@ -71,7 +65,7 @@ This rebuilds local DB from all migrations and runs `supabase/seed.sql` automati
 ### Option B (keep existing data): no reset
 
 ```bash
-npx supabase migration up
+supabase migration up
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/seed.sql
 ```
 

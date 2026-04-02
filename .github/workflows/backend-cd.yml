@@ -13,10 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
-          node-version: "20"
+          version: latest
 
       - name: Validate DB env
         env:
@@ -56,7 +56,7 @@ jobs:
           fi
           export PGUSER="$DB_USER"
           export PGPASSWORD="$DB_PASSWORD"
-          npx supabase migration up --db-url "$CI_DB_URL"
+          supabase migration up --db-url "$CI_DB_URL"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

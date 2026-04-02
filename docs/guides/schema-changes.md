@@ -7,13 +7,13 @@ This project uses Supabase CLI migrations in `supabase/migrations`.
 1. Login:
 
 ```bash
-npx supabase login
+supabase login
 ```
 
 2. Link project:
 
 ```bash
-npx supabase link --project-ref <project_ref>
+supabase link --project-ref <project_ref>
 ```
 
 Use your Supabase project ref from `https://<project_ref>.supabase.co`.
@@ -23,8 +23,8 @@ Use your Supabase project ref from `https://<project_ref>.supabase.co`.
 If local is missing hosted tables:
 
 ```bash
-npx supabase db pull remote_schema_init_all --schema public,auth,storage
-npx supabase db reset
+supabase db pull remote_schema_init_all --schema public,auth,storage
+supabase db reset
 ```
 
 Use `db reset` here only when you intentionally want a full local rebuild.
@@ -34,9 +34,9 @@ Use `db reset` here only when you intentionally want a full local rebuild.
 Use this flow when you want to keep your local data and apply only pending migrations:
 
 ```bash
-npx supabase start
-npx supabase migration up
-npx supabase migration list
+supabase start
+supabase migration up
+supabase migration list
 ```
 
 `migration up` applies only migrations that are not yet recorded in migration history.
@@ -65,7 +65,7 @@ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/seed.sq
 Create migration file:
 
 ```bash
-npx supabase migration new add_lesson_flags
+supabase migration new add_lesson_flags
 ```
 
 Edit the generated SQL under `supabase/migrations`.
@@ -73,13 +73,13 @@ Edit the generated SQL under `supabase/migrations`.
 Apply locally (choose one):
 
 ```bash
-npx supabase migration up
+supabase migration up
 ```
 
 or full rebuild:
 
 ```bash
-npx supabase db reset
+supabase db reset
 ```
 
 ### Option B: Studio-first
@@ -88,19 +88,19 @@ npx supabase db reset
 2. Generate migration diff:
 
 ```bash
-npx supabase db diff -f add_lesson_flags
+supabase db diff -f add_lesson_flags
 ```
 
 3. Rebuild local DB from migrations:
 
 ```bash
-npx supabase db reset
+supabase db reset
 ```
 
 If you want to keep existing local data instead, run:
 
 ```bash
-npx supabase migration up
+supabase migration up
 ```
 
 ## Validate and Commit
@@ -127,13 +127,13 @@ If `db pull` reports remote migration mismatch:
 2. Run:
 
 ```bash
-npx supabase migration list
+supabase migration list
 ```
 
 3. Repair specific IDs as needed:
 
 ```bash
-npx supabase migration repair --status applied <migration_id>
+supabase migration repair --status applied <migration_id>
 ```
 
 ## Manual SQL Apply Without Reset
@@ -141,13 +141,13 @@ npx supabase migration repair --status applied <migration_id>
 If you already ran a migration SQL manually (Studio SQL editor or `psql`) and want Supabase CLI to treat it as applied:
 
 ```bash
-npx supabase migration repair --status applied <migration_id>
+supabase migration repair --status applied <migration_id>
 ```
 
 Example:
 
 ```bash
-npx supabase migration repair --status applied 20260402170000
+supabase migration repair --status applied 20260402170000
 ```
 
 This avoids re-running the same migration on the next `migration up`.
