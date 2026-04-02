@@ -4,26 +4,35 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.imposter.lobby.ImposterGameLobby;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyMember;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
-import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
+import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
+import com.example.demo.learner.Learner;
+import com.example.demo.learner.LearnerRepository;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -31,6 +40,7 @@ public class LearnerImposterLobbyService {
 
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final int LOBBY_CODE_MAX_RETRIES = 10;
+    private static final int MIN_ACTIVE_MEMBERS_TO_START = 3;
     private static final String LOBBY_CODE_UNIQUE_CONSTRAINT = "uk_imposter_game_lobbies_lobby_code";
     private static final String MEMBER_UNIQUE_CONSTRAINT = "uk_imposter_game_lobby_members_lobby_learner";
 
@@ -39,6 +49,7 @@ public class LearnerImposterLobbyService {
     private final ImposterLobbyCodeGenerator imposterLobbyCodeGenerator;
     private final ImposterMonthlyPackRepository imposterMonthlyPackRepository;
     private final ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
+    private final LearnerRepository learnerRepository;
     private final Clock clock;
 
     public LearnerImposterLobbyService(
@@ -47,6 +58,7 @@ public class LearnerImposterLobbyService {
             ImposterLobbyCodeGenerator imposterLobbyCodeGenerator,
             ImposterMonthlyPackRepository imposterMonthlyPackRepository,
             ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
+            LearnerRepository learnerRepository,
             Clock clock
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
@@ -54,6 +66,7 @@ public class LearnerImposterLobbyService {
         this.imposterLobbyCodeGenerator = imposterLobbyCodeGenerator;
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
+        this.learnerRepository = learnerRepository;
         this.clock = clock;
     }
 
@@ -148,7 +161,133 @@ public class LearnerImposterLobbyService {
         }
     }
 
-    private ImposterGameLobbyMember createMembership(ImposterGameLobby lobby, java.util.UUID learnerId) {
+    @Transactional
+    public PrivateImposterLobbyStateDto leavePrivateLobby(SupabaseAuthUser user, UUID lobbyPublicId) {
+        requireLearner(user);
+        ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId);
+        ensureViewerIsMember(lobby, user.userId());
+
+        if (lobby.getStartedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby has already started");
+        }
+
+        ImposterGameLobbyMember member = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Learner is not an active member of this lobby"
+                ));
+
+        member.setLeftAt(OffsetDateTime.now(clock));
+        imposterGameLobbyMemberRepository.saveAndFlush(member);
+
+        return buildLobbyState(lobby, user.userId());
+    }
+
+    @Transactional
+    public PrivateImposterLobbyStateDto startPrivateLobby(SupabaseAuthUser user, UUID lobbyPublicId) {
+        requireLearner(user);
+        ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId);
+        ensureViewerIsMember(lobby, user.userId());
+
+        if (!user.userId().equals(lobby.getHostLearnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only lobby host can start this imposter lobby");
+        }
+
+        if (lobby.getStartedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby has already started");
+        }
+
+        boolean hostIsActiveMember = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
+                .isPresent();
+        if (!hostIsActiveMember) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Lobby host must be an active member to start");
+        }
+
+        long activeMemberCount = imposterGameLobbyMemberRepository.countByLobby_IdAndLeftAtIsNull(lobby.getId());
+        if (activeMemberCount < MIN_ACTIVE_MEMBERS_TO_START) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "At least " + MIN_ACTIVE_MEMBERS_TO_START + " active players are required to start"
+            );
+        }
+
+        lobby.setStartedAt(OffsetDateTime.now(clock));
+        lobby.setStartedByLearnerId(user.userId());
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+        return buildLobbyState(savedLobby, user.userId());
+    }
+
+    @Transactional(readOnly = true)
+    public PrivateImposterLobbyStateDto getPrivateLobbyState(SupabaseAuthUser user, UUID lobbyPublicId) {
+        requireLearner(user);
+        ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId);
+        ensureViewerIsMember(lobby, user.userId());
+        return buildLobbyState(lobby, user.userId());
+    }
+
+    private ImposterGameLobby resolveLobbyByPublicId(UUID lobbyPublicId) {
+        if (lobbyPublicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lobbyPublicId is required");
+        }
+
+        return imposterGameLobbyRepository.findByPublicId(lobbyPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found"));
+    }
+
+    private void ensureViewerIsMember(ImposterGameLobby lobby, UUID learnerId) {
+        if (!imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(lobby.getId(), learnerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner is not a member of this lobby");
+        }
+    }
+
+    private PrivateImposterLobbyStateDto buildLobbyState(ImposterGameLobby lobby, UUID viewerLearnerId) {
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+
+        Map<UUID, Learner> learnersById = learnerRepository.findAllById(
+                        activeMembers.stream().map(ImposterGameLobbyMember::getLearnerId).toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(Learner::getId, Function.identity()));
+
+        List<PrivateImposterLobbyMemberStateDto> activeMemberDtos = activeMembers.stream()
+                .map(member -> {
+                    Learner learner = learnersById.get(member.getLearnerId());
+                    return new PrivateImposterLobbyMemberStateDto(
+                            learner == null ? null : learner.getPublicId(),
+                            learner == null ? null : learner.getUsername(),
+                            member.getJoinedAt(),
+                            member.getLearnerId().equals(lobby.getHostLearnerId())
+                    );
+                })
+                .toList();
+
+        long activeMemberCount = activeMemberDtos.size();
+        boolean viewerIsHost = viewerLearnerId.equals(lobby.getHostLearnerId());
+        boolean viewerIsActiveMember = activeMembers.stream()
+                .anyMatch(member -> member.getLearnerId().equals(viewerLearnerId));
+        boolean notStarted = lobby.getStartedAt() == null;
+
+        return new PrivateImposterLobbyStateDto(
+                lobby.getPublicId(),
+                lobby.getLobbyCode(),
+                lobby.isPrivateLobby(),
+                lobby.getConceptPoolMode(),
+                lobby.getPinnedYearMonth(),
+                lobby.getCreatedAt(),
+                lobby.getStartedAt(),
+                activeMemberCount,
+                activeMemberDtos,
+                viewerIsHost,
+                viewerIsActiveMember,
+                viewerIsActiveMember && notStarted,
+                viewerIsHost && viewerIsActiveMember && notStarted && activeMemberCount >= MIN_ACTIVE_MEMBERS_TO_START
+        );
+    }
+
+    private ImposterGameLobbyMember createMembership(ImposterGameLobby lobby, UUID learnerId) {
         ImposterGameLobbyMember member = new ImposterGameLobbyMember();
         member.setLobby(lobby);
         member.setLearnerId(learnerId);
