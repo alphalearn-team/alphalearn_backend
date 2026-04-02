@@ -46,12 +46,24 @@ jobs:
       - name: Apply pending Supabase migrations
         env:
           DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           CI_DB_URL="${DB_URL#jdbc:}"
           if [ "$CI_DB_URL" = "$DB_URL" ]; then
             echo "DB_URL must start with jdbc:"
             exit 1
           fi
+          if [ -z "$DB_USER" ]; then
+            echo "DB_USER is empty"
+            exit 1
+          fi
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "DB_PASSWORD is empty"
+            exit 1
+          fi
+          export PGUSER="$DB_USER"
+          export PGPASSWORD="$DB_PASSWORD"
           npx supabase migration up --db-url "$CI_DB_URL"
 
       - name: Build and run tests
