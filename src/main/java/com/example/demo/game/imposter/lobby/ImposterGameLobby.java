@@ -51,6 +51,12 @@ public class ImposterGameLobby {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "started_at")
+    private OffsetDateTime startedAt;
+
+    @Column(name = "started_by_learner_id", columnDefinition = "uuid")
+    private UUID startedByLearnerId;
+
     @PrePersist
     void assignPublicIdIfMissing() {
         if (publicId == null) {
