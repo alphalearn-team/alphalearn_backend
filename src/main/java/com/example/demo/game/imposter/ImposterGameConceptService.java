@@ -52,6 +52,9 @@ public class ImposterGameConceptService {
     public ImposterAssignedConceptDto assignNextConcept(SupabaseAuthUser user, NextImposterConceptRequest request) {
         Set<java.util.UUID> excludedConceptPublicIds = normalizeExcludedConceptPublicIds(request);
         ImposterGameLobby lobby = resolveRequestedLobby(user, request);
+        if (lobby != null && lobby.getStartedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby game has not started");
+        }
 
         if (lobby != null && lobby.getConceptPoolMode() == ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK) {
             java.util.Optional<ImposterAssignedConceptDto> featuredConcept = resolveFeaturedConceptForLobby(
