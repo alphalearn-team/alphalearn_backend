@@ -17,7 +17,7 @@ public record LearnerCurrentWeeklyQuestDto(
         return new LearnerCurrentWeeklyQuestDto(
                 assignment.getWeek().getWeekStartAt(),
                 LearnerWeeklyQuestConceptDto.from(assignment.getConcept()),
-                LearnerWeeklyQuestDetailsDto.from(assignment.getQuestTemplate()),
+                LearnerWeeklyQuestDetailsDto.fixed(),
                 submission
         );
     }
