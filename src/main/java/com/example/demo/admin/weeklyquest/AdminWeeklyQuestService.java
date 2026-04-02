@@ -12,8 +12,6 @@ import java.util.UUID;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
-import com.example.demo.weeklyquest.QuestTemplate;
-import com.example.demo.weeklyquest.QuestTemplateRepository;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
@@ -33,7 +31,6 @@ public class AdminWeeklyQuestService {
 
     private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
     private final WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
-    private final QuestTemplateRepository questTemplateRepository;
     private final ConceptRepository conceptRepository;
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
     private final Clock clock;
@@ -41,14 +38,12 @@ public class AdminWeeklyQuestService {
     public AdminWeeklyQuestService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
             WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository,
-            QuestTemplateRepository questTemplateRepository,
             ConceptRepository conceptRepository,
             WeeklyQuestCalendarService weeklyQuestCalendarService,
             Clock clock
     ) {
         this.weeklyQuestWeekRepository = weeklyQuestWeekRepository;
         this.weeklyQuestAssignmentRepository = weeklyQuestAssignmentRepository;
-        this.questTemplateRepository = questTemplateRepository;
         this.conceptRepository = conceptRepository;
         this.weeklyQuestCalendarService = weeklyQuestCalendarService;
         this.clock = clock;
@@ -88,13 +83,6 @@ public class AdminWeeklyQuestService {
         return toWeekDto(week, currentWeekStartAt);
     }
 
-    @Transactional(readOnly = true)
-    public List<WeeklyQuestTemplateDto> getTemplates() {
-        return questTemplateRepository.findByActiveTrueOrderByTitleAsc().stream()
-                .map(WeeklyQuestTemplateDto::from)
-                .toList();
-    }
-
     @Transactional
     public WeeklyQuestWeekDto upsertOfficialQuest(
             String weekStartDate,
@@ -104,8 +92,8 @@ public class AdminWeeklyQuestService {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
-        if (request.conceptPublicId() == null || request.questTemplatePublicId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "conceptPublicId and questTemplatePublicId are required");
+        if (request.conceptPublicId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "conceptPublicId is required");
         }
 
         OffsetDateTime targetWeekStartAt = weeklyQuestCalendarService.parseWeekStartDate(weekStartDate);
@@ -115,9 +103,6 @@ public class AdminWeeklyQuestService {
 
         Concept concept = conceptRepository.findByPublicId(request.conceptPublicId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Concept not found: " + request.conceptPublicId()));
-        QuestTemplate template = questTemplateRepository.findByPublicId(request.questTemplatePublicId())
-                .filter(QuestTemplate::isActive)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quest template not found: " + request.questTemplatePublicId()));
 
         WeeklyQuestWeek week = weeklyQuestWeekRepository.findByWeekStartAt(targetWeekStartAt)
                 .orElseGet(() -> createScheduledWeek(targetWeekStartAt));
@@ -131,7 +116,6 @@ public class AdminWeeklyQuestService {
                 .orElseGet(() -> newAssignment(week, adminUserId, now));
 
         assignment.setConcept(concept);
-        assignment.setQuestTemplate(template);
         assignment.setOfficial(true);
         assignment.setSourceType(WeeklyQuestAssignmentSourceType.ADMIN);
         assignment.setStatus(WeeklyQuestAssignmentStatus.DRAFT);

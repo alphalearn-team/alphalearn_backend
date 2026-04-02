@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.learner.Learner;
 import com.example.demo.storage.r2.QuestChallengeStorageService;
-import com.example.demo.weeklyquest.QuestTemplate;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
@@ -15,7 +14,6 @@ import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmission;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
 import com.example.demo.weeklyquest.WeeklyQuestWeek;
 import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
-import com.example.demo.weeklyquest.enums.QuestSubmissionMode;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentSourceType;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentStatus;
 import com.example.demo.weeklyquest.enums.WeeklyQuestWeekStatus;
@@ -183,17 +181,10 @@ class LearnerQuestChallengeSubmissionServiceTest {
     }
 
     private WeeklyQuestAssignment activeAssignment(WeeklyQuestWeek week) {
-        QuestTemplate template = new QuestTemplate();
-        ReflectionTestUtils.setField(template, "publicId", UUID.randomUUID());
-        template.setTitle("Video + Caption");
-        template.setInstructionText("Record a short video.");
-        template.setSubmissionMode(QuestSubmissionMode.VIDEO_WITH_CAPTION);
-
         WeeklyQuestAssignment assignment = new WeeklyQuestAssignment();
         ReflectionTestUtils.setField(assignment, "id", 8L);
         ReflectionTestUtils.setField(assignment, "publicId", UUID.randomUUID());
         assignment.setWeek(week);
-        assignment.setQuestTemplate(template);
         assignment.setOfficial(true);
         assignment.setSourceType(WeeklyQuestAssignmentSourceType.ADMIN);
         assignment.setStatus(WeeklyQuestAssignmentStatus.ACTIVE);

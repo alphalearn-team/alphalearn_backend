@@ -64,9 +64,4 @@ public class AdminWeeklyQuestController {
         return adminWeeklyQuestService.getCurrentWeek();
     }
 
-    @GetMapping("/templates")
-    @Operation(summary = "List weekly quest templates", description = "Returns active weekly quest templates")
-    public List<WeeklyQuestTemplateDto> getTemplates() {
-        return adminWeeklyQuestService.getTemplates();
-    }
 }

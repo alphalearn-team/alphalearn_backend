@@ -48,10 +48,6 @@ public class WeeklyQuestAssignment {
     @JoinColumn(name = "concept_id", nullable = false)
     private Concept concept;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "quest_template_id", nullable = false)
-    private QuestTemplate questTemplate;
-
     @Column(name = "slot_index", nullable = false)
     private short slotIndex = 0;
 

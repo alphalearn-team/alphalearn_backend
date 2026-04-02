@@ -16,8 +16,7 @@ public record WeeklyQuestAssignmentDto(
         UUID createdByAdminId,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
-        WeeklyQuestConceptDto concept,
-        WeeklyQuestTemplateDto questTemplate
+        WeeklyQuestConceptDto concept
 ) {
     public static WeeklyQuestAssignmentDto from(WeeklyQuestAssignment assignment) {
         return new WeeklyQuestAssignmentDto(
@@ -29,8 +28,7 @@ public record WeeklyQuestAssignmentDto(
                 assignment.getCreatedByAdminId(),
                 assignment.getCreatedAt(),
                 assignment.getUpdatedAt(),
-                WeeklyQuestConceptDto.from(assignment.getConcept()),
-                WeeklyQuestTemplateDto.from(assignment.getQuestTemplate())
+                WeeklyQuestConceptDto.from(assignment.getConcept())
         );
     }
 }

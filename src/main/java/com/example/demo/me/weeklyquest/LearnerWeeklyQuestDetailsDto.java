@@ -1,6 +1,5 @@
 package com.example.demo.me.weeklyquest;
 
-import com.example.demo.weeklyquest.QuestTemplate;
 import com.example.demo.weeklyquest.enums.QuestSubmissionMode;
 
 public record LearnerWeeklyQuestDetailsDto(
@@ -8,11 +7,15 @@ public record LearnerWeeklyQuestDetailsDto(
         String instructionText,
         QuestSubmissionMode submissionMode
 ) {
-    public static LearnerWeeklyQuestDetailsDto from(QuestTemplate template) {
+    private static final String FIXED_TITLE = "Video + Caption";
+    private static final String FIXED_INSTRUCTION_TEXT = "Record a short video and write a caption using this week's concept.";
+    private static final QuestSubmissionMode FIXED_SUBMISSION_MODE = QuestSubmissionMode.VIDEO_WITH_CAPTION;
+
+    public static LearnerWeeklyQuestDetailsDto fixed() {
         return new LearnerWeeklyQuestDetailsDto(
-                template.getTitle(),
-                template.getInstructionText(),
-                template.getSubmissionMode()
+                FIXED_TITLE,
+                FIXED_INSTRUCTION_TEXT,
+                FIXED_SUBMISSION_MODE
         );
     }
 }
