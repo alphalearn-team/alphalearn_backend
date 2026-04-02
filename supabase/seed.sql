@@ -34,7 +34,7 @@ set
 insert into public.admins (admin_id)
 select u.id
 from auth.users u
-where u.email in ('jiugeng45@gmail.com')
+where u.email in ('jiugeng45@gmail.com', 'alphalearn00@gmail.com')
 on conflict (admin_id) do nothing;
 
 commit;
