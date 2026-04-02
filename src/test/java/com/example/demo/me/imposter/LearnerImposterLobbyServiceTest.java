@@ -197,6 +197,8 @@ class LearnerImposterLobbyServiceTest {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
         when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
                 .thenReturn(Optional.empty());
 
@@ -216,6 +218,8 @@ class LearnerImposterLobbyServiceTest {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
         when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
                 .thenReturn(Optional.empty());
 
@@ -229,22 +233,44 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
-    void joinPrivateLobbyReturnsExistingMembershipIdempotently() {
+    void joinPrivateLobbyReturnsConflictWhenAlreadyActiveMember() {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         ImposterGameLobbyMember member = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
         when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
-        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
                 .thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Learner already joined this lobby");
+        verify(imposterGameLobbyMemberRepository, never()).saveAndFlush(any(ImposterGameLobbyMember.class));
+    }
+
+    @Test
+    void joinPrivateLobbyAllowsRejoinAfterLearnerHasLeft() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        ImposterGameLobbyMember historical = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        historical.setLeftAt(OffsetDateTime.parse("2026-04-01T13:00:00Z"));
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.of(historical));
 
         JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
                 user,
                 new JoinPrivateImposterLobbyRequest("ABCD2345")
         );
 
-        assertThat(result.alreadyMember()).isTrue();
-        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-01T12:00:00Z"));
-        verify(imposterGameLobbyMemberRepository, never()).saveAndFlush(any(ImposterGameLobbyMember.class));
+        assertThat(result.alreadyMember()).isFalse();
+        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(historical.getLeftAt()).isNull();
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(historical);
     }
 
     @Test

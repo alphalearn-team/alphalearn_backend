@@ -106,7 +106,20 @@ class MeImposterLobbyControllerTest {
 
         mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(request)))
+                .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsConflictWhenAlreadyActiveMember() throws Exception {
+        JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("ABCD2345");
+
+        when(learnerImposterLobbyService.joinPrivateLobby(any(), eq(request)))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby"));
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isConflict());
     }
 }
