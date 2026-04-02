@@ -1,8 +1,9 @@
 package com.example.demo.me.imposter;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -12,19 +13,22 @@ import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class MeImposterLobbyControllerTest {
@@ -98,6 +102,54 @@ class MeImposterLobbyControllerTest {
     }
 
     @Test
+    void leavePrivateLobbyReturnsUpdatedState() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        PrivateImposterLobbyStateDto state = stateDto(lobbyPublicId, null, 2, false, false);
+
+        when(learnerImposterLobbyService.leavePrivateLobby(any(), eq(lobbyPublicId))).thenReturn(state);
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/leave", lobbyPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.activeMemberCount").value(2))
+                .andExpect(jsonPath("$.canLeave").value(false));
+    }
+
+    @Test
+    void startPrivateLobbyReturnsStartedState() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        PrivateImposterLobbyStateDto state = stateDto(
+                lobbyPublicId,
+                OffsetDateTime.parse("2026-04-02T00:00:00Z"),
+                3,
+                true,
+                false
+        );
+
+        when(learnerImposterLobbyService.startPrivateLobby(any(), eq(lobbyPublicId))).thenReturn(state);
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/start", lobbyPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.startedAt").value("2026-04-02T00:00:00Z"))
+                .andExpect(jsonPath("$.canStart").value(false));
+    }
+
+    @Test
+    void getPrivateLobbyStateReturnsLobbySnapshot() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        PrivateImposterLobbyStateDto state = stateDto(lobbyPublicId, null, 3, true, true);
+
+        when(learnerImposterLobbyService.getPrivateLobbyState(any(), eq(lobbyPublicId))).thenReturn(state);
+
+        mockMvc.perform(get("/api/me/imposter/lobbies/private/{lobbyPublicId}/state", lobbyPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.activeMemberCount").value(3))
+                .andExpect(jsonPath("$.canStart").value(true));
+    }
+
+    @Test
     void joinPrivateLobbyReturnsBadRequestWhenServiceRejects() throws Exception {
         JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("  ");
 
@@ -106,20 +158,42 @@ class MeImposterLobbyControllerTest {
 
         mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
                         .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsBytes(request)))
+                        .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void joinPrivateLobbyReturnsConflictWhenAlreadyActiveMember() throws Exception {
-        JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("ABCD2345");
+    void startPrivateLobbyReturnsConflictWhenServiceRejects() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
 
-        when(learnerImposterLobbyService.joinPrivateLobby(any(), eq(request)))
-                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby"));
+        when(learnerImposterLobbyService.startPrivateLobby(any(), eq(lobbyPublicId)))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "At least 3 active players are required to start"));
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(request)))
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/start", lobbyPublicId))
                 .andExpect(status().isConflict());
+    }
+
+    private PrivateImposterLobbyStateDto stateDto(
+            UUID lobbyPublicId,
+            OffsetDateTime startedAt,
+            long activeCount,
+            boolean canLeave,
+            boolean canStart
+    ) {
+        return new PrivateImposterLobbyStateDto(
+                lobbyPublicId,
+                "ABCD2345",
+                true,
+                ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL,
+                null,
+                OffsetDateTime.parse("2026-04-01T00:00:00Z"),
+                startedAt,
+                activeCount,
+                List.of(new PrivateImposterLobbyMemberStateDto(UUID.randomUUID(), "host", OffsetDateTime.parse("2026-04-01T00:00:00Z"), true)),
+                true,
+                true,
+                canLeave,
+                canStart
+        );
     }
 }

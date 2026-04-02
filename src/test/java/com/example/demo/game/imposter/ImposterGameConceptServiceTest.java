@@ -247,6 +247,27 @@ class ImposterGameConceptServiceTest {
     }
 
     @Test
+    void rejectsWhenLobbyGameHasNotStarted() {
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+        UUID lobbyPublicId = UUID.randomUUID();
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        lobby.setStartedAt(null);
+        lobby.setStartedByLearnerId(null);
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(), lobbyPublicId)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Imposter lobby game has not started");
+    }
+
+    @Test
     void prioritizesWeeklyFeaturedConceptForCurrentMonthLobby() {
         UUID lobbyPublicId = UUID.randomUUID();
         UUID hostUserId = UUID.randomUUID();
@@ -360,6 +381,8 @@ class ImposterGameConceptServiceTest {
         lobby.setConceptPoolMode(mode);
         lobby.setPinnedYearMonth(pinnedYearMonth);
         lobby.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-02T00:05:00Z"));
+        lobby.setStartedByLearnerId(hostLearnerId);
         return lobby;
     }
 

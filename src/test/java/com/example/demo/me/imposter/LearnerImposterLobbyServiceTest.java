@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,18 +14,20 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.imposter.lobby.ImposterGameLobby;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyMember;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
-import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
+import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
 import com.example.demo.learner.Learner;
+import com.example.demo.learner.LearnerRepository;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -60,6 +62,9 @@ class LearnerImposterLobbyServiceTest {
     @Mock
     private ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
 
+    @Mock
+    private LearnerRepository learnerRepository;
+
     private LearnerImposterLobbyService service;
 
     @BeforeEach
@@ -71,6 +76,7 @@ class LearnerImposterLobbyServiceTest {
                 imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
+                learnerRepository,
                 fixedClock
         );
         lenient().when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class))).thenAnswer(invocation -> {
@@ -299,6 +305,143 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
+    void leavePrivateLobbyMarksActiveMemberLeftWhenLobbyNotStarted() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        ImposterGameLobbyMember self = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember other = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:30:00Z");
+        Learner otherLearner = learner(other.getLearnerId(), "peer");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(self));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(other));
+        when(learnerRepository.findAllById(List.of(other.getLearnerId()))).thenReturn(List.of(otherLearner));
+
+        PrivateImposterLobbyStateDto result = service.leavePrivateLobby(user, lobbyPublicId);
+
+        assertThat(self.getLeftAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(result.activeMemberCount()).isEqualTo(1);
+        assertThat(result.viewerIsActiveMember()).isFalse();
+        assertThat(result.canLeave()).isFalse();
+    }
+
+    @Test
+    void leavePrivateLobbyRejectsWhenLobbyAlreadyStarted() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.leavePrivateLobby(user, lobbyPublicId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("already started");
+    }
+
+    @Test
+    void startPrivateLobbySucceedsWhenHostAndEnoughActiveMembers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember secondMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember thirdMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:10:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.countByLobby_IdAndLeftAtIsNull(11L)).thenReturn(3L);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, secondMember, thirdMember));
+        when(learnerRepository.findAllById(List.of(host.userId(), secondMember.getLearnerId(), thirdMember.getLearnerId())))
+                .thenReturn(List.of(
+                        learner(host.userId(), "host"),
+                        learner(secondMember.getLearnerId(), "member-2"),
+                        learner(thirdMember.getLearnerId(), "member-3")
+                ));
+
+        PrivateImposterLobbyStateDto result = service.startPrivateLobby(host, lobbyPublicId);
+
+        assertThat(lobby.getStartedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(lobby.getStartedByLearnerId()).isEqualTo(host.userId());
+        assertThat(result.startedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(result.canStart()).isFalse();
+    }
+
+    @Test
+    void startPrivateLobbyRejectsWhenInsufficientPlayers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z")));
+        when(imposterGameLobbyMemberRepository.countByLobby_IdAndLeftAtIsNull(11L)).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.startPrivateLobby(host, lobbyPublicId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("At least 3 active players are required");
+    }
+
+    @Test
+    void startPrivateLobbyRejectsWhenRequesterIsNotHost() {
+        SupabaseAuthUser requester = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(UUID.randomUUID());
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, requester.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.startPrivateLobby(requester, lobbyPublicId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Only lobby host can start");
+    }
+
+    @Test
+    void getPrivateLobbyStateReturnsLiveSnapshot() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember secondMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember thirdMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:10:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, secondMember, thirdMember));
+        when(learnerRepository.findAllById(List.of(host.userId(), secondMember.getLearnerId(), thirdMember.getLearnerId())))
+                .thenReturn(List.of(
+                        learner(host.userId(), "host"),
+                        learner(secondMember.getLearnerId(), "member-2"),
+                        learner(thirdMember.getLearnerId(), "member-3")
+                ));
+
+        PrivateImposterLobbyStateDto result = service.getPrivateLobbyState(host, lobbyPublicId);
+
+        assertThat(result.activeMemberCount()).isEqualTo(3);
+        assertThat(result.viewerIsHost()).isTrue();
+        assertThat(result.viewerIsActiveMember()).isTrue();
+        assertThat(result.canLeave()).isTrue();
+        assertThat(result.canStart()).isTrue();
+    }
+
+    @Test
     void joinPrivateLobbyRejectsWhenUserIsNotLearner() {
         SupabaseAuthUser notLearner = new SupabaseAuthUser(UUID.randomUUID(), null, null);
 
@@ -319,6 +462,16 @@ class LearnerImposterLobbyServiceTest {
         learner.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
         learner.setTotalPoints((short) 0);
         return new SupabaseAuthUser(userId, learner, null);
+    }
+
+    private Learner learner(UUID id, String username) {
+        Learner learner = new Learner();
+        learner.setId(id);
+        learner.setPublicId(UUID.randomUUID());
+        learner.setUsername(username);
+        learner.setCreatedAt(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        learner.setTotalPoints((short) 0);
+        return learner;
     }
 
     private ImposterGameLobby lobby(String lobbyCode) {
