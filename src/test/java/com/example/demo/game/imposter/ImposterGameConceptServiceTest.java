@@ -2,6 +2,7 @@ package com.example.demo.game.imposter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.demo.concept.Concept;
@@ -145,6 +146,30 @@ class ImposterGameConceptServiceTest {
     }
 
     @Test
+    void usesLobbyCodeWhenProvided() {
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+
+        Concept firstConcept = concept("alpha");
+        Concept secondConcept = concept("beta");
+        when(conceptRepository.findAll()).thenReturn(List.of(firstConcept, secondConcept));
+
+        ImposterGameConceptService service = service();
+
+        ImposterAssignedConceptDto result = service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(firstConcept.getPublicId()), null, "abcd2345")
+        );
+
+        verify(imposterGameLobbyRepository).findByLobbyCode("ABCD2345");
+        assertThat(result.conceptPublicId()).isEqualTo(secondConcept.getPublicId());
+        assertThat(result.word()).isEqualTo("beta");
+    }
+
+    @Test
     void rejectsWhenNonHostRequestsLobbyConcept() {
         UUID lobbyPublicId = UUID.randomUUID();
         UUID hostUserId = UUID.randomUUID();
@@ -161,6 +186,64 @@ class ImposterGameConceptServiceTest {
         ))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Only lobby host can request concepts");
+    }
+
+    @Test
+    void rejectsWhenNonHostRequestsLobbyConceptByCode() {
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser otherUser = learnerAuthUser(UUID.randomUUID());
+
+        ImposterGameLobby lobby = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobby));
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                otherUser,
+                new NextImposterConceptRequest(List.of(), null, "ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Only lobby host can request concepts");
+    }
+
+    @Test
+    void rejectsWhenLobbyCodeAndLobbyPublicIdPointToDifferentLobbies() {
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+        UUID lobbyPublicId = UUID.randomUUID();
+
+        ImposterGameLobby lobbyByCode = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        ReflectionTestUtils.setField(lobbyByCode, "id", 101L);
+        ImposterGameLobby lobbyByPublicId = lobby(hostUserId, ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL, null);
+        ReflectionTestUtils.setField(lobbyByPublicId, "id", 202L);
+
+        when(imposterGameLobbyRepository.findByLobbyCode("ABCD2345")).thenReturn(Optional.of(lobbyByCode));
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobbyByPublicId));
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(), lobbyPublicId, "ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("lobbyCode and lobbyPublicId refer to different lobbies");
+    }
+
+    @Test
+    void rejectsWhenLobbyCodeIsUnknown() {
+        UUID hostUserId = UUID.randomUUID();
+        SupabaseAuthUser host = learnerAuthUser(hostUserId);
+        when(imposterGameLobbyRepository.findByLobbyCode("ZZZZ9999")).thenReturn(Optional.empty());
+
+        ImposterGameConceptService service = service();
+
+        assertThatThrownBy(() -> service.assignNextConcept(
+                host,
+                new NextImposterConceptRequest(List.of(), null, "ZZZZ9999")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Imposter lobby not found");
     }
 
     @Test

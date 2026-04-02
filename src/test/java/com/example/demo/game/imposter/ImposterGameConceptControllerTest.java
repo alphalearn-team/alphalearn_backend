@@ -57,4 +57,24 @@ class ImposterGameConceptControllerTest {
                 .andExpect(jsonPath("$.conceptPublicId").value(assignedConceptId.toString()))
                 .andExpect(jsonPath("$.word").value("binary tree"));
     }
+
+    @Test
+    void assignNextConceptAcceptsLobbyCode() throws Exception {
+        UUID assignedConceptId = UUID.randomUUID();
+        NextImposterConceptRequest request = new NextImposterConceptRequest(
+                List.of(),
+                null,
+                "ABCD2345"
+        );
+
+        when(imposterGameConceptService.assignNextConcept(any(), eq(request)))
+                .thenReturn(new ImposterAssignedConceptDto(assignedConceptId, "merge sort"));
+
+        mockMvc.perform(post("/api/games/imposter/concepts/next")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conceptPublicId").value(assignedConceptId.toString()))
+                .andExpect(jsonPath("$.word").value("merge sort"));
+    }
 }

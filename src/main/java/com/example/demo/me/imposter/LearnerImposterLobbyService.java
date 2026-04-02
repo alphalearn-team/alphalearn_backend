@@ -106,6 +106,10 @@ public class LearnerImposterLobbyService {
             if (current instanceof ConstraintViolationException violationException) {
                 return LOBBY_CODE_UNIQUE_CONSTRAINT.equalsIgnoreCase(violationException.getConstraintName());
             }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains(LOBBY_CODE_UNIQUE_CONSTRAINT)) {
+                return true;
+            }
             current = current.getCause();
         }
         return false;

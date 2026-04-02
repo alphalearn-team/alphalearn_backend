@@ -3,6 +3,8 @@ package com.example.demo.me.imposter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -138,6 +141,28 @@ class LearnerImposterLobbyServiceTest {
         ))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Current monthly imposter pack has no concepts");
+    }
+
+    @Test
+    void retriesLobbyCodeGenerationWhenUniqueCollisionOccurs() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterLobbyCodeGenerator.generate()).thenReturn("ABCD2345", "WXYZ6789");
+        when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class)))
+                .thenThrow(new DataIntegrityViolationException("violates constraint uk_imposter_game_lobbies_lobby_code"))
+                .thenAnswer(invocation -> {
+                    ImposterGameLobby lobby = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+                    return lobby;
+                });
+
+        PrivateImposterLobbyDto result = service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL)
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("WXYZ6789");
+        verify(imposterLobbyCodeGenerator, times(2)).generate();
+        verify(imposterGameLobbyRepository, times(2)).saveAndFlush(any(ImposterGameLobby.class));
     }
 
     private SupabaseAuthUser learnerAuthUser() {
