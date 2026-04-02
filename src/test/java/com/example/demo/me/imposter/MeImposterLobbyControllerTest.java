@@ -12,7 +12,9 @@ import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,14 +107,19 @@ class MeImposterLobbyControllerTest {
     void leavePrivateLobbyReturnsUpdatedState() throws Exception {
         UUID lobbyPublicId = UUID.randomUUID();
         PrivateImposterLobbyStateDto state = stateDto(lobbyPublicId, null, 2, false, false);
+        LeavePrivateImposterLobbyResponse response = new LeavePrivateImposterLobbyResponse(
+                PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST,
+                state
+        );
 
-        when(learnerImposterLobbyService.leavePrivateLobby(any(), eq(lobbyPublicId))).thenReturn(state);
+        when(learnerImposterLobbyService.leavePrivateLobby(any(), eq(lobbyPublicId))).thenReturn(response);
 
         mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/leave", lobbyPublicId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
-                .andExpect(jsonPath("$.activeMemberCount").value(2))
-                .andExpect(jsonPath("$.canLeave").value(false));
+                .andExpect(jsonPath("$.result").value("LEFT_AND_PROMOTED_HOST"))
+                .andExpect(jsonPath("$.lobbyState.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.lobbyState.activeMemberCount").value(2))
+                .andExpect(jsonPath("$.lobbyState.canLeave").value(false));
     }
 
     @Test

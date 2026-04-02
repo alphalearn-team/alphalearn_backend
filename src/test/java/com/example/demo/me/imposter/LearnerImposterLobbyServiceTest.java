@@ -26,7 +26,9 @@ import com.example.demo.learner.LearnerRepository;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import java.time.Clock;
 import java.time.Instant;
@@ -321,12 +323,64 @@ class LearnerImposterLobbyServiceTest {
                 .thenReturn(List.of(other));
         when(learnerRepository.findAllById(List.of(other.getLearnerId()))).thenReturn(List.of(otherLearner));
 
-        PrivateImposterLobbyStateDto result = service.leavePrivateLobby(user, lobbyPublicId);
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(user, lobbyPublicId);
 
         assertThat(self.getLeftAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
-        assertThat(result.activeMemberCount()).isEqualTo(1);
-        assertThat(result.viewerIsActiveMember()).isFalse();
-        assertThat(result.canLeave()).isFalse();
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT);
+        assertThat(result.lobbyState()).isNotNull();
+        assertThat(result.lobbyState().activeMemberCount()).isEqualTo(1);
+        assertThat(result.lobbyState().viewerIsActiveMember()).isFalse();
+        assertThat(result.lobbyState().canLeave()).isFalse();
+    }
+
+    @Test
+    void leavePrivateLobbyPromotesNextHostWhenHostLeavesWithRemainingMembers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        UUID promotedLearnerId = UUID.randomUUID();
+        ImposterGameLobbyMember promoted = existingMember(lobby, promotedLearnerId, "2026-04-01T12:05:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(promoted), List.of(promoted));
+        when(learnerRepository.findAllById(List.of(promotedLearnerId)))
+                .thenReturn(List.of(learner(promotedLearnerId, "new-host")));
+
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(host, lobbyPublicId);
+
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST);
+        assertThat(result.lobbyState()).isNotNull();
+        assertThat(lobby.getHostLearnerId()).isEqualTo(promotedLearnerId);
+        assertThat(result.lobbyState().activeMemberCount()).isEqualTo(1);
+    }
+
+    @Test
+    void leavePrivateLobbyDeletesLobbyWhenHostLeavesAndNoMembersRemain() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of());
+
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(host, lobbyPublicId);
+
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED);
+        assertThat(result.lobbyState()).isNull();
+        verify(imposterGameLobbyRepository).delete(lobby);
     }
 
     @Test
