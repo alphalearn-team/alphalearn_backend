@@ -1,4 +1,4 @@
-name: Backend CI (Maven)
+name: Backend CI
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  verify:
     name: Backend CI
     runs-on: ubuntu-latest
 
@@ -45,3 +45,6 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SUPABASE_JWT_JWKS_URL: ${{ vars.SUPABASE_JWT_JWKS_URL }}
         run: mvn -B clean verify
+
+      - name: Build backend Docker image
+        run: docker build -f docker/backend.Dockerfile -t alphalearn-backend:${{ github.sha }} .

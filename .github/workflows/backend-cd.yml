@@ -1,0 +1,60 @@
+name: Backend CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Backend CD
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Validate deployment configuration
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+        run: |
+          test -n "$AWS_REGION" || (echo "AWS_REGION is required" && exit 1)
+          test -n "$ECR_REPOSITORY_URI" || (echo "ECR_REPOSITORY_URI is required" && exit 1)
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract image tags
+        id: image
+        run: |
+          echo "sha_tag=${ECR_REPOSITORY_URI}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${ECR_REPOSITORY_URI}:latest" >> "$GITHUB_OUTPUT"
+        env:
+          ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backend.Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.latest_tag }}
+
+      - name: Trigger App Runner deployment
+        if: ${{ vars.APP_RUNNER_SERVICE_ARN != '' }}
+        run: aws apprunner start-deployment --service-arn "$APP_RUNNER_SERVICE_ARN"
+        env:
+          APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
+
+      - name: Skip App Runner deployment
+        if: ${{ vars.APP_RUNNER_SERVICE_ARN == '' }}
+        run: echo "Skipping App Runner deployment because APP_RUNNER_SERVICE_ARN is not configured yet."

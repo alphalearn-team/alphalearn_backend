@@ -36,4 +36,8 @@ build/
 application-local.properties
 .env
 .env.local
+docker/backend.env
+
+### OS files ###
+.DS_Store
 MOCKDATA.md
