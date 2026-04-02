@@ -1,6 +1,7 @@
 package com.example.demo.me.imposter;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPackWeeklyFeature;
@@ -12,7 +13,6 @@ import com.example.demo.me.imposter.dto.LearnerImposterMonthlyPackVisibleConcept
 import com.example.demo.me.imposter.dto.LearnerImposterMonthlyPackWeeklyFeaturedSlotDto;
 import java.time.Clock;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -29,22 +29,24 @@ import org.springframework.web.server.ResponseStatusException;
 public class LearnerImposterMonthlyPackService {
 
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
-    private static final ZoneId WEEK_SLOT_ZONE_ID = ZoneId.of("Asia/Singapore");
 
     private final ImposterMonthlyPackRepository imposterMonthlyPackRepository;
     private final ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
     private final ImposterMonthlyPackWeeklyFeatureRepository imposterMonthlyPackWeeklyFeatureRepository;
+    private final ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
     private final Clock clock;
 
     public LearnerImposterMonthlyPackService(
             ImposterMonthlyPackRepository imposterMonthlyPackRepository,
             ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
             ImposterMonthlyPackWeeklyFeatureRepository imposterMonthlyPackWeeklyFeatureRepository,
+            ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
             Clock clock
     ) {
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
         this.imposterMonthlyPackWeeklyFeatureRepository = imposterMonthlyPackWeeklyFeatureRepository;
+        this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
         this.clock = clock;
     }
 
@@ -53,7 +55,7 @@ public class LearnerImposterMonthlyPackService {
         requireLearner(user);
 
         String yearMonth = YearMonth.now(clock).format(YEAR_MONTH_FORMATTER);
-        short currentWeekSlot = currentWeekSlotInMonth();
+        short currentWeekSlot = imposterWeeklyFeaturedConceptService.currentWeekSlotInMonth();
 
         ImposterMonthlyPack pack = imposterMonthlyPackRepository.findByYearMonth(yearMonth).orElse(null);
         if (pack == null) {
@@ -62,7 +64,7 @@ public class LearnerImposterMonthlyPackService {
                     false,
                     currentWeekSlot,
                     List.of(),
-                    List.of()
+                    hiddenWeeklyFeaturedSlots()
             );
         }
 
@@ -77,6 +79,10 @@ public class LearnerImposterMonthlyPackService {
                 ));
 
         List<LearnerImposterMonthlyPackVisibleConceptDto> visibleConcepts = conceptRows.stream()
+                .filter(row -> {
+                    Short weekSlot = weeklyFeatureByConceptPublicId.get(row.getConcept().getPublicId());
+                    return weekSlot == null || weekSlot <= currentWeekSlot;
+                })
                 .map(row -> {
                     Short weekSlot = weeklyFeatureByConceptPublicId.get(row.getConcept().getPublicId());
                     return new LearnerImposterMonthlyPackVisibleConceptDto(
@@ -100,11 +106,12 @@ public class LearnerImposterMonthlyPackService {
                 .mapToObj(slotValue -> {
                     short weekSlot = (short) slotValue;
                     ImposterMonthlyPackWeeklyFeature row = weeklyFeatureBySlot.get(weekSlot);
+                    boolean revealed = weekSlot <= currentWeekSlot;
                     return new LearnerImposterMonthlyPackWeeklyFeaturedSlotDto(
                             weekSlot,
-                            weekSlot <= currentWeekSlot,
-                            row == null ? null : row.getConcept().getPublicId(),
-                            row == null ? null : row.getConcept().getTitle()
+                            revealed,
+                            !revealed || row == null ? null : row.getConcept().getPublicId(),
+                            !revealed || row == null ? null : row.getConcept().getTitle()
                     );
                 })
                 .toList();
@@ -124,10 +131,14 @@ public class LearnerImposterMonthlyPackService {
         }
     }
 
-    short currentWeekSlotInMonth() {
-        java.time.LocalDate singaporeDate = java.time.LocalDate.now(clock.withZone(WEEK_SLOT_ZONE_ID));
-        int dayOfMonth = singaporeDate.getDayOfMonth();
-        int slot = ((dayOfMonth - 1) / 7) + 1;
-        return (short) Math.min(slot, 4);
+    private List<LearnerImposterMonthlyPackWeeklyFeaturedSlotDto> hiddenWeeklyFeaturedSlots() {
+        return IntStream.rangeClosed(1, 4)
+                .mapToObj(slot -> new LearnerImposterMonthlyPackWeeklyFeaturedSlotDto(
+                        (short) slot,
+                        false,
+                        null,
+                        null
+                ))
+                .toList();
     }
 }

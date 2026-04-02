@@ -34,7 +34,7 @@ public class ImposterWeeklyFeaturedConceptService {
                 .flatMap(pack -> resolveFeatureByWeekSlot(pack, currentWeekSlotInMonth()));
     }
 
-    short currentWeekSlotInMonth() {
+    public short currentWeekSlotInMonth() {
         LocalDate singaporeDate = LocalDate.now(clock.withZone(WEEK_SLOT_ZONE_ID));
         int dayOfMonth = singaporeDate.getDayOfMonth();
         int slot = ((dayOfMonth - 1) / 7) + 1;
