@@ -27,6 +27,20 @@ npx supabase db pull remote_schema_init_all --schema public,auth,storage
 npx supabase db reset
 ```
 
+Use `db reset` here only when you intentionally want a full local rebuild.
+
+## Apply Only New Migrations (Keep Existing Data)
+
+Use this flow when you want to keep your local data and apply only pending migrations:
+
+```bash
+npx supabase start
+npx supabase migration up
+npx supabase migration list
+```
+
+`migration up` applies only migrations that are not yet recorded in migration history.
+
 ## Make Schema Changes Locally
 
 ### Option A: SQL-first
@@ -39,7 +53,13 @@ npx supabase migration new add_lesson_flags
 
 Edit the generated SQL under `supabase/migrations`.
 
-Apply locally:
+Apply locally (choose one):
+
+```bash
+npx supabase migration up
+```
+
+or full rebuild:
 
 ```bash
 npx supabase db reset
@@ -58,6 +78,12 @@ npx supabase db diff -f add_lesson_flags
 
 ```bash
 npx supabase db reset
+```
+
+If you want to keep existing local data instead, run:
+
+```bash
+npx supabase migration up
 ```
 
 ## Validate and Commit
@@ -91,4 +117,35 @@ npx supabase migration list
 
 ```bash
 npx supabase migration repair --status applied <migration_id>
+```
+
+## Manual SQL Apply Without Reset
+
+If you already ran a migration SQL manually (Studio SQL editor or `psql`) and want Supabase CLI to treat it as applied:
+
+```bash
+npx supabase migration repair --status applied <migration_id>
+```
+
+Example:
+
+```bash
+npx supabase migration repair --status applied 20260402170000
+```
+
+This avoids re-running the same migration on the next `migration up`.
+
+## RLS Default for New Tables
+
+New tables created by migration SQL do not automatically enable Row Level Security. Add this explicitly in each migration:
+
+```sql
+alter table public.your_table enable row level security;
+-- optional policy example
+create policy "service_role_all"
+on public.your_table
+for all
+to service_role
+using (true)
+with check (true);
 ```
