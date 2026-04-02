@@ -120,26 +120,32 @@ public class LearnerImposterLobbyService {
         ImposterGameLobby lobby = imposterGameLobbyRepository.findByLobbyCode(lobbyCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found"));
 
-        ImposterGameLobbyMember existingMember = imposterGameLobbyMemberRepository
+        ImposterGameLobbyMember activeMember = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
+                .orElse(null);
+        if (activeMember != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby");
+        }
+
+        ImposterGameLobbyMember historicalMember = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLearnerId(lobby.getId(), user.userId())
                 .orElse(null);
-        if (existingMember != null) {
-            return JoinedPrivateImposterLobbyDto.from(lobby, existingMember, true);
+        if (historicalMember != null) {
+            historicalMember.setJoinedAt(OffsetDateTime.now(clock));
+            historicalMember.setLeftAt(null);
+            ImposterGameLobbyMember rejoinedMember = imposterGameLobbyMemberRepository.saveAndFlush(historicalMember);
+            return JoinedPrivateImposterLobbyDto.from(lobby, rejoinedMember, false);
         }
 
-        ImposterGameLobbyMember createdMember;
         try {
-            createdMember = createMembership(lobby, user.userId());
+            ImposterGameLobbyMember createdMember = createMembership(lobby, user.userId());
+            return JoinedPrivateImposterLobbyDto.from(lobby, createdMember, false);
         } catch (DataIntegrityViolationException ex) {
-            if (!isMemberUniqueViolation(ex)) {
-                throw ex;
+            if (isMemberUniqueViolation(ex)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby");
             }
-            createdMember = imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(lobby.getId(), user.userId())
-                    .orElseThrow(() -> ex);
-            return JoinedPrivateImposterLobbyDto.from(lobby, createdMember, true);
+            throw ex;
         }
-
-        return JoinedPrivateImposterLobbyDto.from(lobby, createdMember, false);
     }
 
     private ImposterGameLobbyMember createMembership(ImposterGameLobby lobby, java.util.UUID learnerId) {

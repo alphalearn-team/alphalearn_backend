@@ -36,4 +36,7 @@ public class ImposterGameLobbyMember {
 
     @Column(name = "joined_at", nullable = false)
     private OffsetDateTime joinedAt;
+
+    @Column(name = "left_at")
+    private OffsetDateTime leftAt;
 }

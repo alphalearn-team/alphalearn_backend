@@ -8,5 +8,7 @@ public interface ImposterGameLobbyMemberRepository extends JpaRepository<Imposte
 
     Optional<ImposterGameLobbyMember> findByLobby_IdAndLearnerId(Long lobbyId, UUID learnerId);
 
+    Optional<ImposterGameLobbyMember> findByLobby_IdAndLearnerIdAndLeftAtIsNull(Long lobbyId, UUID learnerId);
+
     boolean existsByLobby_IdAndLearnerId(Long lobbyId, UUID learnerId);
 }
