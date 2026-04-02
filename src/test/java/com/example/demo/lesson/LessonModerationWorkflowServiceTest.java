@@ -129,7 +129,7 @@ class LessonModerationWorkflowServiceTest {
     }
 
     @Test
-    void submitForReviewFallsBackToPendingWhenModerationFails() {
+    void submitForReviewAutoRejectsWhenModerationFails() {
         Lesson lesson = lessonWithStatus(LessonModerationStatus.UNPUBLISHED);
         when(lessonRepository.findByPublicId(lesson.getPublicId())).thenReturn(Optional.of(lesson));
         when(lessonAutoModerationService.moderate(lesson)).thenThrow(new IllegalStateException("provider timeout"));
@@ -137,7 +137,7 @@ class LessonModerationWorkflowServiceTest {
 
         service.submitForReview(lesson);
 
-        assertThat(lesson.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.PENDING);
+        assertThat(lesson.getLessonModerationStatus()).isEqualTo(LessonModerationStatus.REJECTED);
         verify(lessonRepository, times(2)).save(any(Lesson.class));
         verify(lessonRepository).findByPublicId(lesson.getPublicId());
         ArgumentCaptor<LessonModerationRecord> captor = ArgumentCaptor.forClass(LessonModerationRecord.class);
@@ -146,6 +146,7 @@ class LessonModerationWorkflowServiceTest {
         assertThat(record.getEventType()).isEqualTo(LessonModerationEventType.AUTO_FAILED);
         assertThat(record.getDecisionSource()).isEqualTo(LessonModerationDecisionSource.AUTO_FALLBACK);
         assertThat(record.getFailureMessage()).isEqualTo("provider timeout");
+        assertThat(record.getResultingStatus()).isEqualTo(LessonModerationStatus.REJECTED);
     }
 
     @Test
