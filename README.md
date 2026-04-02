@@ -1,50 +1,9 @@
-## Local Spring Boot Run
+# Backend Docs
 
-### 1. Create local env files
+## Guides
 
-Create/confirm:
-
-- `.env.shared` (shared settings, local-only, ignored by git)
-- `.env.local` (local secrets, ignored by git)
-
-If needed:
-
-```bash
-cp .env.shared.example .env.shared
-cp .env.example .env.local
-```
-
-### 2. Run backend
-
-Preferred (uses layered env loading):
-
-```bash
-./run_local.sh
-```
-
-Optional modes:
-
-```bash
-./run_local.sh production
-```
-
-Open:
-
-- Backend root health check: http://localhost:8080/health
-- Swagger UI: http://localhost:8080/swagger-ui/index.html
-- OpenAPI JSON: http://localhost:8080/v3/api-docs
-
-### 3. Run tests with same env layering
-
-```bash
-./test_local.sh
-```
-
-Optional modes:
-
-```bash
-./test_local.sh production
-```
+- Local setup and run: `docs/guides/local-development.md`
+- Supabase schema changes and migrations: `docs/guides/schema-changes.md`
 
 ## CI/CD Pipeline
 
