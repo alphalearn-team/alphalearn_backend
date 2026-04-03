@@ -1,8 +1,5 @@
 package com.example.demo.config;
 
-import java.nio.charset.StandardCharsets;
-import javax.crypto.spec.SecretKeySpec;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -12,12 +9,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 
 @Configuration
 @EnableWebSecurity
@@ -59,60 +53,14 @@ public class SecurityConfig {
 
     @Bean
     public JwtDecoder jwtDecoder(
-            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwkSetUri,
-            @Value("${SUPABASE_JWT_SECRET:}") String jwtSecret
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri
     ) {
-        JwtDecoder jwksDecoder = null;
-        JwtDecoder hmacDecoder = null;
-
-        if (jwkSetUri != null && !jwkSetUri.isBlank()) {
-            jwksDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
-                    .jwsAlgorithms(algorithms -> {
-                        algorithms.add(SignatureAlgorithm.ES256);
-                        algorithms.add(SignatureAlgorithm.RS256);
-                    })
-                    .build();
+        if (jwkSetUri == null || jwkSetUri.isBlank()) {
+            throw new IllegalStateException("JWKS URL is required (set SUPABASE_JWT_JWKS_URL).");
         }
-
-        if (jwtSecret != null && !jwtSecret.isBlank()) {
-            hmacDecoder = NimbusJwtDecoder
-                    .withSecretKey(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
-                    .macAlgorithm(MacAlgorithm.HS256)
-                    .build();
-        }
-
-        if (jwksDecoder == null && hmacDecoder == null) {
-            throw new IllegalStateException("Either SUPABASE_JWT_JWKS_URL or SUPABASE_JWT_SECRET is required.");
-        }
-
-        JwtDecoder finalJwksDecoder = jwksDecoder;
-        JwtDecoder finalHmacDecoder = hmacDecoder;
-        return token -> decodeWithFallback(token, finalJwksDecoder, finalHmacDecoder);
-    }
-
-    private Jwt decodeWithFallback(String token, JwtDecoder jwksDecoder, JwtDecoder hmacDecoder) {
-        JwtException lastFailure = null;
-
-        if (jwksDecoder != null) {
-            try {
-                return jwksDecoder.decode(token);
-            } catch (JwtException ex) {
-                lastFailure = ex;
-            }
-        }
-
-        if (hmacDecoder != null) {
-            try {
-                return hmacDecoder.decode(token);
-            } catch (JwtException ex) {
-                if (lastFailure != null) {
-                    ex.addSuppressed(lastFailure);
-                }
-                throw ex;
-            }
-        }
-
-        throw lastFailure == null ? new JwtException("JWT decoder is not configured.") : lastFailure;
+        return NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+                .jwsAlgorithm(SignatureAlgorithm.ES256)
+                .build();
     }
 
 }

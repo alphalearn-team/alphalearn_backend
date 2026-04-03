@@ -3,47 +3,54 @@ package com.example.demo.weeklyquest;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.example.demo.concept.Concept;
-import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
+import com.example.demo.concept.ConceptRepository;
 import com.example.demo.weeklyquest.enums.WeeklyQuestActivationSource;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentSourceType;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentStatus;
 import com.example.demo.weeklyquest.enums.WeeklyQuestWeekStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class WeeklyQuestAutomationService {
     private static final Logger log = LoggerFactory.getLogger(WeeklyQuestAutomationService.class);
+    private static final UUID UNCONFIGURED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
     private static final String REMINDER_TYPE_MISSING_OFFICIAL = "MISSING_OFFICIAL_QUEST";
-    private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
     private final WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
-    private final ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+    private final ConceptRepository conceptRepository;
+    private final QuestTemplateRepository questTemplateRepository;
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
+    private final WeeklyQuestProperties weeklyQuestProperties;
     private final Clock clock;
     private final Set<String> emittedReminderKeys = ConcurrentHashMap.newKeySet();
 
     public WeeklyQuestAutomationService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
             WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository,
-            ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
+            ConceptRepository conceptRepository,
+            QuestTemplateRepository questTemplateRepository,
             WeeklyQuestCalendarService weeklyQuestCalendarService,
+            WeeklyQuestProperties weeklyQuestProperties,
             Clock clock
     ) {
         this.weeklyQuestWeekRepository = weeklyQuestWeekRepository;
         this.weeklyQuestAssignmentRepository = weeklyQuestAssignmentRepository;
-        this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
+        this.conceptRepository = conceptRepository;
+        this.questTemplateRepository = questTemplateRepository;
         this.weeklyQuestCalendarService = weeklyQuestCalendarService;
+        this.weeklyQuestProperties = weeklyQuestProperties;
         this.clock = clock;
     }
 
@@ -57,13 +64,12 @@ public class WeeklyQuestAutomationService {
         WeeklyQuestAssignment officialAssignment = weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(currentWeek.getId())
                 .orElse(null);
         if (officialAssignment == null) {
-            officialAssignment = createMonthlyFeaturedAssignment(currentWeek, now);
+            officialAssignment = createFallbackAssignment(currentWeek, now);
         }
         if (officialAssignment == null) {
-            log.warn(
-                    "Weekly quest featured concept is not configured for current month pack. weekStartAt={}, yearMonth={}",
-                    currentWeekStartAt,
-                    currentYearMonth()
+            log.error(
+                    "Weekly quest fallback is not configured. Set weekly-quest.fallback.concept-public-id and weekly-quest.fallback.quest-template-public-id before activation. weekStartAt={}",
+                    currentWeekStartAt
             );
             return;
         }
@@ -128,17 +134,22 @@ public class WeeklyQuestAutomationService {
         return weeklyQuestWeekRepository.save(week);
     }
 
-    private WeeklyQuestAssignment createMonthlyFeaturedAssignment(WeeklyQuestWeek week, OffsetDateTime now) {
-        String yearMonth = currentYearMonth();
-        Concept concept = imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept(yearMonth)
-                .orElse(null);
-        if (concept == null) {
+    private WeeklyQuestAssignment createFallbackAssignment(WeeklyQuestWeek week, OffsetDateTime now) {
+        UUID fallbackConceptPublicId = weeklyQuestProperties.fallback().conceptPublicId();
+        UUID fallbackTemplatePublicId = weeklyQuestProperties.fallback().questTemplatePublicId();
+        if (isUnconfigured(fallbackConceptPublicId) || isUnconfigured(fallbackTemplatePublicId)) {
             return null;
         }
+
+        Concept concept = conceptRepository.findByPublicId(fallbackConceptPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Fallback concept not found: " + fallbackConceptPublicId));
+        QuestTemplate template = questTemplateRepository.findByPublicId(fallbackTemplatePublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Fallback quest template not found: " + fallbackTemplatePublicId));
 
         WeeklyQuestAssignment assignment = new WeeklyQuestAssignment();
         assignment.setWeek(week);
         assignment.setConcept(concept);
+        assignment.setQuestTemplate(template);
         assignment.setSlotIndex((short) 0);
         assignment.setOfficial(true);
         assignment.setSourceType(WeeklyQuestAssignmentSourceType.FALLBACK);
@@ -177,9 +188,8 @@ public class WeeklyQuestAutomationService {
         }
     }
 
-    private String currentYearMonth() {
-        LocalDate nowDate = weeklyQuestCalendarService.localDate(weeklyQuestCalendarService.now());
-        return YearMonth.from(nowDate).format(YEAR_MONTH_FORMATTER);
+    private boolean isUnconfigured(UUID value) {
+        return value == null || UNCONFIGURED_UUID.equals(value);
     }
 
     private String buildReminderKey(OffsetDateTime targetWeekStartAt, LocalDate reminderDate, String reminderType) {

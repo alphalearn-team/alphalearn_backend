@@ -11,12 +11,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.example.demo.concept.Concept;
+import com.example.demo.weeklyquest.QuestTemplate;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
 import com.example.demo.weeklyquest.WeeklyQuestWeek;
 import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
+import com.example.demo.weeklyquest.enums.QuestSubmissionMode;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentSourceType;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentStatus;
 import com.example.demo.weeklyquest.enums.WeeklyQuestWeekStatus;
@@ -63,7 +65,7 @@ class LearnerWeeklyQuestQueryServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().weekStartAt()).isEqualTo(week.getWeekStartAt());
         assertThat(result.get().concept().title()).isEqualTo("fire");
-        assertThat(result.get().quest().instructionText()).contains("this week's concept");
+        assertThat(result.get().quest().instructionText()).contains("assigned concept");
         assertThat(result.get().questChallengeSubmission()).isNull();
     }
 
@@ -106,9 +108,16 @@ class LearnerWeeklyQuestQueryServiceTest {
         concept.setTitle("fire");
         concept.setDescription("Describes something intense.");
 
+        QuestTemplate template = new QuestTemplate();
+        ReflectionTestUtils.setField(template, "publicId", UUID.randomUUID());
+        template.setTitle("Video + Caption");
+        template.setInstructionText("Record a short video and write a caption using the assigned concept.");
+        template.setSubmissionMode(QuestSubmissionMode.VIDEO_WITH_CAPTION);
+
         WeeklyQuestAssignment assignment = new WeeklyQuestAssignment();
         assignment.setWeek(week);
         assignment.setConcept(concept);
+        assignment.setQuestTemplate(template);
         assignment.setOfficial(true);
         assignment.setSourceType(sourceType);
         assignment.setStatus(WeeklyQuestAssignmentStatus.ACTIVE);

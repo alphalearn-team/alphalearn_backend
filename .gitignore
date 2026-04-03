@@ -35,13 +35,8 @@ build/
 ### Local secrets ###
 application-local.properties
 .env
-.env.shared
 .env.local
-.env.production
 docker/backend.env
-
-### Node ###
-node_modules/
 
 ### OS files ###
 .DS_Store
