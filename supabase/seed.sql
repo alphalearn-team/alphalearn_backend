@@ -3,6 +3,89 @@
 
 begin;
 
+-- Local admin auth user for development login:
+-- email: admin@gmail.com
+-- password: 123456
+with upserted_admin_user as (
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  is_super_admin,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  '8a7a21d2-f77e-4f55-8a9c-3d7d3b2b62cb'::uuid,
+  'authenticated',
+  'authenticated',
+  'admin@gmail.com',
+  crypt('123456', gen_salt('bf')),
+  now(),
+  now(),
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{}'::jsonb,
+  false,
+  '',
+  '',
+  '',
+  ''
+)
+on conflict (email) where (is_sso_user = false) do update
+set
+  id = excluded.id,
+  email = excluded.email,
+  encrypted_password = excluded.encrypted_password,
+  email_confirmed_at = excluded.email_confirmed_at,
+  updated_at = now(),
+  raw_app_meta_data = excluded.raw_app_meta_data,
+  raw_user_meta_data = excluded.raw_user_meta_data
+returning id
+)
+insert into auth.identities (
+  user_id,
+  provider_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+)
+select
+  id,
+  id::text,
+  jsonb_build_object(
+    'sub', id::text,
+    'email', 'admin@gmail.com',
+    'email_verified', true,
+    'phone_verified', false
+  ),
+  'email',
+  now(),
+  now()
+from upserted_admin_user
+on conflict (provider_id, provider) do update
+set
+  user_id = excluded.user_id,
+  identity_data = excluded.identity_data,
+  updated_at = now();
+
+insert into public.admins (admin_id, created_at)
+select id, now() from auth.users where email = 'admin@gmail.com'
+on conflict (admin_id) do update
+set created_at = admins.created_at;
+
 insert into public.concepts (public_id, title, description, created_at)
 values
   ('3f125211-fe25-46e8-9f8a-2d51725b98fa'::uuid, 'Cringe', 'Cringe means to feel extreme embarrassment, awkwardness, or discomfort, often accompanied by a physical reaction like wincing or pulling back', now()),
@@ -30,11 +113,5 @@ set
   title = excluded.title,
   description = excluded.description;
 
--- Admin bootstrap: if this auth user exists, ensure admin role exists.
-insert into public.admins (admin_id)
-select u.id
-from auth.users u
-where u.email in ('jiugeng45@gmail.com')
-on conflict (admin_id) do nothing;
 
 commit;

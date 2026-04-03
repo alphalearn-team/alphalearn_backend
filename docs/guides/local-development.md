@@ -10,6 +10,10 @@
 
 Install Supabase CLI globally on your machine, then verify:
 
+See platform-specific instructions:
+
+- [Supabase CLI Install Guide (Windows + macOS)](./supabase-cli-install.md)
+
 ```bash
 supabase --version
 ```
@@ -48,10 +52,6 @@ Keep these local DB values unless you changed ports:
 - `DB_PASSWORD=postgres`
 - `SUPABASE_JWT_JWKS_URL=http://127.0.0.1:54321/auth/v1/.well-known/jwks.json`
 
-Optional JWT fallback (only if you intentionally use HMAC fallback):
-
-- `SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long`
-
 ## 5) Initialize or update local DB (choose one)
 
 ### Option A (recommended for first-time setup): clean reset
@@ -79,10 +79,22 @@ Default mode (`.env.shared + .env.local`):
 ./run_local.sh
 ```
 
+Windows:
+
+```bat
+run_local.cmd
+```
+
 Production-like mode (`.env.shared + .env.production`):
 
 ```bash
 ./run_local.sh production
+```
+
+Windows:
+
+```bat
+run_local.cmd production
 ```
 
 ## 7) Run tests
@@ -93,14 +105,27 @@ Default mode:
 ./test_local.sh
 ```
 
+Windows:
+
+```bat
+test_local.cmd
+```
+
 Production-like mode:
 
 ```bash
 ./test_local.sh production
 ```
 
+Windows:
+
+```bat
+test_local.cmd production
+```
+
 ## Local endpoints
 
+- Supabase Studio: `http://127.0.0.1:54323`
 - Health: `http://localhost:8080/health`
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
