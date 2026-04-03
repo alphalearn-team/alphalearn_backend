@@ -17,7 +17,6 @@ import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConc
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
-import com.example.demo.me.imposter.dto.CompleteImposterDrawingTurnRequest;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.ImposterConceptResolution;
 import com.example.demo.me.imposter.dto.ImposterConceptWinnerSide;
@@ -80,7 +79,6 @@ public class LearnerImposterLobbyService {
     private static final String LOBBY_CODE_UNIQUE_CONSTRAINT = "uk_imposter_game_lobbies_lobby_code";
     private static final String MEMBER_UNIQUE_CONSTRAINT = "uk_imposter_game_lobby_members_lobby_learner";
     private static final String DRAWING_VERSION_CONFLICT_MESSAGE = "Drawing version conflict";
-    private static final String TURN_TIMER_AUTHORITATIVE_MESSAGE = "Drawing turns are timer-controlled in realtime mode";
 
     private enum WinnerSide {
         IMPOSTER,
@@ -434,15 +432,6 @@ public class LearnerImposterLobbyService {
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId());
         publishRealtimeState(savedLobby, user.userId(), "DRAWING_LIVE");
         return state;
-    }
-
-    @Transactional
-    public PrivateImposterLobbyStateDto completeDrawingTurn(
-            SupabaseAuthUser user,
-            UUID lobbyPublicId,
-            CompleteImposterDrawingTurnRequest request
-    ) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, TURN_TIMER_AUTHORITATIVE_MESSAGE);
     }
 
     @Transactional
