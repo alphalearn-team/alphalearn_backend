@@ -475,6 +475,9 @@ public class LearnerImposterLobbyService {
         if (voteTargetLearnerId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vote target");
         }
+        if (voteTargetLearnerId.equals(user.userId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot vote for yourself");
+        }
 
         Set<UUID> eligibleTargets = new LinkedHashSet<>(deserializeUuidList(lobby.getVotingEligibleTargetLearnerIds()));
         if (!eligibleTargets.contains(voteTargetLearnerId)) {
