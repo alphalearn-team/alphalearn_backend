@@ -3,6 +3,7 @@ package com.example.demo.me.imposter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -34,6 +35,7 @@ import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
+import com.example.demo.me.imposter.dto.SubmitImposterVoteRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -532,6 +534,46 @@ class LearnerImposterLobbyServiceTest {
         assertThat(result.viewerIsActiveMember()).isTrue();
         assertThat(result.canLeave()).isTrue();
         assertThat(result.canStart()).isTrue();
+    }
+
+    @Test
+    void submitVoteRejectsSelfVote() {
+        SupabaseAuthUser voter = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.VOTING);
+        lobby.setVotingRoundNumber(1);
+        lobby.setVotingDeadlineAt(OffsetDateTime.parse("2026-04-02T00:10:00Z"));
+
+        UUID otherLearnerId1 = UUID.randomUUID();
+        UUID otherLearnerId2 = UUID.randomUUID();
+        lobby.setVotingEligibleTargetLearnerIds(voter.userId() + "," + otherLearnerId1 + "," + otherLearnerId2);
+
+        ImposterGameLobbyMember voterMember = existingMember(lobby, voter.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember otherMember1 = existingMember(lobby, otherLearnerId1, "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember otherMember2 = existingMember(lobby, otherLearnerId2, "2026-04-01T12:10:00Z");
+
+        Learner voterLearner = learner(voter.userId(), "voter");
+        Learner otherLearner1 = learner(otherLearnerId1, "other-1");
+        Learner otherLearner2 = learner(otherLearnerId2, "other-2");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voter.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(voterMember, otherMember1, otherMember2));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(voterLearner, otherLearner1, otherLearner2));
+
+        assertThatThrownBy(() -> service.submitVote(
+                voter,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(voterLearner.getPublicId())
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("cannot vote for yourself");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
     }
 
     @Test
