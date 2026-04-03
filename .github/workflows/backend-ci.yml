@@ -42,6 +42,9 @@ jobs:
           DB_USER: ${{ secrets.CI_DB_USER }}
           DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
           SUPABASE_JWT_JWKS_URL: ${{ secrets.CI_SUPABASE_JWKS_URL }}
+          CLOUDFLARE_R2_ENABLED: "false"
+          CLOUDFLARE_R2_PRESIGN_EXPIRY_MINUTES: "15"
+          CLOUDFLARE_R2_MAX_UPLOAD_SIZE_BYTES: "52428800"
         run: ./mvnw -B clean verify
 
       - name: Build backend Docker image
