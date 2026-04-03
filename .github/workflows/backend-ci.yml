@@ -40,9 +40,15 @@ jobs:
         with:
           version: latest
 
-      - name: Apply pending Supabase migrations
+      - name: Verify postgres connectivity
         run: |
-          supabase migration up --db-url "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable" -c "select version();"
+
+      - name: Apply pending Supabase migrations
+        env:
+          PGSSLMODE: disable
+        run: |
+          supabase migration up --debug --db-url "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
 
       - name: Build and run tests
         env:
