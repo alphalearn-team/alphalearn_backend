@@ -4,6 +4,7 @@ import com.example.demo.config.websocket.ImposterGameWebSocketConfig;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,8 +14,8 @@ public class ImposterLobbyRealtimePublisher {
     private final SimpMessagingTemplate messagingTemplate;
     private final Clock clock;
 
-    public ImposterLobbyRealtimePublisher(SimpMessagingTemplate messagingTemplate, Clock clock) {
-        this.messagingTemplate = messagingTemplate;
+    public ImposterLobbyRealtimePublisher(ObjectProvider<SimpMessagingTemplate> messagingTemplateProvider, Clock clock) {
+        this.messagingTemplate = messagingTemplateProvider.getIfAvailable();
         this.clock = clock;
     }
 
@@ -27,6 +28,10 @@ public class ImposterLobbyRealtimePublisher {
     }
 
     public void publishSharedLobbyState(UUID lobbyPublicId, Integer stateVersion, String reason, Object state) {
+        if (messagingTemplate == null) {
+            return;
+        }
+
         ImposterLobbyRealtimeEnvelope envelope = new ImposterLobbyRealtimeEnvelope(
                 "LOBBY_STATE",
                 lobbyPublicId,
@@ -45,7 +50,7 @@ public class ImposterLobbyRealtimePublisher {
             String reason,
             Object state
     ) {
-        if (learnerId == null) {
+        if (learnerId == null || messagingTemplate == null) {
             return;
         }
 
