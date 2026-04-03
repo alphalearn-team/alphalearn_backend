@@ -1,12 +1,9 @@
 alter table if exists public.weekly_quest_assignments
     drop constraint if exists weekly_quest_assignments_quest_template_id_fkey;
-
 alter table if exists public.weekly_quest_assignments
     drop column if exists quest_template_id;
-
 drop table if exists public.quest_templates;
 drop sequence if exists public.quest_templates_id_seq;
-
 do $$
 begin
     if exists (

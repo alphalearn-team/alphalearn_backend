@@ -8,11 +8,20 @@
 
 ## 2) Install Supabase CLI
 
-Install Supabase CLI globally on your machine, then verify:
+Install Supabase CLI using one of these methods:
 
 See platform-specific instructions:
 
 - [Supabase CLI Install Guide (Windows + macOS)](./supabase-cli-install.md)
+
+Project-pinned npm method (recommended):
+
+```bash
+npm install supabase --save-dev
+npx supabase --version
+```
+
+Global install methods (brew/scoop) are also documented in the guide above.
 
 ```bash
 supabase --version
@@ -121,6 +130,33 @@ Windows:
 
 ```bat
 test_local.cmd production
+```
+
+## 8) Run CI-parity check against hosted Supabase
+
+Create CI env file template:
+
+```bash
+cp .env.ci.example .env.ci
+```
+
+Fill `.env.ci` with:
+
+- `CI_DB_URL_JDBC`
+- `CI_DB_USER`
+- `CI_DB_PASSWORD`
+- `CI_SUPABASE_JWKS_URL`
+
+Run CI-parity check:
+
+```bash
+./ci_check.sh
+```
+
+Windows:
+
+```bat
+ci_check.cmd
 ```
 
 ## Local endpoints

@@ -8,8 +8,9 @@ REM   run_local.cmd production -> loads .env.shared + .env.production
 set "MODE=%~1"
 if "%MODE%"=="" set "MODE=local"
 
-set "ENV_SHARED=.env.shared"
-set "ENV_MODE=.env.%MODE%"
+set "SCRIPT_DIR=%~dp0"
+set "ENV_SHARED=%SCRIPT_DIR%.env.shared"
+set "ENV_MODE=%SCRIPT_DIR%.env.%MODE%"
 
 if not exist "%ENV_SHARED%" (
   echo Error: %ENV_SHARED% not found. Create it with shared settings.
@@ -25,7 +26,7 @@ echo Loading env files: %ENV_SHARED% + %ENV_MODE%
 call :load_env "%ENV_SHARED%" || exit /b 1
 call :load_env "%ENV_MODE%" || exit /b 1
 
-call mvnw.cmd spring-boot:run
+call "%SCRIPT_DIR%mvnw.cmd" spring-boot:run
 exit /b %errorlevel%
 
 :load_env

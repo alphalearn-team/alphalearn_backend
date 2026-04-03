@@ -4,11 +4,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
+import com.example.demo.game.imposter.lobby.ImposterLobbyPhase;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
 import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
@@ -17,6 +19,7 @@ import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
+import com.example.demo.me.imposter.dto.UpdatePrivateImposterLobbySettingsRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -157,6 +160,21 @@ class MeImposterLobbyControllerTest {
     }
 
     @Test
+    void updatePrivateLobbySettingsReturnsState() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UpdatePrivateImposterLobbySettingsRequest request = new UpdatePrivateImposterLobbySettingsRequest(4, 2, 45, 35, 20);
+        PrivateImposterLobbyStateDto state = stateDto(lobbyPublicId, null, 3, true, true);
+
+        when(learnerImposterLobbyService.updatePrivateLobbySettings(any(), eq(lobbyPublicId), eq(request))).thenReturn(state);
+
+        mockMvc.perform(patch("/api/me/imposter/lobbies/private/{lobbyPublicId}/settings", lobbyPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()));
+    }
+
+    @Test
     void joinPrivateLobbyReturnsBadRequestWhenServiceRejects() throws Exception {
         JoinPrivateImposterLobbyRequest request = new JoinPrivateImposterLobbyRequest("  ");
 
@@ -193,6 +211,10 @@ class MeImposterLobbyControllerTest {
                 true,
                 ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL,
                 null,
+                3,
+                1,
+                30,
+                30,
                 OffsetDateTime.parse("2026-04-01T00:00:00Z"),
                 startedAt,
                 activeCount,
@@ -200,7 +222,39 @@ class MeImposterLobbyControllerTest {
                 true,
                 true,
                 canLeave,
-                canStart
+                canStart,
+                null,
+                null,
+                null,
+                25,
+                null,
+                null,
+                false,
+                false,
+                false,
+                false,
+                null,
+                0,
+                ImposterLobbyPhase.DRAWING,
+                1,
+                3,
+                List.of(),
+                null,
+                3,
+                10,
+                120,
+                0,
+                null,
+                null,
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null
         );
     }
 }

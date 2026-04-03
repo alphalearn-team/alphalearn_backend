@@ -2,6 +2,35 @@
 
 Use this guide to install Supabase CLI for local development.
 
+## Cross-platform (npm, recommended for this repo)
+
+Use this when you want the CLI version pinned to the project.
+
+Prerequisite: Node.js 20+.
+
+Install Supabase CLI as a dev dependency:
+
+```bash
+npm install supabase --save-dev
+```
+
+Run CLI commands with `npx`:
+
+```bash
+npx supabase --version
+npx supabase start
+```
+
+Update later:
+
+```bash
+npm update supabase --save-dev
+```
+
+Reference:
+
+- [Supabase CLI Docs](https://supabase.com/docs/guides/local-development/cli/getting-started)
+
 ## Windows
 
 Primary walkthrough (community guide):

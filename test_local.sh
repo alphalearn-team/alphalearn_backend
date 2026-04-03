@@ -5,11 +5,14 @@
 #
 # Runs backend test suite with layered env files.
 
-set -euo pipefail
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 
 MODE="${1:-local}"
-ENV_SHARED=".env.shared"
-ENV_MODE=".env.${MODE}"
+ENV_SHARED="${SCRIPT_DIR}/.env.shared"
+ENV_MODE="${SCRIPT_DIR}/.env.${MODE}"
 
 if [ ! -f "$ENV_SHARED" ]; then
   echo "Error: $ENV_SHARED not found. Create it with shared settings." >&2
@@ -24,8 +27,8 @@ fi
 echo "Loading env files: $ENV_SHARED + $ENV_MODE"
 
 set -a
-source "$ENV_SHARED"
-source "$ENV_MODE"
+. "$ENV_SHARED"
+. "$ENV_MODE"
 set +a
 
-./mvnw test
+"${SCRIPT_DIR}/mvnw" test

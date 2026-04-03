@@ -21,30 +21,31 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Validate DB env
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply migrations to hosted CI DB
         env:
-          DB_URL: ${{ secrets.DB_URL }}
+          CI_DB_URL_JDBC: ${{ secrets.CI_DB_URL_JDBC }}
+          CI_DB_USER: ${{ secrets.CI_DB_USER }}
+          CI_DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
         run: |
-          if [ -z "$DB_URL" ]; then
-            echo "DB_URL is empty"
-            exit 1
-          fi
-          if echo "$DB_URL" | grep -q '^\${'; then
-            echo "DB_URL unresolved placeholder"
-            exit 1
-          fi
-          if ! echo "$DB_URL" | grep -q '^jdbc:postgresql://'; then
-            echo "DB_URL must start with jdbc:postgresql://"
-            exit 1
-          fi
+          ENCODED_DB_PASSWORD="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["CI_DB_PASSWORD"], safe=""))')"
+          PG_URL="postgresql://${CI_DB_USER}:${ENCODED_DB_PASSWORD}@${CI_DB_URL_JDBC#jdbc:postgresql://}"
+          supabase migration up --db-url "$PG_URL"
 
       - name: Build and run tests
         env:
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          SUPABASE_JWT_JWKS_URL: ${{ vars.SUPABASE_JWT_JWKS_URL }}
-        run: mvn -B clean verify
+          DB_URL: ${{ secrets.CI_DB_URL_JDBC }}
+          DB_USER: ${{ secrets.CI_DB_USER }}
+          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+          SUPABASE_JWT_JWKS_URL: ${{ secrets.CI_SUPABASE_JWKS_URL }}
+          CLOUDFLARE_R2_ENABLED: "false"
+          CLOUDFLARE_R2_PRESIGN_EXPIRY_MINUTES: "15"
+          CLOUDFLARE_R2_MAX_UPLOAD_SIZE_BYTES: "52428800"
+        run: ./mvnw -B clean verify
 
       - name: Build backend Docker image
         run: docker build -f docker/backend.Dockerfile -t alphalearn-backend:${{ github.sha }} .

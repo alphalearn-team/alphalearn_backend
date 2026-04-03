@@ -31,4 +31,12 @@ public class SupabaseAuthenticationToken extends AbstractAuthenticationToken {
     public SupabaseAuthUser getPrincipal() {
         return principal;
     }
+
+    @Override
+    public String getName() {
+        if (principal != null && principal.userId() != null) {
+            return principal.userId().toString();
+        }
+        return token == null || token.getSubject() == null ? "" : token.getSubject();
+    }
 }
