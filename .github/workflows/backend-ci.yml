@@ -42,7 +42,7 @@ jobs:
 
       - name: Apply pending Supabase migrations
         run: |
-          supabase migration up --db-url "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+          supabase migration up --db-url "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
 
       - name: Build and run tests
         env:
