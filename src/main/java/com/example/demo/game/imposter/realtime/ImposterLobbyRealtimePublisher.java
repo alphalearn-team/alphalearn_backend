@@ -22,7 +22,11 @@ public class ImposterLobbyRealtimePublisher {
         return ImposterGameWebSocketConfig.IMP_LOBBY_TOPIC_PREFIX + "/" + lobbyPublicId;
     }
 
-    public void publishLobbyState(UUID lobbyPublicId, Integer stateVersion, String reason, Object state) {
+    public String userQueueForLobby(UUID lobbyPublicId) {
+        return "/queue/imposter/lobbies/" + lobbyPublicId;
+    }
+
+    public void publishSharedLobbyState(UUID lobbyPublicId, Integer stateVersion, String reason, Object state) {
         ImposterLobbyRealtimeEnvelope envelope = new ImposterLobbyRealtimeEnvelope(
                 "LOBBY_STATE",
                 lobbyPublicId,
@@ -32,5 +36,31 @@ public class ImposterLobbyRealtimePublisher {
                 state
         );
         messagingTemplate.convertAndSend(topicForLobby(lobbyPublicId), envelope);
+    }
+
+    public void publishViewerLobbyState(
+            UUID lobbyPublicId,
+            UUID learnerId,
+            Integer stateVersion,
+            String reason,
+            Object state
+    ) {
+        if (learnerId == null) {
+            return;
+        }
+
+        ImposterLobbyRealtimeEnvelope envelope = new ImposterLobbyRealtimeEnvelope(
+                "VIEWER_STATE",
+                lobbyPublicId,
+                stateVersion,
+                reason,
+                OffsetDateTime.now(clock),
+                state
+        );
+        messagingTemplate.convertAndSendToUser(
+                learnerId.toString(),
+                userQueueForLobby(lobbyPublicId),
+                envelope
+        );
     }
 }

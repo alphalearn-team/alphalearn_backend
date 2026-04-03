@@ -28,7 +28,9 @@ import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyPlayerScoreDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbySharedStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyViewerStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyVoteTallyDto;
 import com.example.demo.me.imposter.dto.SubmitImposterGuessRequest;
 import com.example.demo.me.imposter.dto.SubmitImposterVoteRequest;
@@ -207,7 +209,7 @@ public class LearnerImposterLobbyService {
             ImposterGameLobbyMember rejoinedMember = imposterGameLobbyMemberRepository.saveAndFlush(historicalMember);
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "JOIN_REJOIN");
+            publishRealtimeState(savedLobby, "JOIN_REJOIN");
             return JoinedPrivateImposterLobbyDto.from(savedLobby, rejoinedMember, false);
         }
 
@@ -215,7 +217,7 @@ public class LearnerImposterLobbyService {
             ImposterGameLobbyMember createdMember = createMembership(lobby, user.userId());
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "JOIN");
+            publishRealtimeState(savedLobby, "JOIN");
             return JoinedPrivateImposterLobbyDto.from(savedLobby, createdMember, false);
         } catch (DataIntegrityViolationException ex) {
             if (isMemberUniqueViolation(ex)) {
@@ -277,7 +279,7 @@ public class LearnerImposterLobbyService {
                 ? PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST
                 : PrivateImposterLobbyLeaveResult.LEFT;
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
-        publishRealtimeState(savedLobby, user.userId(), leavingHost ? "LEAVE_HOST_TRANSFER" : "LEAVE");
+        publishRealtimeState(savedLobby, leavingHost ? "LEAVE_HOST_TRANSFER" : "LEAVE");
         return new LeavePrivateImposterLobbyResponse(result, state);
     }
 
@@ -326,7 +328,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId());
-        publishRealtimeState(savedLobby, user.userId(), "SETTINGS");
+        publishRealtimeState(savedLobby, "SETTINGS");
         return state;
     }
 
@@ -372,7 +374,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
-        publishRealtimeState(savedLobby, user.userId(), "START");
+        publishRealtimeState(savedLobby, "START");
         return state;
     }
 
@@ -388,7 +390,7 @@ public class LearnerImposterLobbyService {
         if (transitioned) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "STATE_RECONCILE");
+            publishRealtimeState(savedLobby, "STATE_RECONCILE");
             return buildLobbyState(savedLobby, user.userId(), activeMembers);
         }
 
@@ -418,7 +420,7 @@ public class LearnerImposterLobbyService {
         if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.DRAWING) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "TURN_EXPIRED");
+            publishRealtimeState(savedLobby, "TURN_EXPIRED");
             return buildLobbyState(savedLobby, user.userId());
         }
 
@@ -430,7 +432,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId());
-        publishRealtimeState(savedLobby, user.userId(), "DRAWING_LIVE");
+        publishRealtimeState(savedLobby, "DRAWING_LIVE");
         return state;
     }
 
@@ -456,7 +458,7 @@ public class LearnerImposterLobbyService {
         if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.VOTING) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "STATE_RECONCILE");
+            publishRealtimeState(savedLobby, "STATE_RECONCILE");
             return buildLobbyState(savedLobby, user.userId(), activeMembers);
         }
         ensurePhase(lobby, ImposterLobbyPhase.VOTING, "Voting is not active");
@@ -490,7 +492,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
-        publishRealtimeState(savedLobby, user.userId(), "VOTE");
+        publishRealtimeState(savedLobby, "VOTE");
         return state;
     }
 
@@ -516,7 +518,7 @@ public class LearnerImposterLobbyService {
         if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.IMPOSTER_GUESS) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, user.userId(), "STATE_RECONCILE");
+            publishRealtimeState(savedLobby, "STATE_RECONCILE");
             return buildLobbyState(savedLobby, user.userId(), activeMembers);
         }
         ensurePhase(lobby, ImposterLobbyPhase.IMPOSTER_GUESS, "Imposter guess is not active");
@@ -559,7 +561,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
-        publishRealtimeState(savedLobby, user.userId(), "GUESS");
+        publishRealtimeState(savedLobby, "GUESS");
         return state;
     }
 
@@ -614,7 +616,7 @@ public class LearnerImposterLobbyService {
         if (transitioned) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, savedLobby.getHostLearnerId(), "DEADLINE_ADVANCE", activeMembers);
+            publishRealtimeState(savedLobby, "DEADLINE_ADVANCE", activeMembers);
         }
     }
 
@@ -1171,6 +1173,15 @@ public class LearnerImposterLobbyService {
             List<ImposterGameLobbyMember> activeMembers
     ) {
         Map<UUID, Learner> learnersById = loadLearnersByIdForState(activeMembers, lobby);
+        return buildLobbyState(lobby, viewerLearnerId, activeMembers, learnersById);
+    }
+
+    private PrivateImposterLobbyStateDto buildLobbyState(
+            ImposterGameLobby lobby,
+            UUID viewerLearnerId,
+            List<ImposterGameLobbyMember> activeMembers,
+            Map<UUID, Learner> learnersById
+    ) {
         List<PrivateImposterLobbyMemberStateDto> activeMemberDtos = activeMembers.stream()
                 .map(member -> {
                     Learner learner = learnersById.get(member.getLearnerId());
@@ -1274,6 +1285,58 @@ public class LearnerImposterLobbyService {
         );
     }
 
+    private PrivateImposterLobbySharedStateDto buildSharedLobbyState(PrivateImposterLobbyStateDto state) {
+        return new PrivateImposterLobbySharedStateDto(
+                state.publicId(),
+                state.lobbyCode(),
+                state.isPrivate(),
+                state.conceptPoolMode(),
+                state.pinnedYearMonth(),
+                state.conceptCount(),
+                state.roundsPerConcept(),
+                state.discussionTimerSeconds(),
+                state.imposterGuessTimerSeconds(),
+                state.createdAt(),
+                state.startedAt(),
+                state.activeMemberCount(),
+                state.activeMembers(),
+                state.currentDrawerPublicId(),
+                state.currentTurnIndex(),
+                state.totalTurns(),
+                state.turnDurationSeconds(),
+                state.turnStartedAt(),
+                state.turnEndsAt(),
+                state.isRoundComplete(),
+                state.currentDrawingSnapshot(),
+                state.drawingVersion(),
+                state.currentPhase(),
+                state.currentConceptIndex(),
+                state.totalConcepts(),
+                state.playerScores(),
+                state.latestConceptResult(),
+                state.maxVotingRounds(),
+                state.minTimerSeconds(),
+                state.maxTimerSeconds(),
+                state.stateVersion(),
+                state.conceptResultDeadlineAt(),
+                state.eligibleVoteTargetPublicIds(),
+                state.votingRoundNumber(),
+                state.votingDeadlineAt(),
+                state.votedOutPublicId(),
+                state.imposterGuessDeadlineAt(),
+                state.lastImposterGuess(),
+                state.lastImposterGuessCorrect()
+        );
+    }
+
+    private PrivateImposterLobbyViewerStateDto buildViewerLobbyState(PrivateImposterLobbyStateDto state) {
+        return new PrivateImposterLobbyViewerStateDto(
+                state.viewerVoteTargetPublicId(),
+                state.viewerIsImposter(),
+                state.viewerConceptTitle()
+        );
+    }
+
     private Map<UUID, Learner> loadLearnersByIdForState(List<ImposterGameLobbyMember> activeMembers, ImposterGameLobby lobby) {
         Set<UUID> learnerIds = new LinkedHashSet<>(activeMembers.stream().map(ImposterGameLobbyMember::getLearnerId).toList());
         learnerIds.addAll(deserializeScoreMap(lobby.getPlayerScores()).keySet());
@@ -1374,25 +1437,41 @@ public class LearnerImposterLobbyService {
         return user;
     }
 
-    private void publishRealtimeState(ImposterGameLobby lobby, UUID viewerLearnerId, String reason) {
+    private void publishRealtimeState(ImposterGameLobby lobby, String reason) {
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
-        publishRealtimeState(lobby, viewerLearnerId, reason, activeMembers);
+        publishRealtimeState(lobby, reason, activeMembers);
     }
 
     private void publishRealtimeState(
             ImposterGameLobby lobby,
-            UUID viewerLearnerId,
             String reason,
             List<ImposterGameLobbyMember> activeMembers
     ) {
-        PrivateImposterLobbyStateDto state = buildLobbyState(lobby, null, activeMembers);
-        realtimePublisher.publishLobbyState(
+        Map<UUID, Learner> learnersById = loadLearnersByIdForState(activeMembers, lobby);
+        PrivateImposterLobbyStateDto sharedBase = buildLobbyState(lobby, null, activeMembers, learnersById);
+        realtimePublisher.publishSharedLobbyState(
                 lobby.getPublicId(),
                 defaultStateVersion(lobby),
                 reason,
-                state
+                buildSharedLobbyState(sharedBase)
         );
+
+        for (ImposterGameLobbyMember activeMember : activeMembers) {
+            PrivateImposterLobbyStateDto viewerState = buildLobbyState(
+                    lobby,
+                    activeMember.getLearnerId(),
+                    activeMembers,
+                    learnersById
+            );
+            realtimePublisher.publishViewerLobbyState(
+                    lobby.getPublicId(),
+                    activeMember.getLearnerId(),
+                    defaultStateVersion(lobby),
+                    reason,
+                    buildViewerLobbyState(viewerState)
+            );
+        }
     }
 
     private String normalizeLobbyCode(String lobbyCode) {

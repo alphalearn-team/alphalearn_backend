@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final Pattern LOBBY_TOPIC_PATTERN = Pattern.compile("^/topic/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
+    private static final Pattern LOBBY_USER_QUEUE_PATTERN = Pattern.compile("^/user/queue/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
     private static final Pattern LOBBY_APP_PATTERN = Pattern.compile(
             "^/app/imposter/lobbies/([0-9a-fA-F\\-]{36})/(drawing/live|vote|guess)$"
     );
@@ -96,7 +97,9 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
 
         UUID lobbyPublicId = extractLobbyPublicId(destination);
         if (lobbyPublicId == null) {
-            if (destination.startsWith("/app/imposter") || destination.startsWith("/topic/imposter")) {
+            if (destination.startsWith("/app/imposter")
+                    || destination.startsWith("/topic/imposter")
+                    || destination.startsWith("/user/queue/imposter")) {
                 throw new AccessDeniedException("Unsupported imposter websocket destination");
             }
             return;
@@ -110,8 +113,12 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
             throw new AccessDeniedException("Active lobby membership required");
         }
 
-        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand()) && !LOBBY_TOPIC_PATTERN.matcher(destination).matches()) {
-            throw new AccessDeniedException("Invalid imposter websocket subscribe destination");
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            boolean validTopicSubscribe = LOBBY_TOPIC_PATTERN.matcher(destination).matches();
+            boolean validUserQueueSubscribe = LOBBY_USER_QUEUE_PATTERN.matcher(destination).matches();
+            if (!validTopicSubscribe && !validUserQueueSubscribe) {
+                throw new AccessDeniedException("Invalid imposter websocket subscribe destination");
+            }
         }
 
         if (StompCommand.SEND.equals(accessor.getCommand()) && !LOBBY_APP_PATTERN.matcher(destination).matches()) {
@@ -123,6 +130,11 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
         Matcher topicMatcher = LOBBY_TOPIC_PATTERN.matcher(destination);
         if (topicMatcher.matches()) {
             return UUID.fromString(topicMatcher.group(1));
+        }
+
+        Matcher userQueueMatcher = LOBBY_USER_QUEUE_PATTERN.matcher(destination);
+        if (userQueueMatcher.matches()) {
+            return UUID.fromString(userQueueMatcher.group(1));
         }
 
         Matcher appMatcher = LOBBY_APP_PATTERN.matcher(destination);
