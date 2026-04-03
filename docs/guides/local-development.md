@@ -48,10 +48,6 @@ Keep these local DB values unless you changed ports:
 - `DB_PASSWORD=postgres`
 - `SUPABASE_JWT_JWKS_URL=http://127.0.0.1:54321/auth/v1/.well-known/jwks.json`
 
-Optional JWT fallback (only if you intentionally use HMAC fallback):
-
-- `SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long`
-
 ## 5) Initialize or update local DB (choose one)
 
 ### Option A (recommended for first-time setup): clean reset
@@ -101,6 +97,7 @@ Production-like mode:
 
 ## Local endpoints
 
+- Supabase Studio: `http://127.0.0.1:54323`
 - Health: `http://localhost:8080/health`
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
