@@ -9,6 +9,20 @@ jobs:
   verify:
     name: Backend CI
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
 
     steps:
       - name: Checkout code
@@ -21,29 +35,21 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Validate DB env
-        env:
-          DB_URL: ${{ secrets.DB_URL }}
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply pending Supabase migrations
         run: |
-          if [ -z "$DB_URL" ]; then
-            echo "DB_URL is empty"
-            exit 1
-          fi
-          if echo "$DB_URL" | grep -q '^\${'; then
-            echo "DB_URL unresolved placeholder"
-            exit 1
-          fi
-          if ! echo "$DB_URL" | grep -q '^jdbc:postgresql://'; then
-            echo "DB_URL must start with jdbc:postgresql://"
-            exit 1
-          fi
+          supabase migration up --db-url "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
 
       - name: Build and run tests
         env:
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          SUPABASE_JWT_JWKS_URL: ${{ vars.SUPABASE_JWT_JWKS_URL }}
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/postgres
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          SUPABASE_JWT_SECRET: test-secret-for-ci-only
         run: mvn -B clean verify
 
       - name: Build backend Docker image
