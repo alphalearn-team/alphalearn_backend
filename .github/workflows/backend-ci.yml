@@ -26,25 +26,23 @@ jobs:
         with:
           version: latest
 
-      - name: Start Supabase local stack
+      - name: Apply migrations to hosted CI DB
+        env:
+          CI_DB_URL_JDBC: ${{ secrets.CI_DB_URL_JDBC }}
+          CI_DB_USER: ${{ secrets.CI_DB_USER }}
+          CI_DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
         run: |
-          supabase start
-
-      - name: Reset local Supabase DB from migrations
-        run: |
-          supabase db reset --local --yes --debug
+          ENCODED_DB_PASSWORD="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["CI_DB_PASSWORD"], safe=""))')"
+          PG_URL="postgresql://${CI_DB_USER}:${ENCODED_DB_PASSWORD}@${CI_DB_URL_JDBC#jdbc:postgresql://}"
+          supabase migration up --db-url "$PG_URL"
 
       - name: Build and run tests
         env:
-          DB_URL: jdbc:postgresql://127.0.0.1:54322/postgres
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          SUPABASE_JWT_JWKS_URL: http://127.0.0.1:54321/auth/v1/.well-known/jwks.json
-        run: mvn -B clean verify
+          DB_URL: ${{ secrets.CI_DB_URL_JDBC }}
+          DB_USER: ${{ secrets.CI_DB_USER }}
+          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+          SUPABASE_JWT_JWKS_URL: ${{ secrets.CI_SUPABASE_JWKS_URL }}
+        run: ./mvnw -B clean verify
 
       - name: Build backend Docker image
         run: docker build -f docker/backend.Dockerfile -t alphalearn-backend:${{ github.sha }} .
-
-      - name: Stop Supabase local stack
-        if: always()
-        run: supabase stop
