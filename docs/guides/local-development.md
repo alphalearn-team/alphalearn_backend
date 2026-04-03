@@ -8,11 +8,20 @@
 
 ## 2) Install Supabase CLI
 
-Install Supabase CLI globally on your machine, then verify:
+Install Supabase CLI using one of these methods:
 
 See platform-specific instructions:
 
 - [Supabase CLI Install Guide (Windows + macOS)](./supabase-cli-install.md)
+
+Project-pinned npm method (recommended):
+
+```bash
+npm install supabase --save-dev
+npx supabase --version
+```
+
+Global install methods (brew/scoop) are also documented in the guide above.
 
 ```bash
 supabase --version
