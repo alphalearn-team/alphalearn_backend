@@ -79,10 +79,22 @@ Default mode (`.env.shared + .env.local`):
 ./run_local.sh
 ```
 
+Windows:
+
+```bat
+run_local.cmd
+```
+
 Production-like mode (`.env.shared + .env.production`):
 
 ```bash
 ./run_local.sh production
+```
+
+Windows:
+
+```bat
+run_local.cmd production
 ```
 
 ## 7) Run tests
@@ -93,10 +105,22 @@ Default mode:
 ./test_local.sh
 ```
 
+Windows:
+
+```bat
+test_local.cmd
+```
+
 Production-like mode:
 
 ```bash
 ./test_local.sh production
+```
+
+Windows:
+
+```bat
+test_local.cmd production
 ```
 
 ## Local endpoints
