@@ -7,6 +7,7 @@ import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
+import com.example.demo.me.imposter.dto.UpdatePrivateImposterLobbySettingsRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,6 +68,16 @@ public class MeImposterLobbyController {
             @PathVariable UUID lobbyPublicId
     ) {
         return learnerImposterLobbyService.startPrivateLobby(user, lobbyPublicId);
+    }
+
+    @PatchMapping("/private/{lobbyPublicId}/settings")
+    @Operation(summary = "Update private imposter lobby settings", description = "Host updates pre-game settings before the lobby starts")
+    public PrivateImposterLobbyStateDto updatePrivateLobbySettings(
+            @AuthenticationPrincipal SupabaseAuthUser user,
+            @PathVariable UUID lobbyPublicId,
+            @RequestBody UpdatePrivateImposterLobbySettingsRequest request
+    ) {
+        return learnerImposterLobbyService.updatePrivateLobbySettings(user, lobbyPublicId, request);
     }
 
     @GetMapping("/private/{lobbyPublicId}/state")
