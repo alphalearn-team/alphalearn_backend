@@ -1,5 +1,7 @@
 package com.example.demo.config.websocket;
 
+import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,9 +26,17 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     public static final String IMP_APP_PREFIX = "/app";
     public static final String IMP_WS_ENDPOINT = "/ws";
     private final ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor;
+    private final String[] allowedOriginPatterns;
 
-    public ImposterGameWebSocketConfig(ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor) {
+    public ImposterGameWebSocketConfig(
+            ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor,
+            @Value("${app.cors.allowed-origin-patterns:${app.cors.allowed-origins:${APP_CORS_ALLOWED_ORIGIN_PATTERNS:${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}}}}") String allowedOriginPatterns
+    ) {
         this.imposterStompAuthChannelInterceptor = imposterStompAuthChannelInterceptor;
+        this.allowedOriginPatterns = Arrays.stream(allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toArray(String[]::new);
     }
 
     @Override
@@ -39,7 +49,7 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint(IMP_WS_ENDPOINT)
-                .setAllowedOriginPatterns("http://localhost:3000", "http://127.0.0.1:3000")
+                .setAllowedOriginPatterns(allowedOriginPatterns)
                 .withSockJS();
     }
 
