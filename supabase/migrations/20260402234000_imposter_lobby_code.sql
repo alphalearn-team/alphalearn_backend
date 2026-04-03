@@ -1,6 +1,5 @@
 alter table if exists public.imposter_game_lobbies
     add column if not exists lobby_code varchar(8);
-
 create or replace function public.generate_imposter_lobby_code()
 returns text
 language plpgsql
@@ -17,7 +16,6 @@ begin
     return result;
 end;
 $$;
-
 do $$
 declare
     row_record record;
@@ -43,15 +41,11 @@ begin
     end loop;
 end;
 $$;
-
 alter table if exists public.imposter_game_lobbies
     add constraint uk_imposter_game_lobbies_lobby_code unique (lobby_code);
-
 alter table if exists public.imposter_game_lobbies
     add constraint ck_imposter_game_lobbies_lobby_code_format
         check (lobby_code ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$');
-
 alter table if exists public.imposter_game_lobbies
     alter column lobby_code set not null;
-
 drop function if exists public.generate_imposter_lobby_code();

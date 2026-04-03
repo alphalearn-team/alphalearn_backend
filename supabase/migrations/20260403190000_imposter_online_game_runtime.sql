@@ -41,7 +41,6 @@ alter table if exists public.imposter_game_lobbies
     add column if not exists concept_result_deadline_at timestamptz,
     add column if not exists max_voting_rounds integer,
     add column if not exists state_version integer;
-
 do $$
 begin
     if not exists (
@@ -55,7 +54,6 @@ begin
     end if;
 end
 $$;
-
 do $$
 begin
     if not exists (
@@ -69,22 +67,17 @@ begin
     end if;
 end
 $$;
-
 create index if not exists idx_imposter_game_lobbies_current_phase
     on public.imposter_game_lobbies (current_phase);
-
 create index if not exists idx_imposter_game_lobbies_turn_ends_at
     on public.imposter_game_lobbies (turn_ends_at)
     where turn_ends_at is not null;
-
 create index if not exists idx_imposter_game_lobbies_voting_deadline_at
     on public.imposter_game_lobbies (voting_deadline_at)
     where voting_deadline_at is not null;
-
 create index if not exists idx_imposter_game_lobbies_guess_deadline_at
     on public.imposter_game_lobbies (imposter_guess_deadline_at)
     where imposter_guess_deadline_at is not null;
-
 create index if not exists idx_imposter_game_lobbies_concept_result_deadline_at
     on public.imposter_game_lobbies (concept_result_deadline_at)
     where concept_result_deadline_at is not null;

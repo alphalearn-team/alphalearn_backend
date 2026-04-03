@@ -9,9 +9,7 @@ create table if not exists imposter_game_lobby_members (
         foreign key (learner_id) references learners(id) on delete cascade,
     constraint uk_imposter_game_lobby_members_lobby_learner unique (lobby_id, learner_id)
 );
-
 create index if not exists idx_imposter_game_lobby_members_lobby_id
     on imposter_game_lobby_members (lobby_id);
-
 create index if not exists idx_imposter_game_lobby_members_learner_id
     on imposter_game_lobby_members (learner_id);

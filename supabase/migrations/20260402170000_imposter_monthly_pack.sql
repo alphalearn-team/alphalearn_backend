@@ -7,7 +7,6 @@ create table if not exists imposter_monthly_packs (
     constraint uk_imposter_monthly_packs_year_month unique (year_month),
     constraint ck_imposter_monthly_packs_year_month_format check (year_month ~ '^[0-9]{4}-[0-9]{2}$')
 );
-
 create table if not exists imposter_monthly_pack_concepts (
     id bigserial primary key,
     pack_id bigint not null,
@@ -21,7 +20,6 @@ create table if not exists imposter_monthly_pack_concepts (
     constraint uk_imposter_pack_concepts_pack_concept unique (pack_id, concept_id),
     constraint ck_imposter_pack_concepts_slot_index check (slot_index between 1 and 20)
 );
-
 create table if not exists imposter_monthly_pack_weekly_features (
     id bigserial primary key,
     pack_id bigint not null,
