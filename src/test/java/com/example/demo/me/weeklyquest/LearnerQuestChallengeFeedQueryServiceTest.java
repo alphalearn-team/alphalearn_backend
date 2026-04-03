@@ -108,7 +108,7 @@ class LearnerQuestChallengeFeedQueryServiceTest {
         when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(learnerId, PageRequest.of(0, 20)))
                 .thenReturn(slice);
 
-        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20);
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, null, null, null);
 
         assertThat(result.page()).isEqualTo(0);
         assertThat(result.size()).isEqualTo(20);
@@ -122,7 +122,7 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsForbiddenWhenUserIsNotLearner() {
         SupabaseAuthUser user = new SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 20))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 20, null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -134,7 +134,7 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsBadRequestWhenPageIsNegative() {
         SupabaseAuthUser user = learnerUser(UUID.randomUUID());
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, -1, 20))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, -1, 20, null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -146,19 +146,76 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsBadRequestWhenSizeIsOutOfRange() {
         SupabaseAuthUser user = learnerUser(UUID.randomUUID());
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 0))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 0, null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 });
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 51))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 51, null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 });
+    }
+
+    @Test
+    void returnsPaginatedFriendsFeedWhenSubmittedRangeProvided() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-14T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-17T23:59:59Z");
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerIdAndSubmittedAtRange(
+                learnerId,
+                submittedFrom,
+                submittedTo,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, null, submittedFrom, submittedTo);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void throwsBadRequestWhenSubmittedRangeIsInvalid() {
+        SupabaseAuthUser user = learnerUser(UUID.randomUUID());
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-04-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 20, null, submittedFrom, submittedTo))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                });
+    }
+
+    @Test
+    void supportsOneSidedSubmittedRangeByNormalizingMissingTo() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-14T00:00:00Z");
+        OffsetDateTime normalizedSubmittedTo = OffsetDateTime.parse("9999-12-31T23:59:59Z");
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerIdAndSubmittedAtRange(
+                learnerId,
+                submittedFrom,
+                normalizedSubmittedTo,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, null, submittedFrom, null);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.items()).isEmpty();
     }
 
     private SupabaseAuthUser learnerUser(UUID learnerId) {

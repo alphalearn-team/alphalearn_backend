@@ -67,6 +67,35 @@ class QuestHistoryQueryServiceTest {
     }
 
     @Test
+    void getsMyHistoryBySubmittedAtRange() {
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-31T23:59:59Z");
+
+        when(submissionRepository.findMyQuestHistoryBySubmittedAtRange(
+                eq(learnerUser.userId()),
+                eq(submittedFrom),
+                eq(submittedTo),
+                eq(PageRequest.of(0, 20))
+        )).thenReturn(new SliceImpl<>(List.of()));
+
+        QuestHistoryDto result = service.getMyHistory(learnerUser, 0, 20, null, submittedFrom, submittedTo);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void rejectsMyHistoryWhenSubmittedRangeIsInvalid() {
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-04-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+
+        assertThatThrownBy(() -> service.getMyHistory(learnerUser, 0, 20, null, submittedFrom, submittedTo))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("submittedFrom must be less than or equal to submittedTo");
+    }
+
+    @Test
     void rejectsFriendHistoryWhenNotFriends() {
         UUID friendPublicId = UUID.randomUUID();
         Learner friend = new Learner(
@@ -105,6 +134,107 @@ class QuestHistoryQueryServiceTest {
                 .thenReturn(new SliceImpl<>(List.of()));
 
         QuestHistoryDto result = service.getFriendHistory(learnerUser, friendPublicId, 0, 20, null);
+
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void getsFriendHistoryBySubmittedAtRangeWhenFriends() {
+        UUID friendPublicId = UUID.randomUUID();
+        Learner friend = new Learner(
+                UUID.randomUUID(),
+                friendPublicId,
+                "friend",
+                OffsetDateTime.parse("2026-03-01T00:00:00Z"),
+                (short) 0
+        );
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-31T23:59:59Z");
+
+        when(learnerRepository.findByPublicId(friendPublicId)).thenReturn(Optional.of(friend));
+        when(friendRepository.existsFriendship(learnerUser.userId(), friend.getId())).thenReturn(true);
+        when(submissionRepository.findFriendQuestHistoryBySubmittedAtRange(
+                eq(friend.getId()),
+                eq(List.of(SubmissionVisibility.PUBLIC, SubmissionVisibility.FRIENDS)),
+                eq(submittedFrom),
+                eq(submittedTo),
+                any()))
+                .thenReturn(new SliceImpl<>(List.of()));
+
+        QuestHistoryDto result = service.getFriendHistory(
+                learnerUser,
+                friendPublicId,
+                0,
+                20,
+                null,
+                submittedFrom,
+                submittedTo
+        );
+
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void rejectsFriendHistoryWhenSubmittedRangeIsInvalid() {
+        UUID friendPublicId = UUID.randomUUID();
+        Learner friend = new Learner(
+                UUID.randomUUID(),
+                friendPublicId,
+                "friend",
+                OffsetDateTime.parse("2026-03-01T00:00:00Z"),
+                (short) 0
+        );
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-04-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+
+        when(learnerRepository.findByPublicId(friendPublicId)).thenReturn(Optional.of(friend));
+        when(friendRepository.existsFriendship(learnerUser.userId(), friend.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.getFriendHistory(
+                learnerUser,
+                friendPublicId,
+                0,
+                20,
+                null,
+                submittedFrom,
+                submittedTo
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("submittedFrom must be less than or equal to submittedTo");
+    }
+
+    @Test
+    void supportsOneSidedSubmittedRangeForFriendHistory() {
+        UUID friendPublicId = UUID.randomUUID();
+        Learner friend = new Learner(
+                UUID.randomUUID(),
+                friendPublicId,
+                "friend",
+                OffsetDateTime.parse("2026-03-01T00:00:00Z"),
+                (short) 0
+        );
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-14T00:00:00Z");
+        OffsetDateTime normalizedSubmittedTo = OffsetDateTime.parse("9999-12-31T23:59:59Z");
+
+        when(learnerRepository.findByPublicId(friendPublicId)).thenReturn(Optional.of(friend));
+        when(friendRepository.existsFriendship(learnerUser.userId(), friend.getId())).thenReturn(true);
+        when(submissionRepository.findFriendQuestHistoryBySubmittedAtRange(
+                eq(friend.getId()),
+                eq(List.of(SubmissionVisibility.PUBLIC, SubmissionVisibility.FRIENDS)),
+                eq(submittedFrom),
+                eq(normalizedSubmittedTo),
+                any()
+        )).thenReturn(new SliceImpl<>(List.of()));
+
+        QuestHistoryDto result = service.getFriendHistory(
+                learnerUser,
+                friendPublicId,
+                0,
+                20,
+                null,
+                submittedFrom,
+                null
+        );
 
         assertThat(result.items()).isEmpty();
     }
