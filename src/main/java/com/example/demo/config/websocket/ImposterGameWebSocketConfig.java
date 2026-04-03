@@ -2,6 +2,7 @@ package com.example.demo.config.websocket;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -13,6 +14,11 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     public static final String IMP_LOBBY_TOPIC_PREFIX = "/topic/imposter/lobbies";
     public static final String IMP_APP_PREFIX = "/app";
     public static final String IMP_WS_ENDPOINT = "/ws";
+    private final ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor;
+
+    public ImposterGameWebSocketConfig(ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor) {
+        this.imposterStompAuthChannelInterceptor = imposterStompAuthChannelInterceptor;
+    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -26,5 +32,10 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
         registry.addEndpoint(IMP_WS_ENDPOINT)
                 .setAllowedOriginPatterns("http://localhost:3000", "http://127.0.0.1:3000")
                 .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(imposterStompAuthChannelInterceptor);
     }
 }

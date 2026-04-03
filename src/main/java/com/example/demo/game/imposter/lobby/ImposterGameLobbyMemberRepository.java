@@ -16,4 +16,6 @@ public interface ImposterGameLobbyMemberRepository extends JpaRepository<Imposte
     long countByLobby_IdAndLeftAtIsNull(Long lobbyId);
 
     boolean existsByLobby_IdAndLearnerId(Long lobbyId, UUID learnerId);
+
+    boolean existsByLobby_IdAndLearnerIdAndLeftAtIsNull(Long lobbyId, UUID learnerId);
 }
