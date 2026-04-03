@@ -6,8 +6,6 @@ import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
@@ -23,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WeeklyQuestAutomationService {
     private static final Logger log = LoggerFactory.getLogger(WeeklyQuestAutomationService.class);
-    private static final String REMINDER_TYPE_MISSING_OFFICIAL = "MISSING_OFFICIAL_QUEST";
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
@@ -31,7 +28,6 @@ public class WeeklyQuestAutomationService {
     private final ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
     private final Clock clock;
-    private final Set<String> emittedReminderKeys = ConcurrentHashMap.newKeySet();
 
     public WeeklyQuestAutomationService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
@@ -85,37 +81,6 @@ public class WeeklyQuestAutomationService {
 
         retireOlderActiveAssignments(currentWeek.getId(), now);
         completeOlderActiveWeeks(currentWeek.getId());
-    }
-
-    @Transactional(readOnly = true)
-    public void sendMissingUpcomingWeekReminder() {
-        OffsetDateTime targetWeekStartAt = weeklyQuestCalendarService.nextSchedulableWeekStartAt();
-        OffsetDateTime deadlineAt = weeklyQuestCalendarService.setupDeadlineAt(targetWeekStartAt);
-        if (!weeklyQuestCalendarService.now().isBefore(deadlineAt)) {
-            return;
-        }
-
-        WeeklyQuestWeek week = weeklyQuestWeekRepository.findByWeekStartAt(targetWeekStartAt).orElse(null);
-        boolean hasOfficialAssignment = week != null
-                && weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(week.getId()).isPresent();
-        if (hasOfficialAssignment) {
-            return;
-        }
-
-        LocalDate reminderDate = weeklyQuestCalendarService.localDate(weeklyQuestCalendarService.now());
-        String reminderKey = buildReminderKey(targetWeekStartAt, reminderDate, REMINDER_TYPE_MISSING_OFFICIAL);
-        if (!emittedReminderKeys.add(reminderKey)) {
-            return;
-        }
-
-        long daysUntilDeadline = weeklyQuestCalendarService.daysUntilSetupDeadline(targetWeekStartAt);
-        log.warn(
-                "Weekly quest reminder [{}]: week starting {} is still unset. {} days left before setup deadline on {}.",
-                REMINDER_TYPE_MISSING_OFFICIAL,
-                targetWeekStartAt,
-                daysUntilDeadline,
-                deadlineAt
-        );
     }
 
     private WeeklyQuestWeek createScheduledWeek(OffsetDateTime weekStartAt, OffsetDateTime now) {
@@ -180,9 +145,5 @@ public class WeeklyQuestAutomationService {
     private String currentYearMonth() {
         LocalDate nowDate = weeklyQuestCalendarService.localDate(weeklyQuestCalendarService.now());
         return YearMonth.from(nowDate).format(YEAR_MONTH_FORMATTER);
-    }
-
-    private String buildReminderKey(OffsetDateTime targetWeekStartAt, LocalDate reminderDate, String reminderType) {
-        return reminderType + "|" + targetWeekStartAt.toInstant() + "|" + reminderDate;
     }
 }

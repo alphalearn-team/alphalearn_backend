@@ -28,7 +28,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
-class WeeklyQuestReminderAutomationServiceTest {
+class WeeklyQuestAutomationServiceTest {
 
     @Mock
     private WeeklyQuestWeekRepository weekRepository;
@@ -50,69 +50,6 @@ class WeeklyQuestReminderAutomationServiceTest {
                 calendarService,
                 clock
         );
-    }
-
-    @Test
-    void emitsReminderWhenNextSchedulableWeekIsUnset(CapturedOutput output) {
-        OffsetDateTime targetWeek = OffsetDateTime.parse("2026-03-29T00:00:00+08:00");
-        when(weekRepository.findByWeekStartAt(targetWeek)).thenReturn(Optional.empty());
-
-        service.sendMissingUpcomingWeekReminder();
-
-        verify(weekRepository).findByWeekStartAt(targetWeek);
-        assertThat(output.getOut())
-                .contains("is still unset")
-                .contains("7 days left");
-    }
-
-    @Test
-    void doesNotEmitReminderWhenOfficialAssignmentExists(CapturedOutput output) {
-        OffsetDateTime targetWeek = OffsetDateTime.parse("2026-03-29T00:00:00+08:00");
-        WeeklyQuestWeek week = new WeeklyQuestWeek();
-        ReflectionTestUtils.setField(week, "id", 7L);
-        week.setWeekStartAt(targetWeek);
-        week.setSetupDeadlineAt(targetWeek.minusDays(7));
-        when(weekRepository.findByWeekStartAt(targetWeek)).thenReturn(Optional.of(week));
-        when(assignmentRepository.findByWeek_IdAndOfficialTrue(7L)).thenReturn(Optional.of(new WeeklyQuestAssignment()));
-
-        service.sendMissingUpcomingWeekReminder();
-
-        assertThat(output.getOut()).doesNotContain("is still unset");
-    }
-
-    @Test
-    void doesNotEmitReminderAfterCutoff(CapturedOutput output) {
-        Clock afterCutoffClock = Clock.fixed(Instant.parse("2026-03-22T01:00:00Z"), ZoneId.of("UTC"));
-        WeeklyQuestCalendarService calendarService = new WeeklyQuestCalendarService(afterCutoffClock, ZoneId.of("Asia/Singapore")) {
-            @Override
-            public OffsetDateTime nextSchedulableWeekStartAt() {
-                return OffsetDateTime.parse("2026-03-22T00:00:00+08:00");
-            }
-        };
-        WeeklyQuestAutomationService afterCutoffService = new WeeklyQuestAutomationService(
-                weekRepository,
-                assignmentRepository,
-                imposterWeeklyFeaturedConceptService,
-                calendarService,
-                afterCutoffClock
-        );
-
-        afterCutoffService.sendMissingUpcomingWeekReminder();
-
-        verify(weekRepository, never()).findByWeekStartAt(OffsetDateTime.parse("2026-03-22T00:00:00+08:00"));
-        assertThat(output.getOut()).doesNotContain("is still unset");
-    }
-
-    @Test
-    void suppressesDuplicateReminderInSameProcessSameDay(CapturedOutput output) {
-        OffsetDateTime targetWeek = OffsetDateTime.parse("2026-03-29T00:00:00+08:00");
-        when(weekRepository.findByWeekStartAt(targetWeek)).thenReturn(Optional.empty());
-
-        service.sendMissingUpcomingWeekReminder();
-        service.sendMissingUpcomingWeekReminder();
-
-        long reminderCount = output.getOut().lines().filter(line -> line.contains("is still unset")).count();
-        assertThat(reminderCount).isEqualTo(1);
     }
 
     @Test
