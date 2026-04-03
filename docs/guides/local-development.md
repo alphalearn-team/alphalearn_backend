@@ -132,6 +132,33 @@ Windows:
 test_local.cmd production
 ```
 
+## 8) Run CI-parity check against hosted Supabase
+
+Create CI env file template:
+
+```bash
+cp .env.ci.example .env.ci
+```
+
+Fill `.env.ci` with:
+
+- `CI_DB_URL_JDBC`
+- `CI_DB_USER`
+- `CI_DB_PASSWORD`
+- `CI_SUPABASE_JWKS_URL`
+
+Run CI-parity check:
+
+```bash
+./ci_check.sh
+```
+
+Windows:
+
+```bat
+ci_check.cmd
+```
+
 ## Local endpoints
 
 - Supabase Studio: `http://127.0.0.1:54323`
