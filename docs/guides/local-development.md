@@ -10,6 +10,10 @@
 
 Install Supabase CLI globally on your machine, then verify:
 
+See platform-specific instructions:
+
+- [Supabase CLI Install Guide (Windows + macOS)](./supabase-cli-install.md)
+
 ```bash
 supabase --version
 ```

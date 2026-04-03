@@ -2,8 +2,9 @@
 
 ## Guides
 
-- Local setup and run: `docs/guides/local-development.md`
-- Supabase schema changes and migrations: `docs/guides/schema-changes.md`
+- Local setup and run: [docs/guides/local-development.md](docs/guides/local-development.md)
+- Supabase schema changes and migrations: [docs/guides/schema-changes.md](docs/guides/schema-changes.md)
+- Supabase CLI install (Windows + macOS): [docs/guides/supabase-cli-install.md](docs/guides/supabase-cli-install.md)
 
 ## CI/CD Pipeline
 
