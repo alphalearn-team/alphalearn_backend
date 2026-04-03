@@ -81,6 +81,7 @@ public class LearnerQuizAttemptService {
         );
 
         QuizAttempt savedAttempt = quizAttemptRepository.save(attempt);
+        lessonEnrollmentService.checkAndCompleteLesson(learner.getId(), quiz.getLesson().getPublicId());
         return toResponse(savedAttempt, submission.totalQuestions());
     }
 

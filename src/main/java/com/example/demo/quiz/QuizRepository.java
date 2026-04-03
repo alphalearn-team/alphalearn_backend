@@ -16,4 +16,6 @@ public interface QuizRepository extends JpaRepository<Quiz, Integer> {
     List<Quiz> findByLessonPublicId(UUID lessonPublicId);
 
     List<Quiz> findByLesson_PublicIdOrderByCreatedAtDesc(UUID lessonPublicId);
+
+    long countByLesson_PublicId(UUID lessonPublicId);
 }
