@@ -3,6 +3,59 @@
 
 begin;
 
+-- Local admin auth user for development login:
+-- email: admin@gmail.com
+-- password: 123456
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  is_super_admin,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  '8a7a21d2-f77e-4f55-8a9c-3d7d3b2b62cb'::uuid,
+  'authenticated',
+  'authenticated',
+  'admin@gmail.com',
+  crypt('123456', gen_salt('bf')),
+  now(),
+  now(),
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{}'::jsonb,
+  false,
+  '',
+  '',
+  '',
+  ''
+)
+on conflict (id) do update
+set
+  email = excluded.email,
+  encrypted_password = excluded.encrypted_password,
+  email_confirmed_at = excluded.email_confirmed_at,
+  updated_at = now(),
+  raw_app_meta_data = excluded.raw_app_meta_data,
+  raw_user_meta_data = excluded.raw_user_meta_data;
+
+insert into public.admins (admin_id, created_at)
+values ('8a7a21d2-f77e-4f55-8a9c-3d7d3b2b62cb'::uuid, now())
+on conflict (admin_id) do update
+set created_at = admins.created_at;
+
 insert into public.concepts (public_id, title, description, created_at)
 values
   ('3f125211-fe25-46e8-9f8a-2d51725b98fa'::uuid, 'Cringe', 'Cringe means to feel extreme embarrassment, awkwardness, or discomfort, often accompanied by a physical reaction like wincing or pulling back', now()),
@@ -30,11 +83,5 @@ set
   title = excluded.title,
   description = excluded.description;
 
--- Admin bootstrap: if this auth user exists, ensure admin role exists.
-insert into public.admins (admin_id)
-select u.id
-from auth.users u
-where u.email in ('jiugeng45@gmail.com')
-on conflict (admin_id) do nothing;
 
 commit;
