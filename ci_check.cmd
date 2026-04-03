@@ -35,9 +35,9 @@ call :require_env CI_DB_USER || exit /b 1
 call :require_env CI_DB_PASSWORD || exit /b 1
 call :require_env CI_SUPABASE_JWKS_URL || exit /b 1
 
-where supabase >nul 2>nul
+where npx >nul 2>nul
 if errorlevel 1 (
-  echo Error: supabase CLI not found in PATH.
+  echo Error: npx is required to run Supabase CLI
   exit /b 1
 )
 
@@ -63,7 +63,7 @@ set "JDBC_SUFFIX=%CI_DB_URL_JDBC:~18%"
 set "PG_URL=postgresql://%CI_DB_USER%:%ENCODED_DB_PASSWORD%@%JDBC_SUFFIX%"
 
 echo Applying pending Supabase migrations to hosted CI DB...
-supabase migration up --db-url "%PG_URL%"
+npx supabase migration up --db-url "%PG_URL%"
 if errorlevel 1 exit /b 1
 
 echo Running backend CI verify ^(mvn clean verify^)...
