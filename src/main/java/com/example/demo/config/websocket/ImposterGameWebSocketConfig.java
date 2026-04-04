@@ -1,6 +1,7 @@
 package com.example.demo.config.websocket;
 
 import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,12 +31,15 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     public static final String IMP_WS_ENDPOINT = "/ws";
     private final ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor;
     private final String[] allowedOriginPatterns;
+    private final TaskScheduler stompHeartbeatTaskScheduler;
 
     public ImposterGameWebSocketConfig(
             ImposterStompAuthChannelInterceptor imposterStompAuthChannelInterceptor,
+            @Qualifier("stompHeartbeatTaskScheduler") TaskScheduler stompHeartbeatTaskScheduler,
             @Value("${app.cors.allowed-origin-patterns:${app.cors.allowed-origins:${APP_CORS_ALLOWED_ORIGIN_PATTERNS:${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}}}}") String allowedOriginPatterns
     ) {
         this.imposterStompAuthChannelInterceptor = imposterStompAuthChannelInterceptor;
+        this.stompHeartbeatTaskScheduler = stompHeartbeatTaskScheduler;
         this.allowedOriginPatterns = Arrays.stream(allowedOriginPatterns.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
@@ -45,7 +49,7 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.enableSimpleBroker("/topic", "/queue")
-                .setTaskScheduler(messageBrokerTaskScheduler())
+                .setTaskScheduler(stompHeartbeatTaskScheduler)
                 .setHeartbeatValue(new long[]{STOMP_HEARTBEAT_INTERVAL_MS, STOMP_HEARTBEAT_INTERVAL_MS});
         registry.setApplicationDestinationPrefixes(IMP_APP_PREFIX);
         registry.setUserDestinationPrefix("/user");
@@ -79,7 +83,7 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     }
 
     @Bean
-    public TaskScheduler messageBrokerTaskScheduler() {
+    public TaskScheduler stompHeartbeatTaskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);
         scheduler.setThreadNamePrefix("stomp-heartbeat-");
