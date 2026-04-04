@@ -629,6 +629,34 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
+    void submitDrawingDoneRejectsStaleBaseVersion() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setDrawingVersion(3);
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-02T00:00:10Z"));
+
+        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(drawerMember));
+
+        assertThatThrownBy(() -> service.submitDrawingDone(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 1)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Drawing version conflict");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
     void submitDrawingDoneRejectsWhenViewerIsNotCurrentDrawer() {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
@@ -652,36 +680,76 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
-    void submitLiveDrawingDoesNotAdvancePhaseOrPublishRealtimeState() {
+    void submitLiveDrawingRejectsWhenDoneBasedModeIsEnabled() {
         SupabaseAuthUser drawer = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         UUID lobbyPublicId = lobby.getPublicId();
         lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
         lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
         lobby.setCurrentDrawerLearnerId(drawer.userId());
-        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-02T00:00:10Z"));
-        lobby.setDrawingVersion(1);
-        lobby.setStateVersion(5);
 
-        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
         when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
         when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
-        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
-                .thenReturn(List.of(drawerMember));
-        when(learnerRepository.findAllById(anyList())).thenReturn(List.of(learner(drawer.userId(), "drawer")));
-
-        PrivateImposterLobbyStateDto state = service.submitLiveDrawing(
+        assertThatThrownBy(() -> service.submitLiveDrawing(
                 drawer,
                 lobbyPublicId,
                 new UpsertImposterDrawingSnapshotRequest("{\"live\":true}", 1)
-        );
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Live drawing is disabled");
 
-        assertThat(state.stateVersion()).isEqualTo(5);
-        assertThat(lobby.getStateVersion()).isEqualTo(5);
-        assertThat(lobby.getDrawingVersion()).isEqualTo(2);
-        assertThat(lobby.getCurrentDrawingSnapshot()).isEqualTo("{\"live\":true}");
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
         verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
         verify(imposterLobbyRealtimePublisher, never()).publishViewerLobbyState(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void submitDrawingDoneRejectsWhenTurnAlreadyExpiredAndPublishesAuthoritativeState() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(drawer.userId());
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setCurrentTurnIndex(0);
+        lobby.setRoundNumber(1);
+        lobby.setRoundsPerConcept(1);
+        lobby.setTurnDurationSeconds(25);
+        lobby.setTurnStartedAt(OffsetDateTime.parse("2026-04-01T23:59:30Z"));
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-01T23:59:59Z"));
+        lobby.setDrawingVersion(1);
+        lobby.setStateVersion(10);
+
+        UUID memberTwoId = UUID.randomUUID();
+        UUID memberThreeId = UUID.randomUUID();
+        lobby.setRoundDrawerOrder(drawer.userId() + "," + memberTwoId);
+        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember memberThree = existingMember(lobby, memberThreeId, "2026-04-01T12:10:00Z");
+        List<ImposterGameLobbyMember> activeMembers = List.of(drawerMember, memberTwo, memberThree);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L)).thenReturn(activeMembers, activeMembers);
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(drawer.userId(), "drawer"),
+                        learner(memberTwoId, "member-2"),
+                        learner(memberThreeId, "member-3")
+                ));
+
+        assertThatThrownBy(() -> service.submitDrawingDone(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 1)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Drawing turn has ended");
+
+        assertThat(lobby.getStateVersion()).isEqualTo(11);
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(11), eq("TURN_EXPIRED"), any());
+        verify(imposterLobbyRealtimePublisher, times(3)).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(11), eq("TURN_EXPIRED"), any());
     }
 
     @Test

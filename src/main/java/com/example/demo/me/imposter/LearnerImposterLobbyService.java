@@ -413,19 +413,7 @@ public class LearnerImposterLobbyService {
         ensureLobbyStarted(lobby);
         ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
         ensureViewerIsCurrentDrawer(lobby, user.userId());
-
-        OffsetDateTime now = OffsetDateTime.now(clock);
-        if (lobby.getTurnEndsAt() != null && !now.isBefore(lobby.getTurnEndsAt())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing turn has ended");
-        }
-
-        Integer currentVersion = defaultVersion(lobby);
-        validateBaseVersion(request.baseVersion(), currentVersion);
-        lobby.setCurrentDrawingSnapshot(request.snapshot());
-        lobby.setDrawingVersion(currentVersion + 1);
-
-        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-        return buildLobbyState(savedLobby, user.userId());
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Live drawing is disabled; submit drawing with done");
     }
 
     @Transactional
@@ -449,11 +437,11 @@ public class LearnerImposterLobbyService {
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         OffsetDateTime now = OffsetDateTime.now(clock);
         boolean transitioned = resolveTimedTransitionsIfNeeded(lobby, activeMembers, now);
-        if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.DRAWING) {
+        if (transitioned) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
             publishRealtimeState(savedLobby, "TURN_EXPIRED");
-            return buildLobbyState(savedLobby, user.userId(), activeMembers);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing turn has ended");
         }
 
         Integer currentVersion = defaultVersion(lobby);
@@ -1304,7 +1292,7 @@ public class LearnerImposterLobbyService {
                 lobby.getTurnEndsAt(),
                 viewerIsCurrentDrawer,
                 drawingActive && viewerIsCurrentDrawer && !roundComplete,
-                false,
+                drawingActive && viewerIsCurrentDrawer && !roundComplete,
                 roundComplete,
                 lobby.getCurrentDrawingSnapshot(),
                 defaultVersion(lobby),
