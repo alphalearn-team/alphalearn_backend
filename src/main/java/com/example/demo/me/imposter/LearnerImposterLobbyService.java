@@ -415,13 +415,8 @@ public class LearnerImposterLobbyService {
         ensureViewerIsCurrentDrawer(lobby, user.userId());
 
         OffsetDateTime now = OffsetDateTime.now(clock);
-        boolean transitioned = resolveTimedTransitionsIfNeeded(lobby, imposterGameLobbyMemberRepository
-                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId()), now);
-        if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.DRAWING) {
-            incrementStateVersion(lobby);
-            ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, "TURN_EXPIRED");
-            return buildLobbyState(savedLobby, user.userId());
+        if (lobby.getTurnEndsAt() != null && !now.isBefore(lobby.getTurnEndsAt())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing turn has ended");
         }
 
         Integer currentVersion = defaultVersion(lobby);
@@ -429,11 +424,8 @@ public class LearnerImposterLobbyService {
         lobby.setCurrentDrawingSnapshot(request.snapshot());
         lobby.setDrawingVersion(currentVersion + 1);
 
-        incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-        PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId());
-        publishRealtimeState(savedLobby, "DRAWING_LIVE");
-        return state;
+        return buildLobbyState(savedLobby, user.userId());
     }
 
     @Transactional
