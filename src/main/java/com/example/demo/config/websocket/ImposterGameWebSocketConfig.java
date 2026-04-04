@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.config.ChannelRegistration;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
@@ -21,6 +23,7 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
     private static final int WS_MESSAGE_SIZE_LIMIT_BYTES = 262_144;
     private static final int WS_SEND_BUFFER_SIZE_LIMIT_BYTES = 524_288;
     private static final int WS_SEND_TIME_LIMIT_MS = 20_000;
+    private static final long STOMP_HEARTBEAT_INTERVAL_MS = 10_000L;
 
     public static final String IMP_LOBBY_TOPIC_PREFIX = "/topic/imposter/lobbies";
     public static final String IMP_APP_PREFIX = "/app";
@@ -41,7 +44,9 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue");
+        registry.enableSimpleBroker("/topic", "/queue")
+                .setTaskScheduler(messageBrokerTaskScheduler())
+                .setHeartbeatValue(new long[]{STOMP_HEARTBEAT_INTERVAL_MS, STOMP_HEARTBEAT_INTERVAL_MS});
         registry.setApplicationDestinationPrefixes(IMP_APP_PREFIX);
         registry.setUserDestinationPrefix("/user");
     }
@@ -71,5 +76,14 @@ public class ImposterGameWebSocketConfig implements WebSocketMessageBrokerConfig
         container.setMaxTextMessageBufferSize(WS_MESSAGE_SIZE_LIMIT_BYTES);
         container.setMaxBinaryMessageBufferSize(WS_MESSAGE_SIZE_LIMIT_BYTES);
         return container;
+    }
+
+    @Bean
+    public TaskScheduler messageBrokerTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("stomp-heartbeat-");
+        scheduler.initialize();
+        return scheduler;
     }
 }
