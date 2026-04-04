@@ -31,6 +31,15 @@ public class MeImposterLobbyRealtimeController {
         learnerImposterLobbyService.submitLiveDrawing(requireLearnerPrincipal(principal), lobbyPublicId, request);
     }
 
+    @MessageMapping("/imposter/lobbies/{lobbyPublicId}/drawing/done")
+    public void submitDrawingDone(
+            @DestinationVariable UUID lobbyPublicId,
+            @Payload UpsertImposterDrawingSnapshotRequest request,
+            Principal principal
+    ) {
+        learnerImposterLobbyService.submitRealtimeDrawingDone(requireLearnerPrincipal(principal), lobbyPublicId, request);
+    }
+
     @MessageMapping("/imposter/lobbies/{lobbyPublicId}/vote")
     public void submitVote(
             @DestinationVariable UUID lobbyPublicId,

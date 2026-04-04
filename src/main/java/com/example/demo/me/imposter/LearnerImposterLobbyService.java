@@ -596,6 +596,15 @@ public class LearnerImposterLobbyService {
     }
 
     @Transactional
+    public PrivateImposterLobbyStateDto submitRealtimeDrawingDone(
+            SupabaseAuthUser user,
+            UUID lobbyPublicId,
+            UpsertImposterDrawingSnapshotRequest request
+    ) {
+        return upsertDrawingSnapshot(user, lobbyPublicId, request);
+    }
+
+    @Transactional
     public void processRealtimeTimedTransitions() {
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<UUID> startedLobbyPublicIds = imposterGameLobbyRepository.findByStartedAtIsNotNull()

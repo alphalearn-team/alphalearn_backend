@@ -26,7 +26,7 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
     private static final Pattern LOBBY_TOPIC_PATTERN = Pattern.compile("^/topic/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
     private static final Pattern LOBBY_USER_QUEUE_PATTERN = Pattern.compile("^/user/queue/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
     private static final Pattern LOBBY_APP_PATTERN = Pattern.compile(
-            "^/app/imposter/lobbies/([0-9a-fA-F\\-]{36})/(drawing/live|vote|guess)$"
+            "^/app/imposter/lobbies/([0-9a-fA-F\\-]{36})/(drawing/live|drawing/done|vote|guess)$"
     );
 
     private final JwtDecoder jwtDecoder;
