@@ -38,10 +38,11 @@ jobs:
 
       - name: Build and run tests
         env:
-          DB_URL: ${{ secrets.CI_DB_URL_JDBC }}
-          DB_USER: ${{ secrets.CI_DB_USER }}
-          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-          SUPABASE_JWT_JWKS_URL: ${{ secrets.CI_SUPABASE_JWKS_URL }}
+          SPRING_PROFILES_ACTIVE: ci
+          CI_DB_URL_JDBC: ${{ secrets.CI_DB_URL_JDBC }}
+          CI_DB_USER: ${{ secrets.CI_DB_USER }}
+          CI_DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+          CI_SUPABASE_JWKS_URL: ${{ secrets.CI_SUPABASE_JWKS_URL }}
           CLOUDFLARE_R2_ENABLED: "false"
           CLOUDFLARE_R2_PRESIGN_EXPIRY_MINUTES: "15"
           CLOUDFLARE_R2_MAX_UPLOAD_SIZE_BYTES: "52428800"
