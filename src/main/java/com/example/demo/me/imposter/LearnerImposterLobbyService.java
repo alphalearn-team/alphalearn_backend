@@ -415,58 +415,24 @@ public class LearnerImposterLobbyService {
         ensureViewerIsCurrentDrawer(lobby, user.userId());
 
         OffsetDateTime now = OffsetDateTime.now(clock);
-        if (lobby.getTurnEndsAt() != null && !now.isBefore(lobby.getTurnEndsAt())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing turn has ended");
-        }
-
-        Integer currentVersion = defaultVersion(lobby);
-        validateBaseVersion(request.baseVersion(), currentVersion);
-        lobby.setCurrentDrawingSnapshot(request.snapshot());
-        lobby.setDrawingVersion(currentVersion + 1);
-
-        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-        return buildLobbyState(savedLobby, user.userId());
-    }
-
-    @Transactional
-    public PrivateImposterLobbyStateDto submitDrawingDone(
-            SupabaseAuthUser user,
-            UUID lobbyPublicId,
-            UpsertImposterDrawingSnapshotRequest request
-    ) {
-        requireLearner(user);
-        if (request == null || request.snapshot() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "snapshot is required");
-        }
-
-        ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
-        ensureViewerIsMember(lobby, user.userId());
-        ensureLobbyStarted(lobby);
-        ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
-        ensureViewerIsCurrentDrawer(lobby, user.userId());
-
-        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
-                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
-        OffsetDateTime now = OffsetDateTime.now(clock);
-        boolean transitioned = resolveTimedTransitionsIfNeeded(lobby, activeMembers, now);
+        boolean transitioned = resolveTimedTransitionsIfNeeded(lobby, imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId()), now);
         if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.DRAWING) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
             publishRealtimeState(savedLobby, "TURN_EXPIRED");
-            return buildLobbyState(savedLobby, user.userId(), activeMembers);
+            return buildLobbyState(savedLobby, user.userId());
         }
 
         Integer currentVersion = defaultVersion(lobby);
         validateBaseVersion(request.baseVersion(), currentVersion);
         lobby.setCurrentDrawingSnapshot(request.snapshot());
         lobby.setDrawingVersion(currentVersion + 1);
-        lobby.setTurnCompletedAt(now);
-        advanceToNextDrawStepOrVoting(lobby, activeMembers, now);
 
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-        PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
-        publishRealtimeState(savedLobby, "DRAWING_DONE");
+        PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId());
+        publishRealtimeState(savedLobby, "DRAWING_LIVE");
         return state;
     }
 
@@ -635,7 +601,7 @@ public class LearnerImposterLobbyService {
             UUID lobbyPublicId,
             UpsertImposterDrawingSnapshotRequest request
     ) {
-        return submitDrawingDone(user, lobbyPublicId, request);
+        return upsertDrawingSnapshot(user, lobbyPublicId, request);
     }
 
     @Transactional
