@@ -68,8 +68,9 @@ echo "Applying pending Supabase migrations to hosted CI DB..."
 supabase migration up --db-url "$PG_URL"
 
 echo "Running backend CI verify (mvn clean verify)..."
-DB_URL="$CI_DB_URL_JDBC" \
-DB_USER="$CI_DB_USER" \
-DB_PASSWORD="$CI_DB_PASSWORD" \
-SUPABASE_JWT_JWKS_URL="$CI_SUPABASE_JWKS_URL" \
+SPRING_PROFILES_ACTIVE="ci" \
+CI_DB_URL_JDBC="$CI_DB_URL_JDBC" \
+CI_DB_USER="$CI_DB_USER" \
+CI_DB_PASSWORD="$CI_DB_PASSWORD" \
+CI_SUPABASE_JWKS_URL="$CI_SUPABASE_JWKS_URL" \
 "${SCRIPT_DIR}/mvnw" -B clean verify
