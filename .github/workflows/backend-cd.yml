@@ -3,6 +3,7 @@ name: Backend CD
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -57,6 +58,34 @@ jobs:
           export PGUSER="$DB_USER"
           export PGPASSWORD="$DB_PASSWORD"
           supabase migration up --db-url "$CI_DB_URL"
+
+      - name: Verify critical production schema state
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          CI_DB_URL="${DB_URL#jdbc:}"
+          export PGUSER="$DB_USER"
+          export PGPASSWORD="$DB_PASSWORD"
+
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          CONCEPT_COUNT_PRESENT="$(psql "$CI_DB_URL" -t -A -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'imposter_game_lobbies' and column_name = 'concept_count';")"
+          QUEST_TEMPLATE_PRESENT="$(psql "$CI_DB_URL" -t -A -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'weekly_quest_assignments' and column_name = 'quest_template_id';")"
+
+          if [ "$CONCEPT_COUNT_PRESENT" != "1" ]; then
+            echo "Expected public.imposter_game_lobbies.concept_count to exist, but found count=$CONCEPT_COUNT_PRESENT"
+            exit 1
+          fi
+
+          if [ "$QUEST_TEMPLATE_PRESENT" != "0" ]; then
+            echo "Expected public.weekly_quest_assignments.quest_template_id to be removed, but found count=$QUEST_TEMPLATE_PRESENT"
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
