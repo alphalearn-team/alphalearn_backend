@@ -67,10 +67,11 @@ npx supabase migration up --db-url "%PG_URL%"
 if errorlevel 1 exit /b 1
 
 echo Running backend CI verify ^(mvn clean verify^)...
-set "DB_URL=%CI_DB_URL_JDBC%"
-set "DB_USER=%CI_DB_USER%"
-set "DB_PASSWORD=%CI_DB_PASSWORD%"
-set "SUPABASE_JWT_JWKS_URL=%CI_SUPABASE_JWKS_URL%"
+set "SPRING_PROFILES_ACTIVE=ci"
+set "CI_DB_URL_JDBC=%CI_DB_URL_JDBC%"
+set "CI_DB_USER=%CI_DB_USER%"
+set "CI_DB_PASSWORD=%CI_DB_PASSWORD%"
+set "CI_SUPABASE_JWKS_URL=%CI_SUPABASE_JWKS_URL%"
 
 call "%SCRIPT_DIR%mvnw.cmd" -B clean verify
 exit /b %errorlevel%
