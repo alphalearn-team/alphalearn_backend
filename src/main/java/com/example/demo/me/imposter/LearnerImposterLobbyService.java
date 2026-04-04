@@ -452,7 +452,7 @@ public class LearnerImposterLobbyService {
         if (transitioned && lobby.getCurrentPhase() != ImposterLobbyPhase.DRAWING) {
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
-            publishRealtimeState(savedLobby, "TURN_EXPIRED", activeMembers);
+            publishRealtimeState(savedLobby, "TURN_EXPIRED");
             return buildLobbyState(savedLobby, user.userId(), activeMembers);
         }
 
@@ -466,7 +466,7 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
-        publishRealtimeState(savedLobby, "DRAWING_DONE", activeMembers);
+        publishRealtimeState(savedLobby, "DRAWING_DONE");
         return state;
     }
 
