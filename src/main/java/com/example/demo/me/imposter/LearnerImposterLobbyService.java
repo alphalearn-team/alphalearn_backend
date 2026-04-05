@@ -87,6 +87,7 @@ public class LearnerImposterLobbyService {
     private static final String DRAWING_VERSION_CONFLICT_MESSAGE = "Drawing version conflict";
     private static final String END_REASON_PLAYER_QUIT = "PLAYER_QUIT";
     private static final String END_REASON_PLAYER_DISCONNECTED_TIMEOUT = "PLAYER_DISCONNECTED_TIMEOUT";
+    private static final String END_REASON_LAST_MEMBER_LEFT = "LAST_MEMBER_LEFT";
 
     private enum WinnerSide {
         IMPOSTER,
@@ -291,6 +292,16 @@ public class LearnerImposterLobbyService {
                 imposterGameLobbyRepository.deleteById(lobby.getId());
                 imposterGameLobbyRepository.flush();
             } catch (DataIntegrityViolationException ex) {
+                if (lobby.getLobbyType() == ImposterLobbyType.RANKED_MATCHMADE) {
+                    // Ranked lobbies may already be referenced by persisted game rows; close instead of hard-delete.
+                    abandonLobby(lobby, user.userId(), now, END_REASON_LAST_MEMBER_LEFT);
+                    incrementStateVersion(lobby);
+                    imposterGameLobbyRepository.saveAndFlush(lobby);
+                    return new LeavePrivateImposterLobbyResponse(
+                            PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED,
+                            null
+                    );
+                }
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
                         "Unable to close lobby because it is still referenced by active game data",
@@ -312,12 +323,29 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
 
-        PrivateImposterLobbyLeaveResult result = leavingHost
+        PrivateImposterLobbyLeaveResult result = leavingHost && lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM
                 ? PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST
                 : PrivateImposterLobbyLeaveResult.LEFT;
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
-        publishRealtimeState(savedLobby, leavingHost ? "LEAVE_HOST_TRANSFER" : "LEAVE");
+        publishRealtimeState(
+                savedLobby,
+                (leavingHost && lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM)
+                        ? "LEAVE_HOST_TRANSFER"
+                        : "LEAVE"
+        );
         return new LeavePrivateImposterLobbyResponse(result, state);
+    }
+
+    @Transactional
+    public LeavePrivateImposterLobbyResponse leaveCurrentLobby(SupabaseAuthUser user) {
+        requireLearner(user);
+        List<ImposterGameLobbyMember> activeMemberships = imposterGameLobbyMemberRepository
+                .findActiveByLearnerIdOrderByJoinedAtDesc(user.userId());
+        if (activeMemberships.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Learner is not in any active lobby");
+        }
+        UUID lobbyPublicId = activeMemberships.get(0).getLobby().getPublicId();
+        return leavePrivateLobby(user, lobbyPublicId);
     }
 
     @Transactional
@@ -741,6 +769,11 @@ public class LearnerImposterLobbyService {
         }
         ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicId(lobbyPublicId).orElse(null);
         if (lobby == null) {
+            return;
+        }
+        if (lobby.getStartedAt() == null
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.MATCH_COMPLETE
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
             return;
         }
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
@@ -1483,7 +1516,8 @@ public class LearnerImposterLobbyService {
                             learner == null ? null : learner.getPublicId(),
                             learner == null ? null : learner.getUsername(),
                             member.getJoinedAt(),
-                            member.getLearnerId().equals(lobby.getHostLearnerId())
+                            lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM
+                                    && member.getLearnerId().equals(lobby.getHostLearnerId())
                     );
                 })
                 .toList();
@@ -1508,7 +1542,11 @@ public class LearnerImposterLobbyService {
                 .map(targetId -> toLearnerPublicId(learnersById, targetId))
                 .filter(id -> id != null)
                 .toList();
-        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners = realtimePresenceTracker
+        boolean inGameSession = lobby.getStartedAt() != null
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.MATCH_COMPLETE
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.ABANDONED;
+        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners = inGameSession
+                ? realtimePresenceTracker
                 .listReconnectPresence(lobby.getPublicId())
                 .stream()
                 .map(snapshot -> new PrivateImposterLobbyReconnectStateDto(
@@ -1516,10 +1554,13 @@ public class LearnerImposterLobbyService {
                         snapshot.disconnectDeadlineAt()
                 ))
                 .filter(snapshot -> snapshot.learnerPublicId() != null)
-                .toList();
+                .toList()
+                : List.of();
 
         long activeMemberCount = activeMemberDtos.size();
-        boolean viewerIsHost = viewerLearnerId != null && viewerLearnerId.equals(lobby.getHostLearnerId());
+        boolean viewerIsHost = lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM
+                && viewerLearnerId != null
+                && viewerLearnerId.equals(lobby.getHostLearnerId());
         boolean viewerIsActiveMember = viewerLearnerId != null
                 && activeMembers.stream().anyMatch(member -> member.getLearnerId().equals(viewerLearnerId));
         boolean notStarted = lobby.getStartedAt() == null;
