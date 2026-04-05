@@ -3,6 +3,7 @@ package com.example.demo.me.imposter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -21,11 +22,11 @@ import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
-import com.example.demo.game.imposter.realtime.ImposterLobbyRealtimePublisher;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
+import com.example.demo.game.imposter.realtime.ImposterLobbyRealtimePublisher;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
@@ -409,11 +410,12 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
-    void leavePrivateLobbyAllowsWhenLobbyAlreadyStarted() {
+    void leavePrivateLobbyAbandonsSessionWhenAnyActiveMemberLeavesAfterStart() {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         UUID lobbyPublicId = lobby.getPublicId();
         lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
         lobby.setHostLearnerId(user.userId());
 
         UUID remainingLearnerId = UUID.randomUUID();
@@ -427,14 +429,69 @@ class LearnerImposterLobbyServiceTest {
                 .thenReturn(Optional.of(self));
         when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
                 .thenReturn(List.of(remaining), List.of(remaining));
-        when(learnerRepository.findAllById(List.of(remainingLearnerId)))
-                .thenReturn(List.of(remainingLearner));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(remainingLearner, learner(user.userId(), "quitter")));
 
         LeavePrivateImposterLobbyResponse response = service.leavePrivateLobby(user, lobbyPublicId);
 
-        assertThat(response.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST);
+        assertThat(response.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_SESSION_ABANDONED);
         assertThat(response.lobbyState()).isNotNull();
         assertThat(response.lobbyState().activeMemberCount()).isEqualTo(1);
+        assertThat(response.lobbyState().currentPhase())
+                .isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+        assertThat(response.lobbyState().endReason()).isEqualTo("PLAYER_QUIT");
+        assertThat(response.lobbyState().endedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(response.lobbyState().endedByPublicId()).isNotNull();
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(1), eq("ABANDONED_BY_QUIT"), any());
+        verify(imposterLobbyRealtimePublisher).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(1), eq("ABANDONED_BY_QUIT"), any());
+    }
+
+    @Test
+    void leavePrivateLobbyDoesNotDeleteAbandonedLobbyWhenLastMemberLeaves() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+
+        ImposterGameLobbyMember self = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(self));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(), List.of());
+        when(learnerRepository.findAllById(List.of())).thenReturn(List.of());
+
+        LeavePrivateImposterLobbyResponse response = service.leavePrivateLobby(user, lobbyPublicId);
+
+        assertThat(response.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT);
+        assertThat(response.lobbyState()).isNotNull();
+        assertThat(response.lobbyState().activeMemberCount()).isEqualTo(0);
+        verify(imposterGameLobbyRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void submitVoteRejectsWhenLobbySessionAbandoned() {
+        SupabaseAuthUser voter = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voter.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.submitVote(
+                voter,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(UUID.randomUUID())
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("session has been abandoned");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
     }
 
     @Test
