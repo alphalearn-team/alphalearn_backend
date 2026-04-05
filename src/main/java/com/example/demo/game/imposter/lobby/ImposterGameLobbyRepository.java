@@ -24,4 +24,6 @@ public interface ImposterGameLobbyRepository extends JpaRepository<ImposterGameL
     Optional<ImposterGameLobby> findByLobbyCodeForUpdate(@Param("lobbyCode") String lobbyCode);
 
     List<ImposterGameLobby> findByStartedAtIsNotNull();
+
+    List<ImposterGameLobby> findByLobbyTypeOrderByCreatedAtAsc(ImposterLobbyType lobbyType);
 }

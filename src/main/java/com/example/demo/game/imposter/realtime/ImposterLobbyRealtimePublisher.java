@@ -27,6 +27,10 @@ public class ImposterLobbyRealtimePublisher {
         return "/queue/imposter/lobbies/" + lobbyPublicId;
     }
 
+    public String userQueueForMatchmaking() {
+        return "/queue/imposter/matchmaking";
+    }
+
     public void publishSharedLobbyState(UUID lobbyPublicId, Integer stateVersion, String reason, Object state) {
         if (messagingTemplate == null) {
             return;
@@ -65,6 +69,31 @@ public class ImposterLobbyRealtimePublisher {
         messagingTemplate.convertAndSendToUser(
                 learnerId.toString(),
                 userQueueForLobby(lobbyPublicId),
+                envelope
+        );
+    }
+
+    public void publishMatchmakingEvent(
+            UUID learnerId,
+            UUID lobbyPublicId,
+            String reason,
+            Object state
+    ) {
+        if (learnerId == null || messagingTemplate == null) {
+            return;
+        }
+
+        ImposterLobbyRealtimeEnvelope envelope = new ImposterLobbyRealtimeEnvelope(
+                "MATCHMAKING_EVENT",
+                lobbyPublicId,
+                null,
+                reason,
+                OffsetDateTime.now(clock),
+                state
+        );
+        messagingTemplate.convertAndSendToUser(
+                learnerId.toString(),
+                userQueueForMatchmaking(),
                 envelope
         );
     }
