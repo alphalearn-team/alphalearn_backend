@@ -202,7 +202,7 @@ public class LearnerImposterLobbyService {
                 .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
                 .orElse(null);
         if (activeMember != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby");
+            return JoinedPrivateImposterLobbyDto.from(lobby, activeMember, true);
         }
 
         ImposterGameLobbyMember historicalMember = imposterGameLobbyMemberRepository
