@@ -25,6 +25,7 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final Pattern LOBBY_TOPIC_PATTERN = Pattern.compile("^/topic/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
     private static final Pattern LOBBY_USER_QUEUE_PATTERN = Pattern.compile("^/user/queue/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
+    private static final Pattern MATCHMAKING_USER_QUEUE_PATTERN = Pattern.compile("^/user/queue/imposter/matchmaking$");
     private static final Pattern LOBBY_APP_PATTERN = Pattern.compile(
             "^/app/imposter/lobbies/([0-9a-fA-F\\-]{36})/(drawing/live|drawing/done|vote|guess)$"
     );
@@ -97,6 +98,10 @@ public class ImposterStompAuthChannelInterceptor implements ChannelInterceptor {
 
         UUID lobbyPublicId = extractLobbyPublicId(destination);
         if (lobbyPublicId == null) {
+            if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())
+                    && MATCHMAKING_USER_QUEUE_PATTERN.matcher(destination).matches()) {
+                return;
+            }
             if (destination.startsWith("/app/imposter")
                     || destination.startsWith("/topic/imposter")
                     || destination.startsWith("/user/queue/imposter")) {
