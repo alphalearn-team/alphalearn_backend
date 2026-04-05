@@ -270,7 +270,7 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
-    void joinPrivateLobbyReturnsConflictWhenAlreadyActiveMember() {
+    void joinPrivateLobbyReturnsSuccessWhenAlreadyActiveMember() {
         SupabaseAuthUser user = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
         ImposterGameLobbyMember member = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
@@ -278,13 +278,17 @@ class LearnerImposterLobbyServiceTest {
         when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
                 .thenReturn(Optional.of(member));
 
-        assertThatThrownBy(() -> service.joinPrivateLobby(
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
                 user,
                 new JoinPrivateImposterLobbyRequest("ABCD2345")
-        ))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Learner already joined this lobby");
+        );
+
+        assertThat(result.alreadyMember()).isTrue();
+        assertThat(result.joinedAt()).isEqualTo(member.getJoinedAt());
         verify(imposterGameLobbyMemberRepository, never()).saveAndFlush(any(ImposterGameLobbyMember.class));
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+        verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
+        verify(imposterLobbyRealtimePublisher, never()).publishViewerLobbyState(any(), any(), any(), any(), any());
     }
 
     @Test
