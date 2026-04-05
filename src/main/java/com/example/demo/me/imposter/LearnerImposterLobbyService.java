@@ -444,7 +444,6 @@ public class LearnerImposterLobbyService {
         }
 
         ImposterGameLobby newLobby = new ImposterGameLobby();
-        newLobby.setLobbyCode(imposterLobbyCodeGenerator.generate());
         newLobby.setHostLearnerId(learnerId);
         newLobby.setPrivateLobby(false);
         newLobby.setLobbyType(ImposterLobbyType.RANKED_MATCHMADE);
