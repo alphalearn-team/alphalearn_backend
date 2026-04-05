@@ -1538,7 +1538,7 @@ public class LearnerImposterLobbyService {
 
         return new PrivateImposterLobbyStateDto(
                 lobby.getPublicId(),
-                lobby.getLobbyCode(),
+                visibleLobbyCode(lobby),
                 lobby.isPrivateLobby(),
                 lobby.getConceptPoolMode(),
                 lobby.getPinnedYearMonth(),
@@ -1591,6 +1591,12 @@ public class LearnerImposterLobbyService {
                 lobby.getLastImposterGuess(),
                 lobby.getLastImposterGuessCorrect()
         );
+    }
+
+    private String visibleLobbyCode(ImposterGameLobby lobby) {
+        return lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM
+                ? lobby.getLobbyCode()
+                : null;
     }
 
     private PrivateImposterLobbySharedStateDto buildSharedLobbyState(PrivateImposterLobbyStateDto state) {
