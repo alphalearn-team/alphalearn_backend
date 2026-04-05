@@ -48,5 +48,14 @@ jobs:
           CLOUDFLARE_R2_MAX_UPLOAD_SIZE_BYTES: "52428800"
         run: ./mvnw -B clean verify
 
+      - name: Dump surefire reports on failure
+        if: failure()
+        run: |
+          if [ -d target/surefire-reports ]; then
+            find target/surefire-reports -maxdepth 1 -type f -print -exec sed -n '1,220p' {} \;
+          else
+            echo "target/surefire-reports not found"
+          fi
+
       - name: Build backend Docker image
         run: docker build -f docker/backend.Dockerfile -t alphalearn-backend:${{ github.sha }} .
