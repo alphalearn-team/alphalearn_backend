@@ -28,6 +28,7 @@ import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyPlayerScoreDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyReconnectStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbySharedStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyViewerStateDto;
@@ -81,6 +82,8 @@ public class LearnerImposterLobbyService {
     private static final String LOBBY_CODE_UNIQUE_CONSTRAINT = "uk_imposter_game_lobbies_lobby_code";
     private static final String MEMBER_UNIQUE_CONSTRAINT = "uk_imposter_game_lobby_members_lobby_learner";
     private static final String DRAWING_VERSION_CONFLICT_MESSAGE = "Drawing version conflict";
+    private static final String END_REASON_PLAYER_QUIT = "PLAYER_QUIT";
+    private static final String END_REASON_PLAYER_DISCONNECTED_TIMEOUT = "PLAYER_DISCONNECTED_TIMEOUT";
 
     private enum WinnerSide {
         IMPOSTER,
@@ -103,6 +106,7 @@ public class LearnerImposterLobbyService {
     private final ConceptRepository conceptRepository;
     private final LearnerRepository learnerRepository;
     private final ImposterLobbyRealtimePublisher realtimePublisher;
+    private final ImposterLobbyRealtimePresenceTracker realtimePresenceTracker;
     private final Clock clock;
 
     public LearnerImposterLobbyService(
@@ -115,6 +119,7 @@ public class LearnerImposterLobbyService {
             ConceptRepository conceptRepository,
             LearnerRepository learnerRepository,
             ImposterLobbyRealtimePublisher realtimePublisher,
+            ImposterLobbyRealtimePresenceTracker realtimePresenceTracker,
             Clock clock
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
@@ -126,6 +131,7 @@ public class LearnerImposterLobbyService {
         this.conceptRepository = conceptRepository;
         this.learnerRepository = learnerRepository;
         this.realtimePublisher = realtimePublisher;
+        this.realtimePresenceTracker = realtimePresenceTracker;
         this.clock = clock;
     }
 
@@ -197,7 +203,7 @@ public class LearnerImposterLobbyService {
                 .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
                 .orElse(null);
         if (activeMember != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Learner already joined this lobby");
+            return JoinedPrivateImposterLobbyDto.from(lobby, activeMember, true);
         }
 
         ImposterGameLobbyMember historicalMember = imposterGameLobbyMemberRepository
@@ -243,10 +249,34 @@ public class LearnerImposterLobbyService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         member.setLeftAt(now);
         imposterGameLobbyMemberRepository.saveAndFlush(member);
+        realtimePresenceTracker.clearLobbyMembership(lobbyPublicId, user.userId());
 
         List<ImposterGameLobbyMember> remainingActiveMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         boolean leavingHost = user.userId().equals(lobby.getHostLearnerId());
+        boolean startedAndActive = lobby.getStartedAt() != null
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.MATCH_COMPLETE
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.ABANDONED;
+
+        if (startedAndActive) {
+            abandonLobby(lobby, user.userId(), now, END_REASON_PLAYER_QUIT);
+            incrementStateVersion(lobby);
+            ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+            PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
+            publishRealtimeState(savedLobby, "ABANDONED_BY_QUIT", remainingActiveMembers);
+            return new LeavePrivateImposterLobbyResponse(
+                    PrivateImposterLobbyLeaveResult.LEFT_AND_SESSION_ABANDONED,
+                    state
+            );
+        }
+
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            incrementStateVersion(lobby);
+            ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+            PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
+            publishRealtimeState(savedLobby, "LEAVE_AFTER_ABANDONED", remainingActiveMembers);
+            return new LeavePrivateImposterLobbyResponse(PrivateImposterLobbyLeaveResult.LEFT, state);
+        }
 
         if (remainingActiveMembers.isEmpty()) {
             imposterGameLobbyMemberRepository.delete(member);
@@ -410,6 +440,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
         ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
         ensureViewerIsCurrentDrawer(lobby, user.userId());
@@ -429,6 +460,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
         ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
         ensureViewerIsCurrentDrawer(lobby, user.userId());
@@ -471,6 +503,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
 
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
@@ -534,6 +567,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
 
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
@@ -638,8 +672,38 @@ public class LearnerImposterLobbyService {
         }
     }
 
+    @Transactional
+    public void processRealtimeDisconnectTimeouts() {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate> dueDisconnects =
+                realtimePresenceTracker.consumeDueDisconnectTimeouts(now);
+        for (ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate dueDisconnect : dueDisconnects) {
+            processDisconnectTimeout(dueDisconnect, now);
+        }
+    }
+
+    @Transactional
+    public void publishRealtimePresenceUpdate(UUID lobbyPublicId, String reason) {
+        if (lobbyPublicId == null) {
+            return;
+        }
+        ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicId(lobbyPublicId).orElse(null);
+        if (lobby == null) {
+            return;
+        }
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (activeMembers.isEmpty()) {
+            return;
+        }
+        publishRealtimeState(lobby, reason, activeMembers);
+    }
+
     private void processTimedTransitionsForLobby(UUID lobbyPublicId, OffsetDateTime now) {
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            return;
+        }
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         if (activeMembers.isEmpty()) {
@@ -652,6 +716,43 @@ public class LearnerImposterLobbyService {
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
             publishRealtimeState(savedLobby, "DEADLINE_ADVANCE", activeMembers);
         }
+    }
+
+    private void processDisconnectTimeout(
+            ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate dueDisconnect,
+            OffsetDateTime now
+    ) {
+        ImposterGameLobby lobby;
+        try {
+            lobby = resolveLobbyByPublicId(dueDisconnect.lobbyPublicId(), true);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return;
+            }
+            throw ex;
+        }
+        if (lobby.getStartedAt() == null
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.MATCH_COMPLETE
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            return;
+        }
+
+        boolean learnerStillActive = imposterGameLobbyMemberRepository
+                .existsByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), dueDisconnect.learnerId());
+        if (!learnerStillActive) {
+            return;
+        }
+
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (activeMembers.isEmpty()) {
+            return;
+        }
+
+        abandonLobby(lobby, dueDisconnect.learnerId(), now, END_REASON_PLAYER_DISCONNECTED_TIMEOUT);
+        incrementStateVersion(lobby);
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+        publishRealtimeState(savedLobby, "ABANDONED_BY_DISCONNECT_TIMEOUT", activeMembers);
     }
 
     private void applyDefaultSettings(ImposterGameLobby lobby) {
@@ -1138,6 +1239,30 @@ public class LearnerImposterLobbyService {
         }
     }
 
+    private void abandonLobby(
+            ImposterGameLobby lobby,
+            UUID abandonedByLearnerId,
+            OffsetDateTime endedAt,
+            String endedReason
+    ) {
+        lobby.setCurrentPhase(ImposterLobbyPhase.ABANDONED);
+        lobby.setEndedReason(endedReason);
+        lobby.setEndedAt(endedAt);
+        lobby.setAbandonedByLearnerId(abandonedByLearnerId);
+        lobby.setCurrentDrawerLearnerId(null);
+        lobby.setCurrentTurnIndex(null);
+        lobby.setTurnStartedAt(null);
+        lobby.setTurnEndsAt(null);
+        lobby.setTurnCompletedAt(endedAt);
+        lobby.setRoundCompletedAt(endedAt);
+        lobby.setVotingRoundNumber(null);
+        lobby.setVotingEligibleTargetLearnerIds(null);
+        lobby.setVotingBallots(null);
+        lobby.setVotingDeadlineAt(null);
+        lobby.setImposterGuessDeadlineAt(null);
+        lobby.setConceptResultDeadlineAt(null);
+    }
+
     private ImposterGameLobby resolveLobbyByPublicId(UUID lobbyPublicId, boolean lockForUpdate) {
         if (lobbyPublicId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lobbyPublicId is required");
@@ -1158,6 +1283,12 @@ public class LearnerImposterLobbyService {
     private void ensureLobbyStarted(ImposterGameLobby lobby) {
         if (lobby.getStartedAt() == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby has not started yet");
+        }
+    }
+
+    private void ensureLobbyNotAbandoned(ImposterGameLobby lobby) {
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby session has been abandoned");
         }
     }
 
@@ -1230,6 +1361,7 @@ public class LearnerImposterLobbyService {
 
         UUID currentDrawerPublicId = toLearnerPublicId(learnersById, lobby.getCurrentDrawerLearnerId());
         UUID votedOutPublicId = toLearnerPublicId(learnersById, lobby.getVotedOutLearnerId());
+        UUID endedByPublicId = toLearnerPublicId(learnersById, lobby.getAbandonedByLearnerId());
         Map<UUID, UUID> ballots = deserializeVoteBallots(lobby.getVotingBallots());
         UUID viewerVoteTargetLearnerId = viewerLearnerId == null ? null : ballots.get(viewerLearnerId);
         UUID viewerVoteTargetPublicId = toLearnerPublicId(learnersById, viewerVoteTargetLearnerId);
@@ -1246,6 +1378,15 @@ public class LearnerImposterLobbyService {
         List<UUID> eligibleVoteTargetPublicIds = deserializeUuidList(lobby.getVotingEligibleTargetLearnerIds()).stream()
                 .map(targetId -> toLearnerPublicId(learnersById, targetId))
                 .filter(id -> id != null)
+                .toList();
+        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners = realtimePresenceTracker
+                .listReconnectPresence(lobby.getPublicId())
+                .stream()
+                .map(snapshot -> new PrivateImposterLobbyReconnectStateDto(
+                        toLearnerPublicId(learnersById, snapshot.learnerId()),
+                        snapshot.disconnectDeadlineAt()
+                ))
+                .filter(snapshot -> snapshot.learnerPublicId() != null)
                 .toList();
 
         long activeMemberCount = activeMemberDtos.size();
@@ -1297,6 +1438,10 @@ public class LearnerImposterLobbyService {
                 lobby.getCurrentDrawingSnapshot(),
                 defaultVersion(lobby),
                 lobby.getCurrentPhase(),
+                lobby.getEndedReason(),
+                lobby.getEndedAt(),
+                endedByPublicId,
+                reconnectingLearners,
                 lobby.getCurrentConceptIndex(),
                 defaultConceptCount(lobby),
                 playerScores,
@@ -1344,6 +1489,10 @@ public class LearnerImposterLobbyService {
                 state.currentDrawingSnapshot(),
                 state.drawingVersion(),
                 state.currentPhase(),
+                state.endReason(),
+                state.endedAt(),
+                state.endedByPublicId(),
+                state.reconnectingLearners(),
                 state.currentConceptIndex(),
                 state.totalConcepts(),
                 state.playerScores(),
@@ -1381,6 +1530,7 @@ public class LearnerImposterLobbyService {
         learnerIds.add(lobby.getCurrentImposterLearnerId());
         learnerIds.add(lobby.getLatestResultAccusedLearnerId());
         learnerIds.add(lobby.getLatestResultImposterLearnerId());
+        learnerIds.add(lobby.getAbandonedByLearnerId());
         learnerIds.remove(null);
 
         List<UUID> orderedLearnerIds = new ArrayList<>(learnerIds);

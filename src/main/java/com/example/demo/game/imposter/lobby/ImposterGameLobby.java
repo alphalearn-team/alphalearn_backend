@@ -184,6 +184,15 @@ public class ImposterGameLobby {
     @Column(name = "state_version")
     private Integer stateVersion;
 
+    @Column(name = "ended_reason", length = 64)
+    private String endedReason;
+
+    @Column(name = "ended_at")
+    private OffsetDateTime endedAt;
+
+    @Column(name = "abandoned_by_learner_id", columnDefinition = "uuid")
+    private UUID abandonedByLearnerId;
+
     @PrePersist
     void assignPublicIdIfMissing() {
         if (publicId == null) {

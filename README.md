@@ -6,6 +6,29 @@
 - Supabase schema changes and migrations: [docs/guides/schema-changes.md](docs/guides/schema-changes.md)
 - Supabase CLI install (Windows + macOS): [docs/guides/supabase-cli-install.md](docs/guides/supabase-cli-install.md)
 
+## Seeded Demo Accounts
+
+These accounts are seeded by:
+- Local reset seed: `supabase/seed.sql`
+- Migration seed (CI/prod): `supabase/migrations/20260405083000_seed_demo_accounts_concepts_and_april_pack.sql`
+
+Shared password for all seeded accounts: `123456`
+
+Contributors:
+- `contributor.gabriel@gmail.com`
+- `contributor.jeniffer@gmail.com`
+- `contributor.josh@gmail.com`
+
+Learners:
+- `learner.nathaniel@gmail.com`
+- `learner.engkit@gmail.com`
+- `learner.christoph@gmail.com`
+
+Admin:
+- `admin.jiugeng@gmail.com`
+
+Security note: these are seeded/demo credentials and should be rotated or removed for public production environments.
+
 ## CI/CD Pipeline
 
 ### Backend CI

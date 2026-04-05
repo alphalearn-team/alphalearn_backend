@@ -5,5 +5,6 @@ public enum ImposterLobbyPhase {
     VOTING,
     IMPOSTER_GUESS,
     CONCEPT_RESULT,
-    MATCH_COMPLETE
+    MATCH_COMPLETE,
+    ABANDONED
 }
