@@ -660,6 +660,57 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
+    void getPrivateLobbyStateIncludesReconnectPresenceCountdown() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        UUID reconnectingLearnerId = UUID.randomUUID();
+        ImposterGameLobbyMember reconnectingMember = existingMember(lobby, reconnectingLearnerId, "2026-04-01T12:05:00Z");
+
+        Learner hostLearner = learner(host.userId(), "host");
+        Learner reconnectingLearner = learner(reconnectingLearnerId, "reconnect");
+        OffsetDateTime deadline = OffsetDateTime.parse("2026-04-02T00:00:30Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, reconnectingMember));
+        when(learnerRepository.findAllById(anyList())).thenReturn(List.of(hostLearner, reconnectingLearner));
+        when(imposterLobbyRealtimePresenceTracker.listReconnectPresence(lobbyPublicId))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.ReconnectPresenceSnapshot(reconnectingLearnerId, deadline)));
+
+        PrivateImposterLobbyStateDto result = service.getPrivateLobbyState(host, lobbyPublicId);
+
+        assertThat(result.reconnectingLearners()).hasSize(1);
+        assertThat(result.reconnectingLearners().get(0).learnerPublicId()).isEqualTo(reconnectingLearner.getPublicId());
+        assertThat(result.reconnectingLearners().get(0).disconnectDeadlineAt()).isEqualTo(deadline);
+    }
+
+    @Test
+    void publishRealtimePresenceUpdateBroadcastsSharedAndViewerState() {
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        UUID memberOneId = UUID.randomUUID();
+        UUID memberTwoId = UUID.randomUUID();
+        ImposterGameLobbyMember memberOne = existingMember(lobby, memberOneId, "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(memberOne, memberTwo));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(learner(memberOneId, "one"), learner(memberTwoId, "two")));
+
+        service.publishRealtimePresenceUpdate(lobbyPublicId, "RECONNECTING");
+
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), any(), eq("RECONNECTING"), any());
+        verify(imposterLobbyRealtimePublisher, times(2)).publishViewerLobbyState(eq(lobbyPublicId), any(), any(), eq("RECONNECTING"), any());
+    }
+
+    @Test
     void submitVoteRejectsSelfVote() {
         SupabaseAuthUser voter = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");

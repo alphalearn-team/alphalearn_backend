@@ -239,6 +239,7 @@ class MeImposterLobbyControllerTest {
                 null,
                 null,
                 null,
+                List.of(),
                 1,
                 3,
                 List.of(),
