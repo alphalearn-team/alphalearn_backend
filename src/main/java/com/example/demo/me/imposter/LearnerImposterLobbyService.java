@@ -247,6 +247,21 @@ public class LearnerImposterLobbyService {
         List<ImposterGameLobbyMember> remainingActiveMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         boolean leavingHost = user.userId().equals(lobby.getHostLearnerId());
+        boolean startedAndActive = lobby.getStartedAt() != null
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.MATCH_COMPLETE
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.ABANDONED;
+
+        if (startedAndActive) {
+            abandonLobbyAfterQuit(lobby, user.userId(), now);
+            incrementStateVersion(lobby);
+            ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+            PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
+            publishRealtimeState(savedLobby, "ABANDONED_BY_QUIT", remainingActiveMembers);
+            return new LeavePrivateImposterLobbyResponse(
+                    PrivateImposterLobbyLeaveResult.LEFT_AND_SESSION_ABANDONED,
+                    state
+            );
+        }
 
         if (remainingActiveMembers.isEmpty()) {
             imposterGameLobbyMemberRepository.delete(member);
@@ -1136,6 +1151,29 @@ public class LearnerImposterLobbyService {
                     deserializeVoteTallies(lobby.getLatestResultVoteTallies())
             );
         }
+    }
+
+    private void abandonLobbyAfterQuit(
+            ImposterGameLobby lobby,
+            UUID abandonedByLearnerId,
+            OffsetDateTime endedAt
+    ) {
+        lobby.setCurrentPhase(ImposterLobbyPhase.ABANDONED);
+        lobby.setEndedReason("PLAYER_QUIT");
+        lobby.setEndedAt(endedAt);
+        lobby.setAbandonedByLearnerId(abandonedByLearnerId);
+        lobby.setCurrentDrawerLearnerId(null);
+        lobby.setCurrentTurnIndex(null);
+        lobby.setTurnStartedAt(null);
+        lobby.setTurnEndsAt(null);
+        lobby.setTurnCompletedAt(endedAt);
+        lobby.setRoundCompletedAt(endedAt);
+        lobby.setVotingRoundNumber(null);
+        lobby.setVotingEligibleTargetLearnerIds(null);
+        lobby.setVotingBallots(null);
+        lobby.setVotingDeadlineAt(null);
+        lobby.setImposterGuessDeadlineAt(null);
+        lobby.setConceptResultDeadlineAt(null);
     }
 
     private ImposterGameLobby resolveLobbyByPublicId(UUID lobbyPublicId, boolean lockForUpdate) {
