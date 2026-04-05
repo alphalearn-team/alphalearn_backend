@@ -40,6 +40,7 @@ public record PrivateImposterLobbyStateDto(
         String endReason,
         OffsetDateTime endedAt,
         UUID endedByPublicId,
+        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners,
         Integer currentConceptIndex,
         Integer totalConcepts,
         List<PrivateImposterLobbyPlayerScoreDto> playerScores,

@@ -16,12 +16,13 @@ public class ImposterLobbyRealtimePresenceTracker {
     private final ConcurrentHashMap<String, SessionState> sessionsById = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<LobbyLearnerKey, PresenceState> presenceByLobbyLearner = new ConcurrentHashMap<>();
 
-    public void registerLobbySubscription(String sessionId, UUID learnerId, UUID lobbyPublicId, OffsetDateTime now) {
+    public boolean registerLobbySubscription(String sessionId, UUID learnerId, UUID lobbyPublicId, OffsetDateTime now) {
         if (sessionId == null || learnerId == null || lobbyPublicId == null || now == null) {
-            return;
+            return false;
         }
 
         SessionState sessionState = sessionsById.computeIfAbsent(sessionId, ignored -> new SessionState(learnerId));
+        boolean clearedReconnectingState = false;
         synchronized (sessionState) {
             if (!sessionState.learnerId().equals(learnerId)) {
                 sessionState = new SessionState(learnerId);
@@ -32,22 +33,26 @@ public class ImposterLobbyRealtimePresenceTracker {
                 LobbyLearnerKey key = new LobbyLearnerKey(lobbyPublicId, learnerId);
                 PresenceState presence = presenceByLobbyLearner.computeIfAbsent(key, ignored -> new PresenceState());
                 synchronized (presence) {
+                    boolean wasReconnectPending = presence.disconnectDeadlineAt != null;
                     presence.activeSessionCount++;
                     presence.disconnectedAt = null;
                     presence.disconnectDeadlineAt = null;
+                    clearedReconnectingState = clearedReconnectingState || wasReconnectPending;
                 }
             }
         }
+        return clearedReconnectingState;
     }
 
-    public void handleSessionDisconnect(String sessionId, OffsetDateTime now, int graceSeconds) {
+    public Set<UUID> handleSessionDisconnect(String sessionId, OffsetDateTime now, int graceSeconds) {
+        Set<UUID> lobbiesNowReconnectPending = new HashSet<>();
         if (sessionId == null || now == null) {
-            return;
+            return lobbiesNowReconnectPending;
         }
 
         SessionState sessionState = sessionsById.remove(sessionId);
         if (sessionState == null) {
-            return;
+            return lobbiesNowReconnectPending;
         }
 
         Set<UUID> lobbyPublicIds;
@@ -69,9 +74,11 @@ public class ImposterLobbyRealtimePresenceTracker {
                 if (presence.activeSessionCount == 0) {
                     presence.disconnectedAt = now;
                     presence.disconnectDeadlineAt = now.plusSeconds(Math.max(1, graceSeconds));
+                    lobbiesNowReconnectPending.add(lobbyPublicId);
                 }
             }
         }
+        return lobbiesNowReconnectPending;
     }
 
     public List<DisconnectTimeoutCandidate> consumeDueDisconnectTimeouts(OffsetDateTime now) {
@@ -114,7 +121,31 @@ public class ImposterLobbyRealtimePresenceTracker {
         });
     }
 
-    record DisconnectTimeoutCandidate(UUID lobbyPublicId, UUID learnerId, OffsetDateTime disconnectedAt) {
+    public List<ReconnectPresenceSnapshot> listReconnectPresence(UUID lobbyPublicId) {
+        List<ReconnectPresenceSnapshot> reconnecting = new ArrayList<>();
+        if (lobbyPublicId == null) {
+            return reconnecting;
+        }
+
+        for (var entry : presenceByLobbyLearner.entrySet()) {
+            if (!entry.getKey().lobbyPublicId().equals(lobbyPublicId)) {
+                continue;
+            }
+            PresenceState state = entry.getValue();
+            synchronized (state) {
+                if (state.activeSessionCount == 0 && state.disconnectDeadlineAt != null) {
+                    reconnecting.add(new ReconnectPresenceSnapshot(entry.getKey().learnerId(), state.disconnectDeadlineAt));
+                }
+            }
+        }
+        reconnecting.sort((left, right) -> left.disconnectDeadlineAt().compareTo(right.disconnectDeadlineAt()));
+        return reconnecting;
+    }
+
+    public record DisconnectTimeoutCandidate(UUID lobbyPublicId, UUID learnerId, OffsetDateTime disconnectedAt) {
+    }
+
+    public record ReconnectPresenceSnapshot(UUID learnerId, OffsetDateTime disconnectDeadlineAt) {
     }
 
     private record LobbyLearnerKey(UUID lobbyPublicId, UUID learnerId) {

@@ -28,6 +28,7 @@ import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyMemberStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyPlayerScoreDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyReconnectStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbySharedStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyViewerStateDto;
@@ -679,6 +680,23 @@ public class LearnerImposterLobbyService {
         for (ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate dueDisconnect : dueDisconnects) {
             processDisconnectTimeout(dueDisconnect, now);
         }
+    }
+
+    @Transactional
+    public void publishRealtimePresenceUpdate(UUID lobbyPublicId, String reason) {
+        if (lobbyPublicId == null) {
+            return;
+        }
+        ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicId(lobbyPublicId).orElse(null);
+        if (lobby == null) {
+            return;
+        }
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (activeMembers.isEmpty()) {
+            return;
+        }
+        publishRealtimeState(lobby, reason, activeMembers);
     }
 
     private void processTimedTransitionsForLobby(UUID lobbyPublicId, OffsetDateTime now) {
@@ -1361,6 +1379,15 @@ public class LearnerImposterLobbyService {
                 .map(targetId -> toLearnerPublicId(learnersById, targetId))
                 .filter(id -> id != null)
                 .toList();
+        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners = realtimePresenceTracker
+                .listReconnectPresence(lobby.getPublicId())
+                .stream()
+                .map(snapshot -> new PrivateImposterLobbyReconnectStateDto(
+                        toLearnerPublicId(learnersById, snapshot.learnerId()),
+                        snapshot.disconnectDeadlineAt()
+                ))
+                .filter(snapshot -> snapshot.learnerPublicId() != null)
+                .toList();
 
         long activeMemberCount = activeMemberDtos.size();
         boolean viewerIsHost = viewerLearnerId != null && viewerLearnerId.equals(lobby.getHostLearnerId());
@@ -1414,6 +1441,7 @@ public class LearnerImposterLobbyService {
                 lobby.getEndedReason(),
                 lobby.getEndedAt(),
                 endedByPublicId,
+                reconnectingLearners,
                 lobby.getCurrentConceptIndex(),
                 defaultConceptCount(lobby),
                 playerScores,
@@ -1464,6 +1492,7 @@ public class LearnerImposterLobbyService {
                 state.endReason(),
                 state.endedAt(),
                 state.endedByPublicId(),
+                state.reconnectingLearners(),
                 state.currentConceptIndex(),
                 state.totalConcepts(),
                 state.playerScores(),

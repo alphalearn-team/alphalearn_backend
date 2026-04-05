@@ -2,9 +2,11 @@ package com.example.demo.config.websocket;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.me.imposter.ImposterLobbyRealtimePresenceTracker;
+import com.example.demo.me.imposter.LearnerImposterLobbyService;
 import java.security.Principal;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,15 +28,18 @@ public class ImposterLobbyWebSocketPresenceListener {
     private static final Pattern LOBBY_USER_QUEUE_PATTERN = Pattern.compile("^/user/queue/imposter/lobbies/([0-9a-fA-F\\-]{36})$");
 
     private final ImposterLobbyRealtimePresenceTracker presenceTracker;
+    private final LearnerImposterLobbyService learnerImposterLobbyService;
     private final Clock clock;
     private final int disconnectGraceSeconds;
 
     public ImposterLobbyWebSocketPresenceListener(
             ImposterLobbyRealtimePresenceTracker presenceTracker,
+            LearnerImposterLobbyService learnerImposterLobbyService,
             Clock clock,
             @Value("${imposter.lobby.realtime.disconnect-grace-seconds:30}") int disconnectGraceSeconds
     ) {
         this.presenceTracker = presenceTracker;
+        this.learnerImposterLobbyService = learnerImposterLobbyService;
         this.clock = clock;
         this.disconnectGraceSeconds = disconnectGraceSeconds;
     }
@@ -58,12 +63,15 @@ public class ImposterLobbyWebSocketPresenceListener {
             return;
         }
 
-        presenceTracker.registerLobbySubscription(
+        boolean clearedReconnectState = presenceTracker.registerLobbySubscription(
                 sessionId,
                 authUser.userId(),
                 lobbyPublicId,
                 OffsetDateTime.now(clock)
         );
+        if (clearedReconnectState) {
+            learnerImposterLobbyService.publishRealtimePresenceUpdate(lobbyPublicId, "RECONNECTED");
+        }
     }
 
     @EventListener
@@ -73,7 +81,14 @@ public class ImposterLobbyWebSocketPresenceListener {
             return;
         }
 
-        presenceTracker.handleSessionDisconnect(sessionId, OffsetDateTime.now(clock), disconnectGraceSeconds);
+        Set<UUID> lobbiesWithPendingReconnect = presenceTracker.handleSessionDisconnect(
+                sessionId,
+                OffsetDateTime.now(clock),
+                disconnectGraceSeconds
+        );
+        for (UUID lobbyPublicId : lobbiesWithPendingReconnect) {
+            learnerImposterLobbyService.publishRealtimePresenceUpdate(lobbyPublicId, "RECONNECTING");
+        }
     }
 
     private UUID extractLobbyPublicId(String destination) {
