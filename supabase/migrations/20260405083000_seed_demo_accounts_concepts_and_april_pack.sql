@@ -1,14 +1,5 @@
--- Local seed data (idempotent)
--- Applied during `npx supabase db reset` because config.toml has [db.seed].
+-- Idempotent seed data for demo accounts, concepts, and April 2026 monthly pack.
 
-begin;
-
--- Local seeded auth users for development login:
--- password for all seeded users: 123456
--- contributors: gabriel, jeniffer, josh
--- learners: nathaniel, eng_kit, christoph
--- admin: jiugeng
--- password: 123456
 insert into auth.users (
   instance_id,
   id,
@@ -193,7 +184,6 @@ set
   title = excluded.title,
   description = excluded.description;
 
--- April 2026 imposter monthly pack: all 20 concepts, with 4 weekly featured slots.
 with upsert_pack as (
   insert into public.imposter_monthly_packs (year_month)
   values ('2026-04')
@@ -307,5 +297,3 @@ select
 from public.imposter_monthly_pack_concepts pmc
 join pack on pack.id = pmc.pack_id
 where pmc.slot_index in (1, 7, 13, 19);
-
-commit;
