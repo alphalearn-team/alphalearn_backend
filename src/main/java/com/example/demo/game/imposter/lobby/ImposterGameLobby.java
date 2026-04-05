@@ -32,7 +32,7 @@ public class ImposterGameLobby {
     @Setter(lombok.AccessLevel.NONE)
     private UUID publicId;
 
-    @Column(name = "lobby_code", nullable = false, unique = true, length = 8)
+    @Column(name = "lobby_code", length = 8)
     private String lobbyCode;
 
     @Column(name = "host_learner_id", columnDefinition = "uuid", nullable = false)
