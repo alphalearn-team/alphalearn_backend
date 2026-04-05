@@ -263,6 +263,14 @@ public class LearnerImposterLobbyService {
             );
         }
 
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            incrementStateVersion(lobby);
+            ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+            PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
+            publishRealtimeState(savedLobby, "LEAVE_AFTER_ABANDONED", remainingActiveMembers);
+            return new LeavePrivateImposterLobbyResponse(PrivateImposterLobbyLeaveResult.LEFT, state);
+        }
+
         if (remainingActiveMembers.isEmpty()) {
             imposterGameLobbyMemberRepository.delete(member);
             try {
@@ -425,6 +433,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
         ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
         ensureViewerIsCurrentDrawer(lobby, user.userId());
@@ -444,6 +453,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
         ensurePhase(lobby, ImposterLobbyPhase.DRAWING, "Drawing is not active");
         ensureViewerIsCurrentDrawer(lobby, user.userId());
@@ -486,6 +496,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
 
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
@@ -549,6 +560,7 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         ensureViewerIsMember(lobby, user.userId());
+        ensureLobbyNotAbandoned(lobby);
         ensureLobbyStarted(lobby);
 
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
@@ -655,6 +667,9 @@ public class LearnerImposterLobbyService {
 
     private void processTimedTransitionsForLobby(UUID lobbyPublicId, OffsetDateTime now) {
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            return;
+        }
         List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
         if (activeMembers.isEmpty()) {
@@ -1196,6 +1211,12 @@ public class LearnerImposterLobbyService {
     private void ensureLobbyStarted(ImposterGameLobby lobby) {
         if (lobby.getStartedAt() == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby has not started yet");
+        }
+    }
+
+    private void ensureLobbyNotAbandoned(ImposterGameLobby lobby) {
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby session has been abandoned");
         }
     }
 
