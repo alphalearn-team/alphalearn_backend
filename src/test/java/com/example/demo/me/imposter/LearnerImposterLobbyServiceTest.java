@@ -84,6 +84,9 @@ class LearnerImposterLobbyServiceTest {
     @Mock
     private ImposterLobbyRealtimePublisher imposterLobbyRealtimePublisher;
 
+    @Mock
+    private ImposterLobbyRealtimePresenceTracker imposterLobbyRealtimePresenceTracker;
+
     private LearnerImposterLobbyService service;
 
     @BeforeEach
@@ -99,6 +102,7 @@ class LearnerImposterLobbyServiceTest {
                 conceptRepository,
                 learnerRepository,
                 imposterLobbyRealtimePublisher,
+                imposterLobbyRealtimePresenceTracker,
                 fixedClock
         );
         lenient().when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class))).thenAnswer(invocation -> {
@@ -356,6 +360,7 @@ class LearnerImposterLobbyServiceTest {
         assertThat(result.lobbyState().activeMemberCount()).isEqualTo(1);
         assertThat(result.lobbyState().viewerIsActiveMember()).isFalse();
         assertThat(result.lobbyState().canLeave()).isFalse();
+        verify(imposterLobbyRealtimePresenceTracker).clearLobbyMembership(lobbyPublicId, user.userId());
     }
 
     @Test
@@ -492,6 +497,62 @@ class LearnerImposterLobbyServiceTest {
                 .hasMessageContaining("session has been abandoned");
 
         verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void processRealtimeDisconnectTimeoutsAbandonsLobbyAndPublishesRealtime() {
+        UUID disconnectedLearnerId = UUID.randomUUID();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setStateVersion(7);
+
+        ImposterGameLobbyMember disconnectedMember = existingMember(lobby, disconnectedLearnerId, "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember otherMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        when(imposterLobbyRealtimePresenceTracker.consumeDueDisconnectTimeouts(any()))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate(
+                        lobbyPublicId,
+                        disconnectedLearnerId,
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z")
+                )));
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, disconnectedLearnerId))
+                .thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(disconnectedMember, otherMember), List.of(disconnectedMember, otherMember));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(disconnectedLearnerId, "dc"),
+                        learner(otherMember.getLearnerId(), "other")
+                ));
+
+        service.processRealtimeDisconnectTimeouts();
+
+        assertThat(lobby.getCurrentPhase()).isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+        assertThat(lobby.getEndedReason()).isEqualTo("PLAYER_DISCONNECTED_TIMEOUT");
+        assertThat(lobby.getEndedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(lobby.getAbandonedByLearnerId()).isEqualTo(disconnectedLearnerId);
+        verify(imposterLobbyRealtimePublisher)
+                .publishSharedLobbyState(eq(lobbyPublicId), eq(8), eq("ABANDONED_BY_DISCONNECT_TIMEOUT"), any());
+    }
+
+    @Test
+    void processRealtimeDisconnectTimeoutsSkipsLobbyWhenNotStarted() {
+        UUID disconnectedLearnerId = UUID.randomUUID();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        when(imposterLobbyRealtimePresenceTracker.consumeDueDisconnectTimeouts(any()))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate(
+                        lobbyPublicId,
+                        disconnectedLearnerId,
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z")
+                )));
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        service.processRealtimeDisconnectTimeouts();
+
+        verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
     }
 
     @Test
