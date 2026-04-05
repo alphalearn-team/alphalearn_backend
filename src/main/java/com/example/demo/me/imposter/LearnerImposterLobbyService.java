@@ -81,6 +81,8 @@ public class LearnerImposterLobbyService {
     private static final String LOBBY_CODE_UNIQUE_CONSTRAINT = "uk_imposter_game_lobbies_lobby_code";
     private static final String MEMBER_UNIQUE_CONSTRAINT = "uk_imposter_game_lobby_members_lobby_learner";
     private static final String DRAWING_VERSION_CONFLICT_MESSAGE = "Drawing version conflict";
+    private static final String END_REASON_PLAYER_QUIT = "PLAYER_QUIT";
+    private static final String END_REASON_PLAYER_DISCONNECTED_TIMEOUT = "PLAYER_DISCONNECTED_TIMEOUT";
 
     private enum WinnerSide {
         IMPOSTER,
@@ -103,6 +105,7 @@ public class LearnerImposterLobbyService {
     private final ConceptRepository conceptRepository;
     private final LearnerRepository learnerRepository;
     private final ImposterLobbyRealtimePublisher realtimePublisher;
+    private final ImposterLobbyRealtimePresenceTracker realtimePresenceTracker;
     private final Clock clock;
 
     public LearnerImposterLobbyService(
@@ -115,6 +118,7 @@ public class LearnerImposterLobbyService {
             ConceptRepository conceptRepository,
             LearnerRepository learnerRepository,
             ImposterLobbyRealtimePublisher realtimePublisher,
+            ImposterLobbyRealtimePresenceTracker realtimePresenceTracker,
             Clock clock
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
@@ -126,6 +130,7 @@ public class LearnerImposterLobbyService {
         this.conceptRepository = conceptRepository;
         this.learnerRepository = learnerRepository;
         this.realtimePublisher = realtimePublisher;
+        this.realtimePresenceTracker = realtimePresenceTracker;
         this.clock = clock;
     }
 
@@ -243,6 +248,7 @@ public class LearnerImposterLobbyService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         member.setLeftAt(now);
         imposterGameLobbyMemberRepository.saveAndFlush(member);
+        realtimePresenceTracker.clearLobbyMembership(lobbyPublicId, user.userId());
 
         List<ImposterGameLobbyMember> remainingActiveMembers = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
@@ -252,7 +258,7 @@ public class LearnerImposterLobbyService {
                 && lobby.getCurrentPhase() != ImposterLobbyPhase.ABANDONED;
 
         if (startedAndActive) {
-            abandonLobbyAfterQuit(lobby, user.userId(), now);
+            abandonLobby(lobby, user.userId(), now, END_REASON_PLAYER_QUIT);
             incrementStateVersion(lobby);
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
             PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
@@ -665,6 +671,16 @@ public class LearnerImposterLobbyService {
         }
     }
 
+    @Transactional
+    public void processRealtimeDisconnectTimeouts() {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate> dueDisconnects =
+                realtimePresenceTracker.consumeDueDisconnectTimeouts(now);
+        for (ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate dueDisconnect : dueDisconnects) {
+            processDisconnectTimeout(dueDisconnect, now);
+        }
+    }
+
     private void processTimedTransitionsForLobby(UUID lobbyPublicId, OffsetDateTime now) {
         ImposterGameLobby lobby = resolveLobbyByPublicId(lobbyPublicId, true);
         if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
@@ -682,6 +698,43 @@ public class LearnerImposterLobbyService {
             ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
             publishRealtimeState(savedLobby, "DEADLINE_ADVANCE", activeMembers);
         }
+    }
+
+    private void processDisconnectTimeout(
+            ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate dueDisconnect,
+            OffsetDateTime now
+    ) {
+        ImposterGameLobby lobby;
+        try {
+            lobby = resolveLobbyByPublicId(dueDisconnect.lobbyPublicId(), true);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return;
+            }
+            throw ex;
+        }
+        if (lobby.getStartedAt() == null
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.MATCH_COMPLETE
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED) {
+            return;
+        }
+
+        boolean learnerStillActive = imposterGameLobbyMemberRepository
+                .existsByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), dueDisconnect.learnerId());
+        if (!learnerStillActive) {
+            return;
+        }
+
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (activeMembers.isEmpty()) {
+            return;
+        }
+
+        abandonLobby(lobby, dueDisconnect.learnerId(), now, END_REASON_PLAYER_DISCONNECTED_TIMEOUT);
+        incrementStateVersion(lobby);
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+        publishRealtimeState(savedLobby, "ABANDONED_BY_DISCONNECT_TIMEOUT", activeMembers);
     }
 
     private void applyDefaultSettings(ImposterGameLobby lobby) {
@@ -1168,13 +1221,14 @@ public class LearnerImposterLobbyService {
         }
     }
 
-    private void abandonLobbyAfterQuit(
+    private void abandonLobby(
             ImposterGameLobby lobby,
             UUID abandonedByLearnerId,
-            OffsetDateTime endedAt
+            OffsetDateTime endedAt,
+            String endedReason
     ) {
         lobby.setCurrentPhase(ImposterLobbyPhase.ABANDONED);
-        lobby.setEndedReason("PLAYER_QUIT");
+        lobby.setEndedReason(endedReason);
         lobby.setEndedAt(endedAt);
         lobby.setAbandonedByLearnerId(abandonedByLearnerId);
         lobby.setCurrentDrawerLearnerId(null);

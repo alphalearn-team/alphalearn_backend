@@ -15,5 +15,6 @@ public class ImposterLobbyRealtimeTransitionScheduler {
     @Scheduled(fixedDelayString = "${imposter.lobby.realtime.transition-poll-ms:1000}")
     public void processTimedTransitions() {
         learnerImposterLobbyService.processRealtimeTimedTransitions();
+        learnerImposterLobbyService.processRealtimeDisconnectTimeouts();
     }
 }
