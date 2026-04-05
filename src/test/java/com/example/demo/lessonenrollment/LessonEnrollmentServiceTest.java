@@ -122,6 +122,28 @@ class LessonEnrollmentServiceTest {
         assertThat(status.enrolled()).isTrue();
     }
 
+    @Test
+    void countEnrollmentsDelegatesToRepository() {
+        UUID lessonPublicId = UUID.randomUUID();
+        when(repository.countByLesson_PublicId(lessonPublicId)).thenReturn(7L);
+
+        long result = service.countEnrollments(lessonPublicId);
+
+        assertThat(result).isEqualTo(7L);
+        verify(repository).countByLesson_PublicId(lessonPublicId);
+    }
+
+    @Test
+    void countCompletionsDelegatesToRepository() {
+        UUID lessonPublicId = UUID.randomUUID();
+        when(repository.countByLesson_PublicIdAndCompletedTrue(lessonPublicId)).thenReturn(3L);
+
+        long result = service.countCompletions(lessonPublicId);
+
+        assertThat(result).isEqualTo(3L);
+        verify(repository).countByLesson_PublicIdAndCompletedTrue(lessonPublicId);
+    }
+
     private SupabaseAuthUser mockUser(UUID userId) {
         Learner learner = new Learner();
         learner.setId(userId);

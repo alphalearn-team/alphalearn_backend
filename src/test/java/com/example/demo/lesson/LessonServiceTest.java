@@ -26,6 +26,7 @@ import com.example.demo.contributor.Contributor;
 import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.dto.CreateLessonRequest;
+import com.example.demo.lesson.dto.LessonContributorSummaryDto;
 import com.example.demo.lesson.dto.LessonDetailDto;
 import com.example.demo.lesson.dto.UpdateLessonRequest;
 import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
@@ -395,6 +396,31 @@ class LessonServiceTest {
         assertThat(ex.getStatusCode().value()).isEqualTo(404);
         assertThat(ex.getReason()).isEqualTo("Lesson not found");
         verify(lessonRepository, never()).save(any(Lesson.class));
+    }
+
+    @Test
+    void getMyAuthoredLessonsIncludesEnrollmentAndCompletionCounts() {
+        UUID ownerId = UUID.randomUUID();
+        UUID lessonPublicId = UUID.randomUUID();
+        Lesson lesson = new Lesson();
+        lesson.setPublicId(lessonPublicId);
+        lesson.setTitle("Test Lesson");
+        lesson.setCreatedAt(OffsetDateTime.now());
+        lesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+        lesson.setContributor(contributor(ownerId));
+
+        when(lessonListQueryService.findLessons(any())).thenReturn(List.of(lesson));
+        when(lessonEnrollmentService.countEnrollments(lessonPublicId)).thenReturn(5L);
+        when(lessonEnrollmentService.countCompletions(lessonPublicId)).thenReturn(3L);
+        when(lessonMappingSupport.conceptPublicIds(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.conceptSummaries(lesson)).thenReturn(List.of());
+        when(lessonMappingSupport.author(lesson)).thenReturn(null);
+
+        List<LessonContributorSummaryDto> result = lessonService.getMyAuthoredLessons(ownerId, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).enrollmentCount()).isEqualTo(5L);
+        assertThat(result.get(0).completionCount()).isEqualTo(3L);
     }
 
     private SupabaseAuthUser contributorUser(UUID contributorId) {
