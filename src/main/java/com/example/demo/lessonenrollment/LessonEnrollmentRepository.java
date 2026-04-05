@@ -18,4 +18,8 @@ public interface LessonEnrollmentRepository extends JpaRepository<LessonEnrollme
 	boolean existsByLearner_IdAndLesson_PublicId(UUID learnerId, UUID lessonPublicId);
 
 	Optional<LessonEnrollment> findByLearner_IdAndLesson_PublicId(UUID learnerId, UUID lessonPublicId);
+
+	long countByLesson_PublicId(UUID lessonPublicId);
+
+	long countByLesson_PublicIdAndCompletedTrue(UUID lessonPublicId);
 }
