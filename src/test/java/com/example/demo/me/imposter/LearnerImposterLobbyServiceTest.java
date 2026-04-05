@@ -22,6 +22,7 @@ import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
+import com.example.demo.game.imposter.lobby.ImposterLobbyType;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
@@ -37,6 +38,7 @@ import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
 import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
 import com.example.demo.me.imposter.dto.SubmitImposterVoteRequest;
+import com.example.demo.me.imposter.dto.UpdatePrivateImposterLobbySettingsRequest;
 import com.example.demo.me.imposter.dto.UpsertImposterDrawingSnapshotRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -626,6 +628,26 @@ class LearnerImposterLobbyServiceTest {
         assertThatThrownBy(() -> service.startPrivateLobby(requester, lobbyPublicId))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Only lobby host can start");
+    }
+
+    @Test
+    void updatePrivateLobbySettingsRejectsForRankedLobby() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+        lobby.setLobbyType(ImposterLobbyType.RANKED_MATCHMADE);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.updatePrivateLobbySettings(
+                host,
+                lobbyPublicId,
+                new UpdatePrivateImposterLobbySettingsRequest(3, 2, 30, 30, 25)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Ranked lobby settings are fixed");
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
 import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
 import com.example.demo.game.imposter.lobby.ImposterLobbyPhase;
+import com.example.demo.game.imposter.lobby.ImposterLobbyType;
 import com.example.demo.game.imposter.realtime.ImposterLobbyRealtimePublisher;
 import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
 import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
@@ -68,8 +69,10 @@ public class LearnerImposterLobbyService {
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final int LOBBY_CODE_MAX_RETRIES = 10;
     private static final int MIN_ACTIVE_MEMBERS_TO_START = 3;
+    private static final int RANKED_ACTIVE_MEMBERS_TO_START = 4;
+    private static final int MAX_ACTIVE_RANKED_LOBBIES = 3;
     private static final int DEFAULT_CONCEPT_COUNT = 3;
-    private static final int DEFAULT_ROUNDS_PER_CONCEPT = 1;
+    private static final int DEFAULT_ROUNDS_PER_CONCEPT = 2;
     private static final int DEFAULT_DISCUSSION_TIMER_SECONDS = 30;
     private static final int DEFAULT_IMPOSTER_GUESS_TIMER_SECONDS = 30;
     private static final int DEFAULT_TURN_DURATION_SECONDS = 25;
@@ -169,6 +172,7 @@ public class LearnerImposterLobbyService {
             lobby.setLobbyCode(imposterLobbyCodeGenerator.generate());
             lobby.setHostLearnerId(user.userId());
             lobby.setPrivateLobby(true);
+            lobby.setLobbyType(ImposterLobbyType.PRIVATE_CUSTOM);
             lobby.setConceptPoolMode(request.conceptPoolMode());
             lobby.setPinnedYearMonth(pinnedYearMonth);
             lobby.setCreatedAt(OffsetDateTime.now(clock));
@@ -198,6 +202,9 @@ public class LearnerImposterLobbyService {
 
         ImposterGameLobby lobby = imposterGameLobbyRepository.findByLobbyCodeForUpdate(lobbyCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found"));
+        if (lobby.getLobbyType() != ImposterLobbyType.PRIVATE_CUSTOM) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Imposter lobby not found");
+        }
 
         ImposterGameLobbyMember activeMember = imposterGameLobbyMemberRepository
                 .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), user.userId())
@@ -329,6 +336,9 @@ public class LearnerImposterLobbyService {
         if (lobby.getStartedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Imposter lobby settings are locked after start");
         }
+        if (lobby.getLobbyType() == ImposterLobbyType.RANKED_MATCHMADE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ranked lobby settings are fixed");
+        }
 
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "settings payload is required");
@@ -392,20 +402,63 @@ public class LearnerImposterLobbyService {
             );
         }
 
-        applyDefaultSettings(lobby);
         OffsetDateTime now = OffsetDateTime.now(clock);
-        lobby.setStartedAt(now);
-        lobby.setStartedByLearnerId(user.userId());
-        lobby.setCurrentConceptIndex(1);
-        lobby.setUsedConceptPublicIds(null);
-        lobby.setPlayerScores(serializeScoreMap(initializeScoreMap(activeMembers)));
-        initializeConceptRuntime(lobby, activeMembers, now);
+        startLobbySession(lobby, activeMembers, user.userId(), now);
 
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         PrivateImposterLobbyStateDto state = buildLobbyState(savedLobby, user.userId(), activeMembers);
         publishRealtimeState(savedLobby, "START");
         return state;
+    }
+
+    @Transactional
+    public UUID assignLearnerToRankedLobbyAndMaybeStart(UUID learnerId) {
+        if (learnerId == null) {
+            return null;
+        }
+        if (!learnerRepository.existsById(learnerId)) {
+            return null;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        List<ImposterGameLobby> rankedLobbies = imposterGameLobbyRepository
+                .findByLobbyTypeOrderByCreatedAtAsc(ImposterLobbyType.RANKED_MATCHMADE);
+
+        for (ImposterGameLobby candidate : rankedLobbies) {
+            ImposterGameLobby lobby = imposterGameLobbyRepository.findByPublicIdForUpdate(candidate.getPublicId()).orElse(null);
+            if (lobby == null || !isLobbyJoinableForRanked(lobby)) {
+                continue;
+            }
+            UUID assignedLobbyId = assignLearnerToRankedLobby(lobby, learnerId, now);
+            if (assignedLobbyId != null) {
+                return assignedLobbyId;
+            }
+        }
+
+        long activeRankedLobbyCount = rankedLobbies.stream()
+                .filter(this::isLobbyActiveForRankedCapacity)
+                .count();
+        if (activeRankedLobbyCount >= MAX_ACTIVE_RANKED_LOBBIES) {
+            return null;
+        }
+
+        ImposterGameLobby newLobby = new ImposterGameLobby();
+        newLobby.setLobbyCode(imposterLobbyCodeGenerator.generate());
+        newLobby.setHostLearnerId(learnerId);
+        newLobby.setPrivateLobby(false);
+        newLobby.setLobbyType(ImposterLobbyType.RANKED_MATCHMADE);
+        newLobby.setConceptPoolMode(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
+        newLobby.setPinnedYearMonth(null);
+        newLobby.setCreatedAt(now);
+        applyDefaultSettings(newLobby);
+
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(newLobby);
+        createMembership(savedLobby, learnerId);
+        incrementStateVersion(savedLobby);
+        ImposterGameLobby persistedLobby = imposterGameLobbyRepository.saveAndFlush(savedLobby);
+        publishRealtimeState(persistedLobby, "RANKED_MATCHED");
+        return persistedLobby.getPublicId();
     }
 
     @Transactional
@@ -753,6 +806,83 @@ public class LearnerImposterLobbyService {
         incrementStateVersion(lobby);
         ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
         publishRealtimeState(savedLobby, "ABANDONED_BY_DISCONNECT_TIMEOUT", activeMembers);
+    }
+
+    private UUID assignLearnerToRankedLobby(ImposterGameLobby lobby, UUID learnerId, OffsetDateTime now) {
+        List<ImposterGameLobbyMember> activeMembers = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        if (activeMembers.size() >= RANKED_ACTIVE_MEMBERS_TO_START) {
+            return null;
+        }
+
+        ImposterGameLobbyMember existingActiveMember = imposterGameLobbyMemberRepository
+                .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), learnerId)
+                .orElse(null);
+        if (existingActiveMember == null) {
+            ImposterGameLobbyMember historicalMember = imposterGameLobbyMemberRepository
+                    .findByLobby_IdAndLearnerId(lobby.getId(), learnerId)
+                    .orElse(null);
+            if (historicalMember != null) {
+                historicalMember.setJoinedAt(now);
+                historicalMember.setLeftAt(null);
+                imposterGameLobbyMemberRepository.saveAndFlush(historicalMember);
+            } else {
+                createMembership(lobby, learnerId);
+            }
+            activeMembers = imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        }
+
+        if (activeMembers.isEmpty()) {
+            return null;
+        }
+        if (lobby.getHostLearnerId() == null) {
+            lobby.setHostLearnerId(activeMembers.get(0).getLearnerId());
+        }
+
+        incrementStateVersion(lobby);
+        ImposterGameLobby savedLobby = imposterGameLobbyRepository.saveAndFlush(lobby);
+        publishRealtimeState(savedLobby, "RANKED_MATCHED", activeMembers);
+
+        if (activeMembers.size() == RANKED_ACTIVE_MEMBERS_TO_START && savedLobby.getStartedAt() == null) {
+            startLobbySession(savedLobby, activeMembers, savedLobby.getHostLearnerId(), now);
+            incrementStateVersion(savedLobby);
+            ImposterGameLobby startedLobby = imposterGameLobbyRepository.saveAndFlush(savedLobby);
+            publishRealtimeState(startedLobby, "START", activeMembers);
+        }
+        return savedLobby.getPublicId();
+    }
+
+    private boolean isLobbyJoinableForRanked(ImposterGameLobby lobby) {
+        return lobby.getLobbyType() == ImposterLobbyType.RANKED_MATCHMADE
+                && lobby.getStartedAt() == null
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.ABANDONED
+                && lobby.getCurrentPhase() != ImposterLobbyPhase.MATCH_COMPLETE;
+    }
+
+    private boolean isLobbyActiveForRankedCapacity(ImposterGameLobby lobby) {
+        if (lobby.getLobbyType() != ImposterLobbyType.RANKED_MATCHMADE) {
+            return false;
+        }
+        if (lobby.getCurrentPhase() == ImposterLobbyPhase.ABANDONED
+                || lobby.getCurrentPhase() == ImposterLobbyPhase.MATCH_COMPLETE) {
+            return false;
+        }
+        return true;
+    }
+
+    private void startLobbySession(
+            ImposterGameLobby lobby,
+            List<ImposterGameLobbyMember> activeMembers,
+            UUID startedByLearnerId,
+            OffsetDateTime now
+    ) {
+        applyDefaultSettings(lobby);
+        lobby.setStartedAt(now);
+        lobby.setStartedByLearnerId(startedByLearnerId);
+        lobby.setCurrentConceptIndex(1);
+        lobby.setUsedConceptPublicIds(null);
+        lobby.setPlayerScores(serializeScoreMap(initializeScoreMap(activeMembers)));
+        initializeConceptRuntime(lobby, activeMembers, now);
     }
 
     private void applyDefaultSettings(ImposterGameLobby lobby) {
