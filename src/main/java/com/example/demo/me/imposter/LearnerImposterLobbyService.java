@@ -1230,6 +1230,7 @@ public class LearnerImposterLobbyService {
 
         UUID currentDrawerPublicId = toLearnerPublicId(learnersById, lobby.getCurrentDrawerLearnerId());
         UUID votedOutPublicId = toLearnerPublicId(learnersById, lobby.getVotedOutLearnerId());
+        UUID endedByPublicId = toLearnerPublicId(learnersById, lobby.getAbandonedByLearnerId());
         Map<UUID, UUID> ballots = deserializeVoteBallots(lobby.getVotingBallots());
         UUID viewerVoteTargetLearnerId = viewerLearnerId == null ? null : ballots.get(viewerLearnerId);
         UUID viewerVoteTargetPublicId = toLearnerPublicId(learnersById, viewerVoteTargetLearnerId);
@@ -1297,6 +1298,9 @@ public class LearnerImposterLobbyService {
                 lobby.getCurrentDrawingSnapshot(),
                 defaultVersion(lobby),
                 lobby.getCurrentPhase(),
+                lobby.getEndedReason(),
+                lobby.getEndedAt(),
+                endedByPublicId,
                 lobby.getCurrentConceptIndex(),
                 defaultConceptCount(lobby),
                 playerScores,
@@ -1344,6 +1348,9 @@ public class LearnerImposterLobbyService {
                 state.currentDrawingSnapshot(),
                 state.drawingVersion(),
                 state.currentPhase(),
+                state.endReason(),
+                state.endedAt(),
+                state.endedByPublicId(),
                 state.currentConceptIndex(),
                 state.totalConcepts(),
                 state.playerScores(),
@@ -1381,6 +1388,7 @@ public class LearnerImposterLobbyService {
         learnerIds.add(lobby.getCurrentImposterLearnerId());
         learnerIds.add(lobby.getLatestResultAccusedLearnerId());
         learnerIds.add(lobby.getLatestResultImposterLearnerId());
+        learnerIds.add(lobby.getAbandonedByLearnerId());
         learnerIds.remove(null);
 
         List<UUID> orderedLearnerIds = new ArrayList<>(learnerIds);
