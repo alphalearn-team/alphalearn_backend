@@ -61,14 +61,6 @@ public class MeImposterLobbyController {
         return learnerImposterLobbyService.leavePrivateLobby(user, lobbyPublicId);
     }
 
-    @PostMapping("/private/matchmaking/leave")
-    @Operation(summary = "Leave current matchmaking lobby", description = "Compatibility endpoint for matchmaking clients to leave current active lobby")
-    public LeavePrivateImposterLobbyResponse leaveCurrentMatchmakingLobby(
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return learnerImposterLobbyService.leaveCurrentLobby(user);
-    }
-
     @PostMapping("/private/{lobbyPublicId}/start")
     @Operation(summary = "Start private imposter lobby game", description = "Host starts the lobby once minimum active players have joined")
     public PrivateImposterLobbyStateDto startPrivateLobby(
