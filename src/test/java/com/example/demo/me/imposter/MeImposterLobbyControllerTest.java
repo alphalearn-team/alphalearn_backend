@@ -126,6 +126,20 @@ class MeImposterLobbyControllerTest {
     }
 
     @Test
+    void leaveCurrentMatchmakingLobbyReturnsUpdatedState() throws Exception {
+        LeavePrivateImposterLobbyResponse response = new LeavePrivateImposterLobbyResponse(
+                PrivateImposterLobbyLeaveResult.LEFT,
+                null
+        );
+
+        when(learnerImposterLobbyService.leaveCurrentLobby(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/me/imposter/lobbies/private/matchmaking/leave"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").value("LEFT"));
+    }
+
+    @Test
     void startPrivateLobbyReturnsStartedState() throws Exception {
         UUID lobbyPublicId = UUID.randomUUID();
         PrivateImposterLobbyStateDto state = stateDto(
