@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,9 +118,66 @@ class LessonEnrollmentServiceTest {
         UUID lessonId = UUID.randomUUID();
         SupabaseAuthUser user = mockUser(UUID.randomUUID());
         when(repository.existsByLearner_IdAndLesson_PublicId(user.userId(), lessonId)).thenReturn(true);
+        when(lessonLookupService.findByPublicIdOrThrow(lessonId))
+                .thenReturn(mockLesson(lessonId, UUID.randomUUID(), LessonModerationStatus.APPROVED));
 
         LessonEnrollmentStatusDto status = service.getEnrollmentStatus(lessonId, user);
         assertThat(status.enrolled()).isTrue();
+    }
+
+    @Test
+    void getEnrollmentStatusReturnsFalseWhenLessonIsUnpublished() {
+        UUID lessonId = UUID.randomUUID();
+        SupabaseAuthUser user = mockUser(UUID.randomUUID());
+        when(repository.existsByLearner_IdAndLesson_PublicId(user.userId(), lessonId)).thenReturn(true);
+        when(lessonLookupService.findByPublicIdOrThrow(lessonId))
+                .thenReturn(mockLesson(lessonId, UUID.randomUUID(), LessonModerationStatus.UNPUBLISHED));
+
+        LessonEnrollmentStatusDto status = service.getEnrollmentStatus(lessonId, user);
+        assertThat(status.enrolled()).isFalse();
+    }
+
+    @Test
+    void getMyEnrollmentsHidesUnpublishedLessons() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = mockUser(learnerId);
+        LessonEnrollment approvedEnrollment = new LessonEnrollment();
+        approvedEnrollment.setLesson(mockLesson(UUID.randomUUID(), UUID.randomUUID(), LessonModerationStatus.APPROVED));
+        approvedEnrollment.setCompleted(false);
+        approvedEnrollment.setFirstCompletedAt(null);
+
+        LessonEnrollment unpublishedEnrollment = new LessonEnrollment();
+        unpublishedEnrollment.setLesson(mockLesson(UUID.randomUUID(), UUID.randomUUID(), LessonModerationStatus.UNPUBLISHED));
+        unpublishedEnrollment.setCompleted(false);
+        unpublishedEnrollment.setFirstCompletedAt(null);
+
+        when(repository.findByLearner_Id(learnerId)).thenReturn(List.of(approvedEnrollment, unpublishedEnrollment));
+
+        List<LessonEnrollmentSummaryDto> result = service.getMyEnrollments(user);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).lessonPublicId()).isEqualTo(approvedEnrollment.getLesson().getPublicId());
+    }
+
+    @Test
+    void getMyProgressHidesUnpublishedLessons() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = mockUser(learnerId);
+        LessonEnrollment approvedEnrollment = new LessonEnrollment();
+        approvedEnrollment.setLesson(mockLesson(UUID.randomUUID(), UUID.randomUUID(), LessonModerationStatus.APPROVED));
+        approvedEnrollment.setCompleted(false);
+
+        LessonEnrollment unpublishedEnrollment = new LessonEnrollment();
+        unpublishedEnrollment.setLesson(mockLesson(UUID.randomUUID(), UUID.randomUUID(), LessonModerationStatus.UNPUBLISHED));
+        unpublishedEnrollment.setCompleted(false);
+
+        when(repository.findByLearner_Id(learnerId)).thenReturn(List.of(approvedEnrollment, unpublishedEnrollment));
+        when(quizRepository.countByLesson_PublicId(approvedEnrollment.getLesson().getPublicId())).thenReturn(2L);
+        when(quizAttemptRepository.countFullMarkQuizzesByLearnerAndLesson(learnerId, approvedEnrollment.getLesson().getPublicId()))
+                .thenReturn(1L);
+
+        List<com.example.demo.lessonenrollment.dto.LessonProgressDto> result = service.getMyProgress(user);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).lessonPublicId()).isEqualTo(approvedEnrollment.getLesson().getPublicId());
     }
 
     @Test
@@ -154,6 +212,8 @@ class LessonEnrollmentServiceTest {
         Lesson lesson = new Lesson();
         lesson.setPublicId(publicId);
         lesson.setLessonModerationStatus(status);
+        lesson.setCreatedAt(OffsetDateTime.now());
+        lesson.setDeletedAt(null);
         
         Contributor contributor = new Contributor();
         contributor.setContributorId(creatorId);

@@ -79,7 +79,12 @@ public class LessonEnrollmentService {
         }
 
         boolean enrolled = repository.existsByLearner_IdAndLesson_PublicId(user.userId(), lessonPublicId);
-        return new LessonEnrollmentStatusDto(enrolled);
+        if (!enrolled) {
+            return new LessonEnrollmentStatusDto(false);
+        }
+
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+        return new LessonEnrollmentStatusDto(isVisibleToLearners(lesson));
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +94,7 @@ public class LessonEnrollmentService {
         }
         Learner learner = user.learner();
         return repository.findByLearner_Id(learner.getId()).stream()
+                .filter(e -> isVisibleToLearners(e.getLesson()))
                 .map(e -> new LessonEnrollmentSummaryDto(
                         e.getLesson().getPublicId(),
                         e.getLesson().getTitle(),
@@ -108,7 +114,9 @@ public class LessonEnrollmentService {
 
         List<LessonEnrollment> enrollments = repository.findByLearner_Id(learnerId);
 
-        return enrollments.stream().map(enrollment -> {
+        return enrollments.stream()
+                .filter(enrollment -> isVisibleToLearners(enrollment.getLesson()))
+                .map(enrollment -> {
             UUID lessonPublicId = enrollment.getLesson().getPublicId();
             long total = quizRepository.countByLesson_PublicId(lessonPublicId);
             long passed = quizAttemptRepository.countFullMarkQuizzesByLearnerAndLesson(learnerId, lessonPublicId);
@@ -149,6 +157,12 @@ public class LessonEnrollmentService {
 
     public boolean isEnrolled(UUID learnerId, UUID lessonPublicId) {
         return repository.existsByLearner_IdAndLesson_PublicId(learnerId, lessonPublicId);
+    }
+
+    private boolean isVisibleToLearners(Lesson lesson) {
+        return lesson != null
+                && lesson.getDeletedAt() == null
+                && lesson.getLessonModerationStatus() == LessonModerationStatus.APPROVED;
     }
 
     public long countEnrollments(UUID lessonPublicId) {
