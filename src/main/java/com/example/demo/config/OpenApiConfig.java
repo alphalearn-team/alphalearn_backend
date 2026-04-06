@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Configuration;
         @Tag(name = "Contributors (Public)", description = "Public contributor read endpoints"),
         @Tag(name = "Learners (Public)", description = "Public learner read endpoints"),
         @Tag(name = "Lesson Enrollments", description = "Enrollment progress endpoints"),
+        @Tag(name = "Lesson Reports", description = "Lesson reporting endpoints for learners and contributors"),
         @Tag(name = "Me", description = "Current-user role resolution endpoint"),
         @Tag(name = "Admin Lessons", description = "Lesson moderation endpoints"),
         @Tag(name = "Admin Concepts", description = "Concept management endpoints"),
