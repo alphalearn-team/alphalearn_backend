@@ -13,6 +13,9 @@ import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
+import com.example.demo.lessonreport.LessonReportRepository;
+import com.example.demo.lessonreport.LessonReportResolutionAction;
+import com.example.demo.lessonreport.LessonReportStatus;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
@@ -43,6 +46,7 @@ public class AdminLessonService {
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
     private final LessonSectionService lessonSectionService;
+    private final LessonReportRepository lessonReportRepository;
 
     public AdminLessonService(
             LessonLookupService lessonLookupService,
@@ -53,7 +57,8 @@ public class AdminLessonService {
             LessonModerationRecordRepository lessonModerationRecordRepository,
             ObjectMapper objectMapper,
             NotificationService notificationService,
-            LessonSectionService lessonSectionService
+            LessonSectionService lessonSectionService,
+            LessonReportRepository lessonReportRepository
     ){
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
@@ -64,6 +69,7 @@ public class AdminLessonService {
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.lessonSectionService = lessonSectionService;
+        this.lessonReportRepository = lessonReportRepository;
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +129,40 @@ public class AdminLessonService {
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
         Lesson saved = lessonModerationWorkflowService.reject(lesson, reason, requireActorUserId(user));
         notifyAuthor(lesson, "Your lesson \"" + lesson.getTitle() + "\" was not approved. Reason: " + reason);
+        return toAdminLessonDetailDto(saved);
+    }
+
+    @Transactional
+    public AdminLessonDetailDto updateLessonModerationStatus(
+            UUID lessonPublicId,
+            AdminUpdateLessonModerationStatusRequest request,
+            SupabaseAuthUser user
+    ) {
+        LessonModerationStatus targetStatus = request == null ? null : request.status();
+        if (targetStatus == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status is required");
+        }
+        if (targetStatus != LessonModerationStatus.UNPUBLISHED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only UNPUBLISHED is supported by this endpoint");
+        }
+
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+        Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
+
+        boolean resolvePendingReports = request.resolvePendingReports() == null || Boolean.TRUE.equals(request.resolvePendingReports());
+        if (resolvePendingReports) {
+            lessonReportRepository.resolvePendingForLessonId(
+                    saved.getLessonId(),
+                    LessonReportStatus.PENDING,
+                    LessonReportStatus.RESOLVED,
+                    OffsetDateTime.now(),
+                    requireActorUserId(user),
+                    LessonReportResolutionAction.UNPUBLISHED
+            );
+        }
+
+        notifyAuthor(saved, "Your lesson \"" + saved.getTitle() + "\" has been unpublished by admin.");
+
         return toAdminLessonDetailDto(saved);
     }
 
