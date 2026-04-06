@@ -3,7 +3,6 @@ package com.example.demo.me.imposter.dto;
 import com.example.demo.game.imposter.lobby.ImposterGameLobby;
 import com.example.demo.game.imposter.lobby.ImposterGameLobbyMember;
 import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
-import com.example.demo.game.imposter.lobby.ImposterLobbyType;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -25,7 +24,7 @@ public record JoinedPrivateImposterLobbyDto(
     ) {
         return new JoinedPrivateImposterLobbyDto(
                 lobby.getPublicId(),
-                lobby.getLobbyType() == ImposterLobbyType.PRIVATE_CUSTOM ? lobby.getLobbyCode() : null,
+                lobby.getLobbyCode(),
                 lobby.isPrivateLobby(),
                 lobby.getConceptPoolMode(),
                 lobby.getPinnedYearMonth(),
