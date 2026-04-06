@@ -3,10 +3,14 @@ package com.example.demo.admin.lessonreport;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.example.demo.config.SupabaseAuthUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,5 +36,23 @@ public class AdminLessonReportController {
     @Operation(summary = "Get reported lesson detail", description = "Returns lesson review payload together with pending report reasons")
     public AdminReportedLessonDetailDto getPendingReportedLessonDetail(@PathVariable UUID lessonPublicId) {
         return adminLessonReportService.getPendingReportedLessonDetail(lessonPublicId);
+    }
+
+    @PutMapping("/{lessonPublicId}/dismiss")
+    @Operation(summary = "Dismiss pending reports", description = "Marks all pending reports for the lesson as resolved with DISMISSED action")
+    public AdminLessonReportResolutionResultDto dismissPendingReports(
+            @PathVariable UUID lessonPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return adminLessonReportService.dismissPendingReports(lessonPublicId, user);
+    }
+
+    @PutMapping("/{lessonPublicId}/unpublish")
+    @Operation(summary = "Unpublish and resolve pending reports", description = "Unpublishes lesson and resolves all pending reports with UNPUBLISHED action")
+    public AdminLessonReportResolutionResultDto unpublishAndResolvePendingReports(
+            @PathVariable UUID lessonPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return adminLessonReportService.unpublishAndResolvePendingReports(lessonPublicId, user);
     }
 }

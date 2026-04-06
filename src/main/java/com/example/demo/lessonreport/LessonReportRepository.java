@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface LessonReportRepository extends JpaRepository<LessonReport, Long> {
 
@@ -29,6 +31,25 @@ public interface LessonReportRepository extends JpaRepository<LessonReport, Long
     boolean existsByLesson_LessonIdAndReporterUserId(Integer lessonId, UUID reporterUserId);
 
     List<LessonReport> findByLesson_PublicIdAndStatusOrderByCreatedAtDesc(UUID lessonPublicId, LessonReportStatus status);
+
+    @Modifying
+    @Query("""
+            update LessonReport lr
+            set lr.status = :resolvedStatus,
+                lr.resolvedAt = :resolvedAt,
+                lr.resolvedByAdminUserId = :resolvedByAdminUserId,
+                lr.resolutionAction = :resolutionAction
+            where lr.lesson.lessonId = :lessonId
+              and lr.status = :pendingStatus
+            """)
+    int resolvePendingForLessonId(
+            @Param("lessonId") Integer lessonId,
+            @Param("pendingStatus") LessonReportStatus pendingStatus,
+            @Param("resolvedStatus") LessonReportStatus resolvedStatus,
+            @Param("resolvedAt") java.time.OffsetDateTime resolvedAt,
+            @Param("resolvedByAdminUserId") UUID resolvedByAdminUserId,
+            @Param("resolutionAction") LessonReportResolutionAction resolutionAction
+    );
 
     @Query(value = """
             select
