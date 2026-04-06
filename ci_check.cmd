@@ -6,8 +6,9 @@ REM   ci_check.cmd       -> loads .env.shared + .env.ci (default)
 REM   ci_check.cmd ci    -> same as default
 REM
 REM Runs a CI-parity backend check against a hosted Supabase database:
-REM 1) apply pending migrations
-REM 2) run maven clean verify with CI-style env vars
+REM 1) hard-reset public schema
+REM 2) apply pending migrations
+REM 3) run maven clean verify with CI-style env vars
 
 set "MODE=%~1"
 if "%MODE%"=="" set "MODE=ci"
@@ -47,6 +48,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
+where psql >nul 2>nul
+if errorlevel 1 (
+  echo Error: psql is required to reset hosted CI DB schema.
+  exit /b 1
+)
+
 set "JDBC_PREFIX=jdbc:postgresql://"
 if /I not "%CI_DB_URL_JDBC:~0,18%"=="%JDBC_PREFIX%" (
   echo Error: CI_DB_URL_JDBC must start with %JDBC_PREFIX%
@@ -61,6 +68,20 @@ if "%ENCODED_DB_PASSWORD%"=="" (
 
 set "JDBC_SUFFIX=%CI_DB_URL_JDBC:~18%"
 set "PG_URL=postgresql://%CI_DB_USER%:%ENCODED_DB_PASSWORD%@%JDBC_SUFFIX%"
+
+echo Resetting hosted CI DB public schema...
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade;"
+if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "create schema public;"
+if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "grant usage on schema public to postgres, anon, authenticated, service_role;"
+if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "grant all on schema public to postgres, service_role;"
+if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "grant all on schema public to anon, authenticated;"
+if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "do $$ begin if exists (select 1 from information_schema.tables where table_schema = 'supabase_migrations' and table_name = 'schema_migrations') then delete from supabase_migrations.schema_migrations; end if; end $$;"
+if errorlevel 1 exit /b 1
 
 echo Applying pending Supabase migrations to hosted CI DB...
 npx supabase migration up --db-url "%PG_URL%"
