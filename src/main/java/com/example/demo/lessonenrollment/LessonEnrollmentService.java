@@ -17,6 +17,7 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentStatusDto;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentSummaryDto;
+import com.example.demo.lessonenrollment.dto.LessonProgressDto;
 
 @Service
 public class LessonEnrollmentService {
@@ -24,15 +25,21 @@ public class LessonEnrollmentService {
     private final LessonEnrollmentRepository repository;
     private final LessonLookupService lessonLookupService;
     private final LearnerRepository learnerRepository;
+    private final com.example.demo.quiz.QuizAttemptRepository quizAttemptRepository;
+    private final com.example.demo.quiz.QuizRepository quizRepository;
 
     public LessonEnrollmentService(
             LessonEnrollmentRepository repository,
             LessonLookupService lessonLookupService,
-            LearnerRepository learnerRepository
+            LearnerRepository learnerRepository,
+            com.example.demo.quiz.QuizAttemptRepository quizAttemptRepository,
+            com.example.demo.quiz.QuizRepository quizRepository
     ) {
         this.repository = repository;
         this.lessonLookupService = lessonLookupService;
         this.learnerRepository = learnerRepository;
+        this.quizAttemptRepository = quizAttemptRepository;
+        this.quizRepository = quizRepository;
     }
 
     public List<LessonEnrollment> getAllEnrollments() {
@@ -89,6 +96,55 @@ public class LessonEnrollmentService {
                         e.getFirstCompletedAt()
                 ))
                 .toList();
+    }
+
+    @Transactional
+    public List<LessonProgressDto> getMyProgress(SupabaseAuthUser user) {
+        if (user == null || user.userId() == null || user.learner() == null) {
+            return List.of();
+        }
+        Learner learner = user.learner();
+        UUID learnerId = learner.getId();
+
+        List<LessonEnrollment> enrollments = repository.findByLearner_Id(learnerId);
+
+        return enrollments.stream().map(enrollment -> {
+            UUID lessonPublicId = enrollment.getLesson().getPublicId();
+            long total = quizRepository.countByLesson_PublicId(lessonPublicId);
+            long passed = quizAttemptRepository.countFullMarkQuizzesByLearnerAndLesson(learnerId, lessonPublicId);
+
+            if (!enrollment.isCompleted() && total > 0 && passed == total) {
+                enrollment.setCompleted(true);
+                enrollment.setFirstCompletedAt(OffsetDateTime.now());
+                repository.save(enrollment);
+            }
+
+            return new LessonProgressDto(
+                lessonPublicId,
+                enrollment.getLesson().getTitle(),
+                enrollment.isCompleted(),
+                enrollment.getFirstCompletedAt(),
+                (int) total,
+                (int) passed
+            );
+        }).toList();
+    }
+
+    @Transactional
+    public void checkAndCompleteLesson(UUID learnerId, UUID lessonPublicId) {
+        repository.findByLearner_IdAndLesson_PublicId(learnerId, lessonPublicId).ifPresent(enrollment -> {
+            if (enrollment.isCompleted()) return;
+
+            long total = quizRepository.countByLesson_PublicId(lessonPublicId);
+            if (total == 0) return;
+
+            long passed = quizAttemptRepository.countFullMarkQuizzesByLearnerAndLesson(learnerId, lessonPublicId);
+            if (passed == total) {
+                enrollment.setCompleted(true);
+                enrollment.setFirstCompletedAt(OffsetDateTime.now());
+                repository.save(enrollment);
+            }
+        });
     }
 
     public boolean isEnrolled(UUID learnerId, UUID lessonPublicId) {

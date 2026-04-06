@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentStatusDto;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentSummaryDto;
+import com.example.demo.lessonenrollment.dto.LessonProgressDto;
 
 @RestController
 @RequestMapping("/api/lessonenrollments")
@@ -49,5 +50,11 @@ public class LessonEnrollmentController {
     @Operation(summary = "Check enrollment status", description = "Returns whether the current user is enrolled in the specified lesson")
     public LessonEnrollmentStatusDto getEnrollmentStatus(@PathVariable UUID lessonPublicId, @AuthenticationPrincipal SupabaseAuthUser user) {
         return service.getEnrollmentStatus(lessonPublicId, user);
+    }
+
+    @GetMapping("/me/progress")
+    @Operation(summary = "My lesson progress", description = "Returns progress for all enrolled lessons, including passed/total quiz counts and completion status.")
+    public List<LessonProgressDto> getMyProgress(@AuthenticationPrincipal SupabaseAuthUser user) {
+        return service.getMyProgress(user);
     }
 }

@@ -26,6 +26,8 @@ import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentStatusDto;
 import com.example.demo.lessonenrollment.dto.LessonEnrollmentSummaryDto;
+import com.example.demo.quiz.QuizAttemptRepository;
+import com.example.demo.quiz.QuizRepository;
 
 class LessonEnrollmentServiceTest {
 
@@ -33,13 +35,23 @@ class LessonEnrollmentServiceTest {
     private LessonLookupService lessonLookupService;
     private LessonEnrollmentService service;
     private LearnerRepository learnerRepository;
+    private QuizAttemptRepository quizAttemptRepository;
+    private QuizRepository quizRepository;
 
     @BeforeEach
     void setUp() {
         repository = mock(LessonEnrollmentRepository.class);
         lessonLookupService = mock(LessonLookupService.class);
         learnerRepository = mock(LearnerRepository.class);
-        service = new LessonEnrollmentService(repository, lessonLookupService,learnerRepository);
+        quizAttemptRepository = mock(QuizAttemptRepository.class);
+        quizRepository = mock(QuizRepository.class);
+        service = new LessonEnrollmentService(
+                repository,
+                lessonLookupService,
+                learnerRepository,
+                quizAttemptRepository,
+                quizRepository
+        );
     }
 
     @Test
