@@ -12,8 +12,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.admin.lesson.AdminLessonReviewDto;
+import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.contributor.Contributor;
+import com.example.demo.learner.Learner;
+import com.example.demo.lesson.Lesson;
 import com.example.demo.admin.lesson.AdminLessonService;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonModerationStatus;
@@ -155,5 +162,113 @@ class AdminLessonReportServiceTest {
                 .containsExactly(report1Id, report2Id);
         assertThat(result.pendingReports()).extracting(AdminPendingLessonReportReasonDto::reason)
                 .containsExactly("First reason", "Second reason");
+    }
+
+    @Test
+    void dismissPendingReportsResolvesAllPendingRows() {
+        UUID lessonPublicId = UUID.randomUUID();
+        UUID adminUserId = UUID.randomUUID();
+        Lesson lesson = lesson(42, lessonPublicId, LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonReportRepository.resolvePendingForLessonId(
+                org.mockito.ArgumentMatchers.eq(42),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(adminUserId),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(3);
+
+        AdminLessonReportResolutionResultDto result = adminLessonReportService.dismissPendingReports(
+                lessonPublicId,
+                new SupabaseAuthUser(adminUserId, null, null)
+        );
+
+        assertThat(result.lessonPublicId()).isEqualTo(lessonPublicId);
+        assertThat(result.resolvedCount()).isEqualTo(3);
+        assertThat(result.lessonModerationStatus()).isEqualTo(LessonModerationStatus.APPROVED);
+        assertThat(result.action()).isEqualTo("DISMISSED");
+    }
+
+    @Test
+    void unpublishAndResolvePendingReportsUnpublishesAndResolvesReports() {
+        UUID lessonPublicId = UUID.randomUUID();
+        UUID adminUserId = UUID.randomUUID();
+        Lesson lesson = lesson(88, lessonPublicId, LessonModerationStatus.APPROVED);
+        Lesson unpublished = lesson(88, lessonPublicId, LessonModerationStatus.UNPUBLISHED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationWorkflowService.unpublish(lesson)).thenReturn(unpublished);
+        when(lessonReportRepository.resolvePendingForLessonId(
+                org.mockito.ArgumentMatchers.eq(88),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(adminUserId),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(1);
+
+        AdminLessonReportResolutionResultDto result = adminLessonReportService.unpublishAndResolvePendingReports(
+                lessonPublicId,
+                new SupabaseAuthUser(adminUserId, null, null)
+        );
+
+        assertThat(result.resolvedCount()).isEqualTo(1);
+        assertThat(result.lessonModerationStatus()).isEqualTo(LessonModerationStatus.UNPUBLISHED);
+        assertThat(result.action()).isEqualTo("UNPUBLISHED");
+    }
+
+    @Test
+    void dismissPendingReportsReturnsZeroWhenNoPendingReportsRemain() {
+        UUID lessonPublicId = UUID.randomUUID();
+        UUID adminUserId = UUID.randomUUID();
+        Lesson lesson = lesson(52, lessonPublicId, LessonModerationStatus.APPROVED);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonReportRepository.resolvePendingForLessonId(
+                org.mockito.ArgumentMatchers.eq(52),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(adminUserId),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(0);
+
+        AdminLessonReportResolutionResultDto result = adminLessonReportService.dismissPendingReports(
+                lessonPublicId,
+                new SupabaseAuthUser(adminUserId, null, null)
+        );
+
+        assertThat(result.resolvedCount()).isEqualTo(0);
+    }
+
+    @Test
+    void dismissPendingReportsRequiresAuthenticatedAdminUser() {
+        ResponseStatusException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                ResponseStatusException.class,
+                () -> adminLessonReportService.dismissPendingReports(UUID.randomUUID(), null)
+        );
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).isEqualTo("Authenticated admin user required");
+    }
+
+    private Lesson lesson(int lessonId, UUID lessonPublicId, LessonModerationStatus status) {
+        UUID contributorId = UUID.randomUUID();
+        Learner learner = new Learner(contributorId, UUID.randomUUID(), "u-" + contributorId, OffsetDateTime.now(), (short) 0);
+        Contributor contributor = new Contributor();
+        contributor.setContributorId(contributorId);
+        contributor.setLearner(learner);
+        contributor.setPromotedAt(OffsetDateTime.now());
+
+        Lesson lesson = new Lesson();
+        lesson.setPublicId(lessonPublicId);
+        lesson.setTitle("Lesson");
+        lesson.setContributor(contributor);
+        lesson.setCreatedAt(OffsetDateTime.now());
+        lesson.setLessonModerationStatus(status);
+        ReflectionTestUtils.setField(lesson, "lessonId", lessonId);
+        return lesson;
     }
 }
