@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
@@ -33,6 +34,7 @@ import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.LessonListQueryService;
+import com.example.demo.lessonreport.LessonReportRepository;
 import com.example.demo.notification.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -63,6 +65,9 @@ class AdminLessonServiceTest {
     @Mock
     private LessonSectionService lessonSectionService;
 
+    @Mock
+    private LessonReportRepository lessonReportRepository;
+
     private AdminLessonService adminLessonService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -78,7 +83,8 @@ class AdminLessonServiceTest {
                 lessonModerationRecordRepository,
                 objectMapper,
                 notificationService,
-                lessonSectionService
+                lessonSectionService,
+                lessonReportRepository
         );
     }
 
@@ -223,5 +229,59 @@ class AdminLessonServiceTest {
 
         assertThat(result.automatedModerationReasons()).hasSize(2);
         assertThat(result.automatedModerationReasons()).contains("Potential policy violation", "Requires manual review");
+    }
+
+    @Test
+    void updateLessonModerationStatusUnpublishesAndResolvesPendingReportsByDefault() {
+        UUID lessonPublicId = UUID.randomUUID();
+        UUID adminUserId = UUID.randomUUID();
+
+        Lesson lesson = new Lesson();
+        lesson.setPublicId(lessonPublicId);
+        lesson.setTitle("Test Lesson");
+        lesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+        org.springframework.test.util.ReflectionTestUtils.setField(lesson, "lessonId", 77);
+
+        Lesson unpublished = new Lesson();
+        unpublished.setPublicId(lessonPublicId);
+        unpublished.setTitle("Test Lesson");
+        unpublished.setLessonModerationStatus(LessonModerationStatus.UNPUBLISHED);
+        org.springframework.test.util.ReflectionTestUtils.setField(unpublished, "lessonId", 77);
+
+        when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
+        when(lessonModerationWorkflowService.unpublish(lesson)).thenReturn(unpublished);
+
+        AdminLessonDetailDto result = adminLessonService.updateLessonModerationStatus(
+                lessonPublicId,
+                new AdminUpdateLessonModerationStatusRequest(LessonModerationStatus.UNPUBLISHED, null),
+                new SupabaseAuthUser(adminUserId, null, null)
+        );
+
+        assertThat(result.lessonModerationStatus()).isEqualTo(LessonModerationStatus.UNPUBLISHED);
+        org.mockito.Mockito.verify(lessonReportRepository).resolvePendingForLessonId(
+                org.mockito.ArgumentMatchers.eq(77),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(adminUserId),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void updateLessonModerationStatusRejectsUnsupportedStatus() {
+        UUID lessonPublicId = UUID.randomUUID();
+
+        org.springframework.web.server.ResponseStatusException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> adminLessonService.updateLessonModerationStatus(
+                        lessonPublicId,
+                        new AdminUpdateLessonModerationStatusRequest(LessonModerationStatus.APPROVED, true),
+                        new SupabaseAuthUser(UUID.randomUUID(), null, null)
+                )
+        );
+
+        assertThat(ex.getStatusCode().value()).isEqualTo(400);
+        assertThat(ex.getReason()).isEqualTo("Only UNPUBLISHED is supported by this endpoint");
     }
 }
