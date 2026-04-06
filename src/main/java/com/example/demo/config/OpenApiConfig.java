@@ -34,7 +34,8 @@ import org.springframework.context.annotation.Configuration;
         @Tag(name = "Admin Dashboard", description = "Admin dashboard summary endpoints"),
         @Tag(name = "Admin Contributors", description = "Contributor role management endpoints"),
         @Tag(name = "Admin Contributor Applications", description = "Contributor application moderation endpoints"),
-        @Tag(name = "Admin Learners", description = "Learner listing endpoints for admins")
+        @Tag(name = "Admin Learners", description = "Learner listing endpoints for admins"),
+        @Tag(name = "Admin Lesson Reports", description = "Reported lesson moderation queue endpoints")
     }
 )
 @SecurityScheme(
