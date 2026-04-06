@@ -4,8 +4,12 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import com.example.demo.lesson.Lesson;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -44,8 +48,24 @@ public class LessonReport {
     @Column(name = "reason", columnDefinition = "text", nullable = false)
     private String reason;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", nullable = false, columnDefinition = "lesson_report_status")
+    private LessonReportStatus status;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @Column(name = "resolved_at")
+    private OffsetDateTime resolvedAt;
+
+    @Column(name = "resolved_by_admin_user_id", columnDefinition = "uuid")
+    private UUID resolvedByAdminUserId;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "resolution_action", columnDefinition = "lesson_report_resolution_action")
+    private LessonReportResolutionAction resolutionAction;
 
     @PrePersist
     void assignDefaultsIfMissing() {
@@ -54,6 +74,9 @@ public class LessonReport {
         }
         if (createdAt == null) {
             createdAt = OffsetDateTime.now();
+        }
+        if (status == null) {
+            status = LessonReportStatus.PENDING;
         }
     }
 }
