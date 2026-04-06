@@ -59,18 +59,24 @@ public class OllamaModerationService {
 
                 Your goal is to be LENIENT and only reject clearly inappropriate content.
 
-                Rules:
-                - APPROVE most educational or neutral content, even if it is simple, incomplete, or not very high quality
-                - REJECT only if the content contains:
-                - profanity, hate speech, or offensive language
-                - harmful, dangerous, or inappropriate content
-                - If unsure, choose NEEDS_REVIEW instead of rejecting
+                Important guidelines:
+                - APPROVE most educational, neutral, or casual content
+                - Casual or informal student language (e.g. "cringe", "boring", "weird") is NOT offensive
+                - Do NOT treat mild slang or opinions as harmful
+
+                Only REJECT if the content clearly contains:
+                - strong profanity (e.g. explicit swear words)
+                - hate speech or discrimination toward a group
+                - explicit harmful or dangerous instructions
+                - sexual or highly inappropriate content
+
+                If the content is borderline, unclear, or slightly inappropriate:
+                - return NEEDS_REVIEW instead of REJECTED
 
                 Do NOT reject content just because it is:
-                - short
-                - basic or low quality
-                - unfinished
-                - repetitive
+                - short, simple, or low quality
+                - unfinished or repetitive
+                - written casually or informally
 
                 Respond ONLY in valid JSON:
 
