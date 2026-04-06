@@ -3,11 +3,13 @@ package com.example.demo.admin.lessonreport;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.config.SupabaseAuthUser;
@@ -38,21 +40,13 @@ public class AdminLessonReportController {
         return adminLessonReportService.getPendingReportedLessonDetail(lessonPublicId);
     }
 
-    @PutMapping("/{lessonPublicId}/dismiss")
-    @Operation(summary = "Dismiss pending reports", description = "Marks all pending reports for the lesson as resolved with DISMISSED action")
-    public AdminLessonReportResolutionResultDto dismissPendingReports(
+    @DeleteMapping("/{lessonPublicId}/reports")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Dismiss all pending reports for lesson", description = "Marks all pending reports for this lesson as dismissed")
+    public void dismissPendingReportsForLesson(
             @PathVariable UUID lessonPublicId,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        return adminLessonReportService.dismissPendingReports(lessonPublicId, user);
-    }
-
-    @PutMapping("/{lessonPublicId}/unpublish")
-    @Operation(summary = "Unpublish and resolve pending reports", description = "Unpublishes lesson and resolves all pending reports with UNPUBLISHED action")
-    public AdminLessonReportResolutionResultDto unpublishAndResolvePendingReports(
-            @PathVariable UUID lessonPublicId,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return adminLessonReportService.unpublishAndResolvePendingReports(lessonPublicId, user);
+        adminLessonReportService.dismissPendingReportsForLesson(lessonPublicId, user);
     }
 }

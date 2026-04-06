@@ -51,6 +51,25 @@ public interface LessonReportRepository extends JpaRepository<LessonReport, Long
             @Param("resolutionAction") LessonReportResolutionAction resolutionAction
     );
 
+    @Modifying
+    @Query("""
+            update LessonReport lr
+            set lr.status = :resolvedStatus,
+                lr.resolvedAt = :resolvedAt,
+                lr.resolvedByAdminUserId = :resolvedByAdminUserId,
+                lr.resolutionAction = :resolutionAction
+            where lr.publicId = :reportPublicId
+              and lr.status = :pendingStatus
+            """)
+    int resolvePendingByReportPublicId(
+            @Param("reportPublicId") UUID reportPublicId,
+            @Param("pendingStatus") LessonReportStatus pendingStatus,
+            @Param("resolvedStatus") LessonReportStatus resolvedStatus,
+            @Param("resolvedAt") java.time.OffsetDateTime resolvedAt,
+            @Param("resolvedByAdminUserId") UUID resolvedByAdminUserId,
+            @Param("resolutionAction") LessonReportResolutionAction resolutionAction
+    );
+
     @Query(value = """
             select
                 l.public_id as lessonPublicId,
