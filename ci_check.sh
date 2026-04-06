@@ -76,6 +76,19 @@ create schema public;
 grant usage on schema public to postgres, anon, authenticated, service_role;
 grant all on schema public to postgres, service_role;
 grant all on schema public to anon, authenticated;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'supabase_migrations'
+      and table_name = 'schema_migrations'
+  ) then
+    delete from supabase_migrations.schema_migrations;
+  end if;
+end
+$$;
 SQL
 
 echo "Applying pending Supabase migrations to hosted CI DB..."

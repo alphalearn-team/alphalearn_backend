@@ -80,6 +80,8 @@ psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "grant all on schema public to postgres, s
 if errorlevel 1 exit /b 1
 psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "grant all on schema public to anon, authenticated;"
 if errorlevel 1 exit /b 1
+psql "%PG_URL%" -v ON_ERROR_STOP=1 -c "do $$ begin if exists (select 1 from information_schema.tables where table_schema = 'supabase_migrations' and table_name = 'schema_migrations') then delete from supabase_migrations.schema_migrations; end if; end $$;"
+if errorlevel 1 exit /b 1
 
 echo Applying pending Supabase migrations to hosted CI DB...
 npx supabase migration up --db-url "%PG_URL%"
