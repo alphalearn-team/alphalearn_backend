@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: backend-ci-shared-db
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Backend CI
@@ -26,7 +30,7 @@ jobs:
         with:
           version: latest
 
-      - name: Apply migrations to hosted CI DB
+      - name: Reset shared CI DB and re-apply migrations
         env:
           CI_DB_URL_JDBC: ${{ secrets.CI_DB_URL_JDBC }}
           CI_DB_USER: ${{ secrets.CI_DB_USER }}
@@ -34,6 +38,15 @@ jobs:
         run: |
           ENCODED_DB_PASSWORD="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["CI_DB_PASSWORD"], safe=""))')"
           PG_URL="postgresql://${CI_DB_USER}:${ENCODED_DB_PASSWORD}@${CI_DB_URL_JDBC#jdbc:postgresql://}"
+
+          psql "$PG_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          drop schema if exists public cascade;
+          create schema public;
+          grant usage on schema public to postgres, anon, authenticated, service_role;
+          grant all on schema public to postgres, service_role;
+          grant all on schema public to anon, authenticated;
+          SQL
+
           supabase migration up --db-url "$PG_URL"
 
       - name: Build and run tests
