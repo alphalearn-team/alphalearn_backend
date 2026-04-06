@@ -161,6 +161,8 @@ public class AdminLessonService {
             );
         }
 
+        notifyAuthor(saved, "Your lesson \"" + saved.getTitle() + "\" has been unpublished by admin.");
+
         return toAdminLessonDetailDto(saved);
     }
 

@@ -2,6 +2,7 @@ package com.example.demo.admin.lesson;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.example.demo.concept.ConceptRepository;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.contributor.Contributor;
+import com.example.demo.learner.Learner;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonMappingSupport;
@@ -235,17 +237,25 @@ class AdminLessonServiceTest {
     void updateLessonModerationStatusUnpublishesAndResolvesPendingReportsByDefault() {
         UUID lessonPublicId = UUID.randomUUID();
         UUID adminUserId = UUID.randomUUID();
+        UUID contributorLearnerId = UUID.randomUUID();
 
         Lesson lesson = new Lesson();
         lesson.setPublicId(lessonPublicId);
         lesson.setTitle("Test Lesson");
         lesson.setLessonModerationStatus(LessonModerationStatus.APPROVED);
+        Learner contributorLearner = new Learner();
+        contributorLearner.setId(contributorLearnerId);
+        Contributor contributor = new Contributor();
+        contributor.setContributorId(contributorLearnerId);
+        contributor.setLearner(contributorLearner);
+        lesson.setContributor(contributor);
         org.springframework.test.util.ReflectionTestUtils.setField(lesson, "lessonId", 77);
 
         Lesson unpublished = new Lesson();
         unpublished.setPublicId(lessonPublicId);
         unpublished.setTitle("Test Lesson");
         unpublished.setLessonModerationStatus(LessonModerationStatus.UNPUBLISHED);
+        unpublished.setContributor(contributor);
         org.springframework.test.util.ReflectionTestUtils.setField(unpublished, "lessonId", 77);
 
         when(lessonLookupService.findByPublicIdOrThrow(lessonPublicId)).thenReturn(lesson);
@@ -265,6 +275,10 @@ class AdminLessonServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.eq(adminUserId),
                 org.mockito.ArgumentMatchers.any()
+        );
+        verify(notificationService).create(
+                org.mockito.ArgumentMatchers.eq(contributorLearnerId),
+                org.mockito.ArgumentMatchers.contains("has been unpublished by admin")
         );
     }
 
