@@ -151,6 +151,14 @@ public class LessonEnrollmentService {
         return repository.existsByLearner_IdAndLesson_PublicId(learnerId, lessonPublicId);
     }
 
+    public long countEnrollments(UUID lessonPublicId) {
+        return repository.countByLesson_PublicId(lessonPublicId);
+    }
+
+    public long countCompletions(UUID lessonPublicId) {
+        return repository.countByLesson_PublicIdAndCompletedTrue(lessonPublicId);
+    }
+
     private Learner requireLearner(SupabaseAuthUser user) {
         if (user == null || user.userId() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authentication required");

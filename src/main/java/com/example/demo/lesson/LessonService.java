@@ -360,14 +360,19 @@ public class LessonService {
     }
 
     private LessonContributorSummaryDto toContributorSummaryDto(Lesson lesson) {
+        UUID lessonPublicId = lesson.getPublicId();
+        long enrollmentCount = lessonEnrollmentService.countEnrollments(lessonPublicId);
+        long completionCount = lessonEnrollmentService.countCompletions(lessonPublicId);
         return new LessonContributorSummaryDto(
-                lesson.getPublicId(),
+                lessonPublicId,
                 lesson.getTitle(),
                 lesson.getLessonModerationStatus().name(),
                 lessonMappingSupport.conceptPublicIds(lesson),
                 lessonMappingSupport.conceptSummaries(lesson),
                 lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt());
+                lesson.getCreatedAt(),
+                enrollmentCount,
+                completionCount);
     }
 
     private LessonDetailDto toDetailDto(Lesson lesson) {
