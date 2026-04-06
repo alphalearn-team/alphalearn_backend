@@ -1,6 +1,7 @@
 package com.example.demo.admin.lessonreport;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,7 +53,7 @@ public class AdminLessonReportService {
                         LessonModerationStatus.valueOf(row.getLessonModerationStatus()),
                         row.getPendingReportCount(),
                         row.getLatestReason(),
-                        row.getLatestReportedAt()
+                        row.getLatestReportedAt() == null ? null : OffsetDateTime.ofInstant(row.getLatestReportedAt(), ZoneOffset.UTC)
                 ))
                 .toList();
     }

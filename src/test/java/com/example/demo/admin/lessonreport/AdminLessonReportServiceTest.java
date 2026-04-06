@@ -60,7 +60,7 @@ class AdminLessonReportServiceTest {
     void listPendingReportedLessonsReturnsMappedSummaryRows() {
         UUID lessonPublicId = UUID.randomUUID();
         UUID authorPublicId = UUID.randomUUID();
-        OffsetDateTime latestReportedAt = OffsetDateTime.parse("2026-04-06T12:00:00Z");
+        java.time.Instant latestReportedAt = java.time.Instant.parse("2026-04-06T12:00:00Z");
 
         LessonReportRepository.PendingLessonAggregateProjection projection = new LessonReportRepository.PendingLessonAggregateProjection() {
             @Override
@@ -99,7 +99,7 @@ class AdminLessonReportServiceTest {
             }
 
             @Override
-            public OffsetDateTime getLatestReportedAt() {
+            public java.time.Instant getLatestReportedAt() {
                 return latestReportedAt;
             }
         };
@@ -114,7 +114,7 @@ class AdminLessonReportServiceTest {
         assertThat(result.get(0).lessonModerationStatus()).isEqualTo(LessonModerationStatus.APPROVED);
         assertThat(result.get(0).pendingReportCount()).isEqualTo(3);
         assertThat(result.get(0).latestReason()).isEqualTo("Contains incorrect information");
-        assertThat(result.get(0).latestReportedAt()).isEqualTo(latestReportedAt);
+        assertThat(result.get(0).latestReportedAt()).isEqualTo(OffsetDateTime.parse("2026-04-06T12:00:00Z"));
     }
 
     @Test

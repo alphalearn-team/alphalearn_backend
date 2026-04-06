@@ -25,7 +25,7 @@ public interface LessonReportRepository extends JpaRepository<LessonReport, Long
 
         String getLatestReason();
 
-        java.time.OffsetDateTime getLatestReportedAt();
+        java.time.Instant getLatestReportedAt();
     }
 
     boolean existsByLesson_LessonIdAndReporterUserId(Integer lessonId, UUID reporterUserId);
