@@ -16,7 +16,6 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonLookupService;
 import com.example.demo.lesson.LessonModerationStatus;
-import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import com.example.demo.lessonreport.LessonReport;
 import com.example.demo.lessonreport.LessonReportResolutionAction;
@@ -29,18 +28,15 @@ public class AdminLessonReportService {
     private final LessonReportRepository lessonReportRepository;
     private final AdminLessonService adminLessonService;
     private final LessonLookupService lessonLookupService;
-    private final LessonModerationWorkflowService lessonModerationWorkflowService;
 
     public AdminLessonReportService(
             LessonReportRepository lessonReportRepository,
             AdminLessonService adminLessonService,
-            LessonLookupService lessonLookupService,
-            LessonModerationWorkflowService lessonModerationWorkflowService
+            LessonLookupService lessonLookupService
     ) {
         this.lessonReportRepository = lessonReportRepository;
         this.adminLessonService = adminLessonService;
         this.lessonLookupService = lessonLookupService;
-        this.lessonModerationWorkflowService = lessonModerationWorkflowService;
     }
 
     @Transactional(readOnly = true)
@@ -78,50 +74,32 @@ public class AdminLessonReportService {
     }
 
     @Transactional
-    public AdminLessonReportResolutionResultDto dismissPendingReports(UUID lessonPublicId, SupabaseAuthUser user) {
+    public void dismissPendingReport(UUID reportPublicId, SupabaseAuthUser user) {
         UUID actorUserId = requireActorUserId(user);
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        int resolvedCount = resolvePendingReports(
-                lesson.getLessonId(),
-                actorUserId,
-                LessonReportResolutionAction.DISMISSED
-        );
-
-        return new AdminLessonReportResolutionResultDto(
-                lesson.getPublicId(),
-                resolvedCount,
-                lesson.getLessonModerationStatus(),
-                LessonReportResolutionAction.DISMISSED.name()
-        );
-    }
-
-    @Transactional
-    public AdminLessonReportResolutionResultDto unpublishAndResolvePendingReports(UUID lessonPublicId, SupabaseAuthUser user) {
-        UUID actorUserId = requireActorUserId(user);
-        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
-        int resolvedCount = resolvePendingReports(
-                saved.getLessonId(),
-                actorUserId,
-                LessonReportResolutionAction.UNPUBLISHED
-        );
-
-        return new AdminLessonReportResolutionResultDto(
-                saved.getPublicId(),
-                resolvedCount,
-                saved.getLessonModerationStatus(),
-                LessonReportResolutionAction.UNPUBLISHED.name()
-        );
-    }
-
-    private int resolvePendingReports(Integer lessonId, UUID actorUserId, LessonReportResolutionAction action) {
-        return lessonReportRepository.resolvePendingForLessonId(
-                lessonId,
+        int resolvedCount = lessonReportRepository.resolvePendingByReportPublicId(
+                reportPublicId,
                 LessonReportStatus.PENDING,
                 LessonReportStatus.RESOLVED,
                 OffsetDateTime.now(),
                 actorUserId,
-                action
+                LessonReportResolutionAction.DISMISSED
+        );
+        if (resolvedCount == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pending report not found");
+        }
+    }
+
+    @Transactional
+    public void dismissPendingReportsForLesson(UUID lessonPublicId, SupabaseAuthUser user) {
+        UUID actorUserId = requireActorUserId(user);
+        Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
+        lessonReportRepository.resolvePendingForLessonId(
+                lesson.getLessonId(),
+                LessonReportStatus.PENDING,
+                LessonReportStatus.RESOLVED,
+                OffsetDateTime.now(),
+                actorUserId,
+                LessonReportResolutionAction.DISMISSED
         );
     }
 

@@ -1,8 +1,9 @@
 package com.example.demo.admin.lessonreport;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,48 +116,15 @@ class AdminLessonReportControllerTest {
     }
 
     @Test
-    void dismissPendingReportsReturnsResolutionResult() throws Exception {
+    void dismissPendingReportsForLessonReturnsNoContent() throws Exception {
         SupabaseAuthUser user = adminUser();
         setAuthentication(user);
         UUID lessonPublicId = UUID.randomUUID();
 
-        when(adminLessonReportService.dismissPendingReports(lessonPublicId, user)).thenReturn(
-                new AdminLessonReportResolutionResultDto(
-                        lessonPublicId,
-                        2,
-                        LessonModerationStatus.APPROVED,
-                        "DISMISSED"
-                )
-        );
+        doNothing().when(adminLessonReportService).dismissPendingReportsForLesson(lessonPublicId, user);
 
-        mockMvc.perform(put("/api/admin/lesson-reports/lessons/{lessonPublicId}/dismiss", lessonPublicId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lessonPublicId").value(lessonPublicId.toString()))
-                .andExpect(jsonPath("$.resolvedCount").value(2))
-                .andExpect(jsonPath("$.action").value("DISMISSED"));
-    }
-
-    @Test
-    void unpublishAndResolvePendingReportsReturnsResolutionResult() throws Exception {
-        SupabaseAuthUser user = adminUser();
-        setAuthentication(user);
-        UUID lessonPublicId = UUID.randomUUID();
-
-        when(adminLessonReportService.unpublishAndResolvePendingReports(lessonPublicId, user)).thenReturn(
-                new AdminLessonReportResolutionResultDto(
-                        lessonPublicId,
-                        1,
-                        LessonModerationStatus.UNPUBLISHED,
-                        "UNPUBLISHED"
-                )
-        );
-
-        mockMvc.perform(put("/api/admin/lesson-reports/lessons/{lessonPublicId}/unpublish", lessonPublicId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lessonPublicId").value(lessonPublicId.toString()))
-                .andExpect(jsonPath("$.resolvedCount").value(1))
-                .andExpect(jsonPath("$.lessonModerationStatus").value("UNPUBLISHED"))
-                .andExpect(jsonPath("$.action").value("UNPUBLISHED"));
+        mockMvc.perform(delete("/api/admin/lesson-reports/lessons/{lessonPublicId}/reports", lessonPublicId))
+                .andExpect(status().isNoContent());
     }
 
     private void setAuthentication(SupabaseAuthUser user) {
