@@ -7,14 +7,17 @@ import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 
 import com.example.demo.quest.weekly.enums.SubmissionVisibility;
 
 public interface WeeklyQuestChallengeSubmissionRepository extends JpaRepository<WeeklyQuestChallengeSubmission, Long> {
 
+  @EntityGraph(attributePaths = {"taggedFriends", "taggedFriends.taggedLearner"})
     Optional<WeeklyQuestChallengeSubmission> findByLearner_IdAndWeeklyQuestAssignment_Id(UUID learnerId, Long weeklyQuestAssignmentId);
 
+  @EntityGraph(attributePaths = {"taggedFriends", "taggedFriends.taggedLearner"})
     Optional<WeeklyQuestChallengeSubmission> findByLearner_IdAndWeeklyQuestAssignment_PublicId(UUID learnerId, UUID weeklyQuestAssignmentPublicId);
 
     @Query("""
@@ -221,4 +224,11 @@ public interface WeeklyQuestChallengeSubmissionRepository extends JpaRepository<
             List<UUID> weekPublicIds,
             Pageable pageable
     );
+
+    @EntityGraph(attributePaths = {"taggedFriends", "taggedFriends.taggedLearner"})
+    List<WeeklyQuestChallengeSubmission> findAllById(Iterable<Long> ids);
+
+    @EntityGraph(attributePaths = {"taggedFriends", "taggedFriends.taggedLearner"})
+    @Query("select s from WeeklyQuestChallengeSubmission s where s.publicId in :publicIds")
+    List<WeeklyQuestChallengeSubmission> findByPublicIdIn(List<UUID> publicIds);
 }
