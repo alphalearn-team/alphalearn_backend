@@ -1,7 +1,7 @@
 package com.example.demo.learner;
 
-import com.example.demo.me.weeklyquest.QuestHistoryDto;
-import com.example.demo.me.weeklyquest.QuestHistoryQueryService;
+import com.example.demo.quest.learner.QuestHistoryDto;
+import com.example.demo.quest.learner.QuestHistoryQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
