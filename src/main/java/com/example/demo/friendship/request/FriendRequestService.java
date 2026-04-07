@@ -2,9 +2,9 @@ package com.example.demo.friendship.request;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,20 +79,13 @@ public class FriendRequestService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already friends");
         }
 
-        // existing request?
-        Optional<FriendRequest> existingOutgoingPending = friendRequestRepository
-                .findBySenderIdAndReceiverIdAndStatus(senderId, receiverId, FriendRequestStatus.PENDING);
-
-        if (existingOutgoingPending.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already sent");
-        }
-
-        Optional<FriendRequest> existingIncomingPending = friendRequestRepository
-                .findBySenderIdAndReceiverIdAndStatus(receiverId, senderId, FriendRequestStatus.PENDING);
-
-        if (existingIncomingPending.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Incoming request already pending");
-        }
+        friendRequestRepository.findPendingBetween(senderId, receiverId)
+                .ifPresent(existingPending -> {
+                    String message = existingPending.getSenderId().equals(senderId)
+                            ? "Request already sent"
+                            : "Incoming request already pending";
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, message);
+                });
 
         FriendRequest request = FriendRequest.builder()
                 .senderId(senderId)
@@ -101,7 +94,12 @@ public class FriendRequestService {
                 .createdAt(OffsetDateTime.now())
                 .build();
 
-        FriendRequest saved = friendRequestRepository.save(request);
+        FriendRequest saved;
+        try {
+            saved = friendRequestRepository.save(request);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A pending friend request already exists", ex);
+        }
         return mapToDTO(saved, currentUser);
     }
 
