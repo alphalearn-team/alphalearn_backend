@@ -30,7 +30,10 @@ class OllamaLessonAutoModerationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OllamaLessonAutoModerationService(ollamaModerationService);
+        service = new OllamaLessonAutoModerationService(
+                ollamaModerationService,
+                new LessonModerationTextExtractor()
+        );
     }
 
     @Test

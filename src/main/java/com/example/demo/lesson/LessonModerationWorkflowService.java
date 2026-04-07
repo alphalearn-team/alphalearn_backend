@@ -35,7 +35,7 @@ public class LessonModerationWorkflowService {
     public LessonModerationWorkflowService(
             LessonRepository lessonRepository,
             LessonModerationRecordRepository lessonModerationRecordRepository,
-            @Qualifier("ollamaLessonAutoModerationService") LessonAutoModerationService lessonAutoModerationService,
+            @Qualifier("compositeLessonAutoModerationService") LessonAutoModerationService lessonAutoModerationService,
             ObjectMapper objectMapper
     ) {
         this.lessonRepository = lessonRepository;
@@ -70,7 +70,6 @@ public class LessonModerationWorkflowService {
                     toAutoRecord(savedLesson, result, resultingStatus)
             );
         } catch (RuntimeException ex) {
-            // YOUR ORIGINAL LOG (slightly adapted)
             log.warn(
                     "Async moderation failed for lessonPublicId={} contributorId={} provider={} exceptionType={} message={}",
                     lesson.getPublicId(),
@@ -79,8 +78,7 @@ public class LessonModerationWorkflowService {
                     ex.getClass().getSimpleName(),
                     ex.getMessage()
             );
-            // fallback behavior
-            lesson.setLessonModerationStatus(LessonModerationStatus.PENDING);
+            lesson.setLessonModerationStatus(LessonModerationStatus.REJECTED);
             Lesson savedLesson = lessonRepository.save(lesson);
             lessonModerationRecordRepository.save(
                     toAutoFailureRecord(savedLesson, ex)
@@ -155,15 +153,35 @@ public class LessonModerationWorkflowService {
         record.setLesson(lesson);
         record.setEventType(LessonModerationEventType.AUTO_FAILED);
         record.setDecisionSource(LessonModerationDecisionSource.AUTO_FALLBACK);
-        record.setResultingStatus(LessonModerationStatus.PENDING);
+        record.setResultingStatus(LessonModerationStatus.REJECTED);
         record.setRecordedAt(OffsetDateTime.now());
-        record.setReasons(objectMapper.valueToTree(List.of("Automatic moderation failed; sent for manual review")));
+        record.setReasons(objectMapper.valueToTree(buildAutoFailureReasons(ex)));
         record.setFailureMessage(ex.getMessage());
         record.setRawResponse(null);
         record.setReviewNote(null);
         record.setActorUserId(null);
         record.setProviderName(lessonAutoModerationService.getClass().getSimpleName());
         return record;
+    }
+
+    private List<String> buildAutoFailureReasons(RuntimeException ex) {
+        List<String> reasons = new java.util.ArrayList<>();
+        reasons.add("Automatic lesson checks failed; lesson was auto-rejected");
+
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            reasons.add("Unknown failure");
+            return reasons;
+        }
+
+        for (String part : message.split("\\s*\\|\\s*")) {
+            String trimmed = part == null ? null : part.trim();
+            if (trimmed != null && !trimmed.isBlank()) {
+                reasons.add(trimmed);
+            }
+        }
+
+        return reasons;
     }
 
     private LessonModerationEventType toAutoEventType(LessonModerationDecision decision) {
