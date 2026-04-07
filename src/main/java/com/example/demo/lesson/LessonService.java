@@ -1,9 +1,7 @@
 package com.example.demo.lesson;
 
 import java.time.OffsetDateTime;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -26,14 +24,10 @@ import com.example.demo.lesson.dto.LessonDetailView;
 import com.example.demo.lesson.dto.LessonAuthorDto;
 import com.example.demo.lesson.dto.LessonPublicDetailDto;
 import com.example.demo.lesson.dto.LessonPublicSummaryDto;
-import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
-import com.example.demo.lesson.moderation.LessonModerationEventType;
-import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
 import com.example.demo.lesson.query.LessonListAudience;
 import com.example.demo.lesson.query.LessonListCriteria;
 import com.example.demo.lesson.query.LessonListQueryService;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -41,15 +35,15 @@ public class LessonService {
 
     private final LessonRepository lessonRepository;
     private final ContributorRepository contributorRepository;
-    private final ConceptRepository conceptRepository;
     private final LessonLookupService lessonLookupService;
     private final LessonModerationWorkflowService lessonModerationWorkflowService;
-    private final LessonMappingSupport lessonMappingSupport;
     private final LessonListQueryService lessonListQueryService;
-    private final LessonModerationRecordRepository lessonModerationRecordRepository;
     private final LessonSectionService lessonSectionService;
     private final LessonEnrollmentService lessonEnrollmentService;
     private final ObjectMapper objectMapper;
+    private final LessonServiceValidationSupport validationSupport;
+    private final LessonConceptSupport conceptSupport;
+    private final LessonDetailAssembler detailAssembler;
 
     public LessonService(
             LessonRepository lessonRepository,
@@ -65,15 +59,21 @@ public class LessonService {
             ObjectMapper objectMapper) {
         this.lessonRepository = lessonRepository;
         this.contributorRepository = contributorRepository;
-        this.conceptRepository = conceptRepository;
         this.lessonLookupService = lessonLookupService;
         this.lessonModerationWorkflowService = lessonModerationWorkflowService;
-        this.lessonMappingSupport = lessonMappingSupport;
         this.lessonListQueryService = lessonListQueryService;
-        this.lessonModerationRecordRepository = lessonModerationRecordRepository;
         this.lessonSectionService = lessonSectionService;
         this.lessonEnrollmentService = lessonEnrollmentService;
         this.objectMapper = objectMapper;
+        this.validationSupport = new LessonServiceValidationSupport();
+        this.conceptSupport = new LessonConceptSupport(conceptRepository);
+        this.detailAssembler = new LessonDetailAssembler(
+                lessonMappingSupport,
+                lessonModerationRecordRepository,
+                lessonSectionService,
+                lessonEnrollmentService,
+                objectMapper
+        );
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +88,7 @@ public class LessonService {
                 LessonListAudience.CONTRIBUTOR));
 
         return lessons.stream()
-                .map(this::toContributorSummaryDto)
+                .map(detailAssembler::toContributorSummaryDto)
                 .toList();
     }
 
@@ -101,7 +101,7 @@ public class LessonService {
                 null,
                 LessonListAudience.PUBLIC));
         return lessons.stream()
-                .map(this::toPublicSummaryDto)
+                .map(detailAssembler::toPublicSummaryDto)
                 .toList();
     }
 
@@ -126,9 +126,9 @@ public class LessonService {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
-        requireContributorUser(user);
+        validationSupport.requireContributorUser(user);
 
-        String title = trimToNull(request.title());
+        String title = validationSupport.trimToNull(request.title());
         Object content = request.content();
         List<UUID> conceptPublicIds = normalizeCreateConceptPublicIds(request.conceptPublicIds());
         UUID contributorId = user.userId();
@@ -156,19 +156,7 @@ public class LessonService {
 
         Contributor contributor = contributorRepository.findById(contributorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contributor not found"));
-        List<Concept> concepts = conceptRepository.findAllByPublicIdIn(conceptPublicIds);
-        if (concepts.size() != conceptPublicIds.size()) {
-            Set<UUID> foundConceptPublicIds = concepts.stream()
-                    .map(Concept::getPublicId)
-                    .collect(java.util.stream.Collectors.toSet());
-            UUID missingConceptPublicId = conceptPublicIds.stream()
-                    .filter(id -> !foundConceptPublicIds.contains(id))
-                    .findFirst()
-                    .orElse(null);
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Concept not found" + (missingConceptPublicId == null ? "" : ": " + missingConceptPublicId));
-        }
+        List<Concept> concepts = conceptSupport.resolveConceptEntities(conceptPublicIds);
 
         boolean submit = Boolean.TRUE.equals(request.submit());
         Lesson lesson = new Lesson(
@@ -198,14 +186,14 @@ public class LessonService {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
         }
-        requireContributorUser(user);
+        validationSupport.requireContributorUser(user);
 
-        String title = trimToNull(request.title());
+        String title = validationSupport.trimToNull(request.title());
         Object content = request.content();
 
         // Support both legacy content and new sections format
         boolean hasSections = request.sections() != null && !request.sections().isEmpty();
-        boolean hasContent = content != null && !isEmptyContent(content);
+        boolean hasContent = content != null && !validationSupport.isEmptyContent(content);
 
         if (title == null) {
             throw new ResponseStatusException(
@@ -221,7 +209,7 @@ public class LessonService {
         }
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        requireOwner(lesson, user);
+        validationSupport.requireOwner(lesson, user);
         LessonModerationStatus previousStatus = lesson.getLessonModerationStatus();
 
         lesson.setTitle(title);
@@ -242,20 +230,10 @@ public class LessonService {
         return toDetailDto(saved);
     }
 
-    private boolean isEmptyContent(Object content) {
-        if (content == null) {
-            return true;
-        }
-        if (content instanceof java.util.Map<?, ?> map) {
-            return map.isEmpty();
-        }
-        return false;
-    }
-
     public LessonDetailDto submitLesson(UUID lessonPublicId, SupabaseAuthUser user) {
-        requireContributorUser(user);
+        validationSupport.requireContributorUser(user);
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        requireOwner(lesson, user);
+        validationSupport.requireOwner(lesson, user);
         LessonModerationStatus status = lesson.getLessonModerationStatus();
 
         if (status != LessonModerationStatus.UNPUBLISHED && status != LessonModerationStatus.REJECTED) {
@@ -269,9 +247,9 @@ public class LessonService {
     }
 
     public LessonDetailDto unpublishLesson(UUID lessonPublicId, SupabaseAuthUser user) {
-        requireContributorUser(user);
+        validationSupport.requireContributorUser(user);
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        requireOwner(lesson, user);
+        validationSupport.requireOwner(lesson, user);
 
         Lesson saved = lessonModerationWorkflowService.unpublish(lesson);
         return toDetailDto(saved);
@@ -284,7 +262,7 @@ public class LessonService {
         }
 
         Lesson lesson = lessonLookupService.findByPublicIdOrThrow(lessonPublicId);
-        requireOwner(lesson, user);
+        validationSupport.requireOwner(lesson, user);
 
         if (lesson.getDeletedAt() != null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found");
@@ -294,191 +272,27 @@ public class LessonService {
         lessonRepository.save(lesson);
     }
 
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
     private List<UUID> normalizeCreateConceptPublicIds(List<UUID> rawConceptPublicIds) {
-        if (rawConceptPublicIds == null) {
-            return List.of();
-        }
-
-        LinkedHashSet<UUID> ids = new LinkedHashSet<>();
-        for (UUID value : rawConceptPublicIds) {
-            if (value != null) {
-                ids.add(value);
-            }
-        }
-
-        return List.copyOf(ids);
+        return conceptSupport.normalizeCreateConceptPublicIds(rawConceptPublicIds);
     }
 
     private List<Integer> resolveConceptIdsByPublicIds(List<UUID> conceptPublicIds) {
-        if (conceptPublicIds == null || conceptPublicIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<UUID> normalizedPublicIds = conceptPublicIds.stream()
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .toList();
-        if (normalizedPublicIds.isEmpty()) {
-            return List.of();
-        }
-
-        List<Concept> concepts = conceptRepository.findAllByPublicIdIn(normalizedPublicIds);
-        if (concepts.size() != normalizedPublicIds.size()) {
-            Set<UUID> foundPublicIds = concepts.stream()
-                    .map(Concept::getPublicId)
-                    .collect(java.util.stream.Collectors.toSet());
-            UUID missingPublicId = normalizedPublicIds.stream()
-                    .filter(id -> !foundPublicIds.contains(id))
-                    .findFirst()
-                    .orElse(null);
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Concept not found" + (missingPublicId == null ? "" : ": " + missingPublicId));
-        }
-
-        return concepts.stream()
-                .map(Concept::getConceptId)
-                .toList();
+        return conceptSupport.resolveConceptIdsByPublicIds(conceptPublicIds);
     }
 
     private LessonPublicSummaryDto toPublicSummaryDto(Lesson lesson) {
-        return new LessonPublicSummaryDto(
-                lesson.getPublicId(),
-                lesson.getTitle(),
-                lessonMappingSupport.conceptPublicIds(lesson),
-                lessonMappingSupport.conceptSummaries(lesson),
-                lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt());
+        return detailAssembler.toPublicSummaryDto(lesson);
     }
 
     private LessonContributorSummaryDto toContributorSummaryDto(Lesson lesson) {
-        UUID lessonPublicId = lesson.getPublicId();
-        long enrollmentCount = lessonEnrollmentService.countEnrollments(lessonPublicId);
-        long completionCount = lessonEnrollmentService.countCompletions(lessonPublicId);
-        return new LessonContributorSummaryDto(
-                lessonPublicId,
-                lesson.getTitle(),
-                lesson.getLessonModerationStatus().name(),
-                lessonMappingSupport.conceptPublicIds(lesson),
-                lessonMappingSupport.conceptSummaries(lesson),
-                lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt(),
-                enrollmentCount,
-                completionCount);
+        return detailAssembler.toContributorSummaryDto(lesson);
     }
 
     private LessonDetailDto toDetailDto(Lesson lesson) {
-        LessonDetailBase base = toDetailBase(lesson);
-        LessonModerationRecord latestRecord = lessonModerationRecordRepository
-                .findTopByLessonOrderByRecordedAtDesc(lesson)
-                .orElse(null);
-        LessonModerationRecord latestAdminRecord = lessonModerationRecordRepository
-                .findTopByLessonAndDecisionSourceOrderByRecordedAtDesc(lesson, LessonModerationDecisionSource.ADMIN)
-                .orElse(null);
-
-        List<LessonSection> sections = lessonSectionService.getSectionsForLesson(lesson);
-
-        return new LessonDetailDto(
-                base.lessonPublicId(),
-                base.title(),
-                base.content(),
-                lesson.getLessonModerationStatus().name(),
-                base.conceptPublicIds(),
-                base.concepts(),
-                base.author(),
-                base.createdAt(),
-                latestModerationReasons(latestRecord),
-                latestModerationEventType(latestRecord),
-                latestModeratedAt(latestRecord),
-                adminRejectionReason(latestAdminRecord),
-                lessonSectionService.toSectionDtos(sections),
-                sections.size());
+        return detailAssembler.toDetailDto(lesson);
     }
 
     private LessonPublicDetailDto toPublicDetailDto(Lesson lesson, boolean enrolled) {
-        LessonDetailBase base = toDetailBase(lesson);
-        List<LessonSection> sections = enrolled 
-                ? lessonSectionService.getSectionsForLesson(lesson) 
-                : List.of();
-
-        return new LessonPublicDetailDto(
-                base.lessonPublicId(),
-                base.title(),
-                base.content(),
-                base.conceptPublicIds(),
-                base.concepts(),
-                base.author(),
-                base.createdAt(),
-                lessonSectionService.toSectionDtos(sections),
-                sections.size(),
-                enrolled);
-    }
-
-    private LessonDetailBase toDetailBase(Lesson lesson) {
-        return new LessonDetailBase(
-                lesson.getPublicId(),
-                lesson.getTitle(),
-                objectMapper.convertValue(lesson.getContent(), Object.class),
-                lessonMappingSupport.conceptPublicIds(lesson),
-                lessonMappingSupport.conceptSummaries(lesson),
-                lessonMappingSupport.author(lesson),
-                lesson.getCreatedAt());
-    }
-
-    private List<String> latestModerationReasons(LessonModerationRecord latestRecord) {
-        if (latestRecord == null || latestRecord.getReasons() == null || latestRecord.getReasons().isNull()) {
-            return List.of();
-        }
-        return objectMapper.convertValue(latestRecord.getReasons(), new TypeReference<List<String>>() {
-        });
-    }
-
-    private String latestModerationEventType(LessonModerationRecord latestRecord) {
-        return latestRecord == null || latestRecord.getEventType() == null
-                ? null
-                : latestRecord.getEventType().name();
-    }
-
-    private OffsetDateTime latestModeratedAt(LessonModerationRecord latestRecord) {
-        return latestRecord == null ? null : latestRecord.getRecordedAt();
-    }
-
-    private String adminRejectionReason(LessonModerationRecord latestAdminRecord) {
-        if (latestAdminRecord == null || latestAdminRecord.getEventType() != LessonModerationEventType.ADMIN_REJECTED) {
-            return null;
-        }
-
-        return latestAdminRecord.getReviewNote();
-    }
-
-    private record LessonDetailBase(
-            UUID lessonPublicId,
-            String title,
-            Object content,
-            List<UUID> conceptPublicIds,
-            List<LessonConceptSummaryDto> concepts,
-            LessonAuthorDto author,
-            OffsetDateTime createdAt) {
-    }
-
-    private void requireContributorUser(SupabaseAuthUser user) {
-        if (user == null || !user.isContributor()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contributor access required");
-        }
-    }
-
-    private void requireOwner(Lesson lesson, SupabaseAuthUser user) {
-        UUID ownerId = lesson.getContributor() == null ? null : lesson.getContributor().getContributorId();
-        if (ownerId == null || !ownerId.equals(user.userId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lesson owner access required");
-        }
+        return detailAssembler.toPublicDetailDto(lesson, enrolled);
     }
 }
