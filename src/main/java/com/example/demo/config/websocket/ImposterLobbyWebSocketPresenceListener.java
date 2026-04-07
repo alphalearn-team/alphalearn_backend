@@ -1,8 +1,8 @@
 package com.example.demo.config.websocket;
 
 import com.example.demo.config.SupabaseAuthUser;
-import com.example.demo.me.imposter.ImposterLobbyRealtimePresenceTracker;
-import com.example.demo.me.imposter.LearnerImposterLobbyService;
+import com.example.demo.game.lobby.ImposterLobbyRealtimePresenceTracker;
+import com.example.demo.game.lobby.LearnerImposterLobbyService;
 import java.security.Principal;
 import java.time.Clock;
 import java.time.OffsetDateTime;

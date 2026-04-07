@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.demo.lesson.Lesson;
-import com.example.demo.lesson.LessonLookupService;
+import com.example.demo.lesson.read.LessonLookupService;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizQuestionDto;
 import com.fasterxml.jackson.databind.ObjectMapper;

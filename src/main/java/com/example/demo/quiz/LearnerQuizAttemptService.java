@@ -14,7 +14,7 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonModerationStatus;
-import com.example.demo.lessonenrollment.LessonEnrollmentService;
+import com.example.demo.lesson.enrollment.LessonEnrollmentService;
 import com.example.demo.quiz.dto.QuizAttemptResponse;
 import com.example.demo.quiz.dto.SubmitQuizAttemptRequest;
 

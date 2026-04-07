@@ -6,8 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.demo.me.weeklyquest.QuestHistoryDto;
-import com.example.demo.me.weeklyquest.QuestHistoryQueryService;
+import com.example.demo.quest.learner.QuestHistoryDto;
+import com.example.demo.quest.learner.QuestHistoryQueryService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

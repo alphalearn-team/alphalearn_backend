@@ -18,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.demo.lesson.Lesson;
-import com.example.demo.lesson.LessonLookupService;
+import com.example.demo.lesson.read.LessonLookupService;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
 import com.example.demo.quiz.dto.QuizResponseDto;
@@ -35,7 +35,7 @@ class QuizQueryServiceTest {
     private LessonLookupService lessonLookupService;
 
     @Mock
-    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+    private com.example.demo.lesson.enrollment.LessonEnrollmentService lessonEnrollmentService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
