@@ -3,6 +3,7 @@ package com.example.demo.quiz;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.read.LessonLookupService;
+import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizQuestionDto;
 import com.example.demo.quiz.dto.UpdateQuizRequest;
@@ -38,12 +41,15 @@ class QuizServiceTest {
     @Mock
     private LessonLookupService lessonLookupService;
 
+    @Mock
+    private LessonModerationWorkflowService lessonModerationWorkflowService;
+
     private QuizService quizService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        quizService = new QuizService(quizRepository, lessonLookupService, objectMapper);
+        quizService = new QuizService(quizRepository, lessonLookupService, lessonModerationWorkflowService, objectMapper);
     }
 
     @Test
@@ -150,11 +156,14 @@ class QuizServiceTest {
     @Test
     void updateQuizSuccessfullyReplacesAllQuestions() {
         UUID quizPublicId = UUID.randomUUID();
-        Quiz existing = new Quiz(new Lesson(), java.time.OffsetDateTime.now());
+        Lesson lesson = new Lesson();
+        ReflectionTestUtils.setField(lesson, "lessonModerationStatus", LessonModerationStatus.PENDING);
+        Quiz existing = new Quiz(lesson, java.time.OffsetDateTime.now());
         ReflectionTestUtils.setField(existing, "publicId", quizPublicId);
 
         when(quizRepository.findByPublicId(quizPublicId)).thenReturn(Optional.of(existing));
         when(quizRepository.save(any(Quiz.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonModerationWorkflowService.unpublish(lesson)).thenReturn(lesson);
 
         QuizQuestionDto mcq = new QuizQuestionDto(
                 "single-choice", "Updated MCQ",
@@ -179,6 +188,26 @@ class QuizServiceTest {
         assertThat(result.getQuestions().get(1)).isInstanceOf(MultiSelectQuestion.class);
         assertThat(result.getQuestions().get(2)).isInstanceOf(TrueFalseQuestion.class);
         verify(quizRepository).save(existing);
+        verify(lessonModerationWorkflowService).unpublish(lesson);
+    }
+
+    @Test
+    void updateQuizDoesNotUnpublishWhenLessonAlreadyUnpublished() {
+        UUID quizPublicId = UUID.randomUUID();
+        Lesson lesson = new Lesson();
+        ReflectionTestUtils.setField(lesson, "lessonModerationStatus", LessonModerationStatus.UNPUBLISHED);
+        Quiz existing = new Quiz(lesson, java.time.OffsetDateTime.now());
+        ReflectionTestUtils.setField(existing, "publicId", quizPublicId);
+
+        when(quizRepository.findByPublicId(quizPublicId)).thenReturn(Optional.of(existing));
+        when(quizRepository.save(any(Quiz.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateQuizRequest request = new UpdateQuizRequest(List.of(
+                new QuizQuestionDto("true-false", "TF", Map.of("correctBoolean", true))));
+
+        quizService.updateQuiz(quizPublicId, request);
+
+        verify(lessonModerationWorkflowService, never()).unpublish(any());
     }
 
     @Test
