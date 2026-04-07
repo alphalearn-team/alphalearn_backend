@@ -43,12 +43,11 @@ class MyProfileServiceTest {
         learner.setProfilePicture("https://pub.example/profile-pictures/current.png");
         learner.setProfilePictureObjectKey("profile-pictures/current.png");
         learnerUser = new SupabaseAuthUser(learnerId, learner, null, "learner@example.com");
-
-        when(learnerRepository.findById(learnerId)).thenReturn(Optional.of(learner));
     }
 
     @Test
     void returnsProfileWithEmailFromAuthUser() {
+        stubCurrentLearnerLookup();
         MyProfileResponse response = service.getProfile(learnerUser);
 
         assertThat(response.username()).isEqualTo("learner");
@@ -59,6 +58,7 @@ class MyProfileServiceTest {
 
     @Test
     void updatesTrimmedUsernameAndNormalizedBio() {
+        stubCurrentLearnerLookup();
         when(learnerRepository.existsByUsernameAndIdNot("new-name", learner.getId())).thenReturn(false);
         when(learnerRepository.save(any(Learner.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -75,6 +75,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsBlankUsername() {
+        stubCurrentLearnerLookup();
         assertThatThrownBy(() -> service.updateProfile(new UpdateMyProfileRequest("   ", null), learnerUser))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("username must not be blank");
@@ -82,6 +83,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsDuplicateUsername() {
+        stubCurrentLearnerLookup();
         when(learnerRepository.existsByUsernameAndIdNot("taken-name", learner.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> service.updateProfile(new UpdateMyProfileRequest("taken-name", null), learnerUser))
@@ -91,6 +93,7 @@ class MyProfileServiceTest {
 
     @Test
     void createsProfilePictureUploadInstructions() {
+        stubCurrentLearnerLookup();
         when(profilePictureStorageService.maxUploadSizeBytes()).thenReturn(1024L * 1024L);
         when(profilePictureStorageService.generatePresignedUpload(learner.getId(), "avatar.png", "image/png"))
                 .thenReturn(new ProfilePictureStorageService.PresignedUpload(
@@ -112,6 +115,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsUnsupportedUploadType() {
+        stubCurrentLearnerLookup();
         when(profilePictureStorageService.maxUploadSizeBytes()).thenReturn(1024L * 1024L);
 
         assertThatThrownBy(() -> service.createProfilePictureUploadInstruction(
@@ -123,6 +127,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsOversizedUploadType() {
+        stubCurrentLearnerLookup();
         when(profilePictureStorageService.maxUploadSizeBytes()).thenReturn(1024L);
 
         assertThatThrownBy(() -> service.createProfilePictureUploadInstruction(
@@ -134,6 +139,7 @@ class MyProfileServiceTest {
 
     @Test
     void finalizesProfilePictureAfterValidatingObject() {
+        stubCurrentLearnerLookup();
         String objectKey = "profile-pictures/%s/avatar.png".formatted(learner.getId());
         when(profilePictureStorageService.expectedObjectKeyPrefix(learner.getId()))
                 .thenReturn("profile-pictures/%s/".formatted(learner.getId()));
@@ -155,6 +161,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsProfilePictureFinalizeOutsideLearnerNamespace() {
+        stubCurrentLearnerLookup();
         when(profilePictureStorageService.expectedObjectKeyPrefix(learner.getId()))
                 .thenReturn("profile-pictures/%s/".formatted(learner.getId()));
 
@@ -167,6 +174,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsProfilePictureFinalizeWhenObjectMissing() {
+        stubCurrentLearnerLookup();
         String objectKey = "profile-pictures/%s/avatar.png".formatted(learner.getId());
         when(profilePictureStorageService.expectedObjectKeyPrefix(learner.getId()))
                 .thenReturn("profile-pictures/%s/".formatted(learner.getId()));
@@ -180,6 +188,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsProfilePictureFinalizeWhenObjectIsNotImage() {
+        stubCurrentLearnerLookup();
         String objectKey = "profile-pictures/%s/avatar.png".formatted(learner.getId());
         when(profilePictureStorageService.expectedObjectKeyPrefix(learner.getId()))
                 .thenReturn("profile-pictures/%s/".formatted(learner.getId()));
@@ -197,6 +206,7 @@ class MyProfileServiceTest {
 
     @Test
     void rejectsProfilePictureFinalizeWhenObjectIsTooLarge() {
+        stubCurrentLearnerLookup();
         String objectKey = "profile-pictures/%s/avatar.png".formatted(learner.getId());
         when(profilePictureStorageService.expectedObjectKeyPrefix(learner.getId()))
                 .thenReturn("profile-pictures/%s/".formatted(learner.getId()));
@@ -220,5 +230,9 @@ class MyProfileServiceTest {
         assertThatThrownBy(() -> service.getProfile(noLearnerUser))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403 FORBIDDEN");
+    }
+
+    private void stubCurrentLearnerLookup() {
+        when(learnerRepository.findById(learner.getId())).thenReturn(Optional.of(learner));
     }
 }
