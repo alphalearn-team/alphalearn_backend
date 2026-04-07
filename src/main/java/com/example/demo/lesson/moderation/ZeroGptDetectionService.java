@@ -33,16 +33,20 @@ public class ZeroGptDetectionService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+            
+            // FIX 1: Use the specific header name required by the API docs
+            headers.set("ApiKey", apiKey);
 
+            // FIX 2: Use "input_text" as the key, as shown in the documentation screenshot
             Map<String, Object> body = Map.of(
-                    "text", content,
-                    "include_sentence_analysis", false
+                "input_text", content
             );
+            
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
+            // It is better to use String.class or JsonNode first to see exactly what the API returns
             ResponseEntity<Map> response = restTemplate.exchange(
-                    "https://api.zerogpt.org/api/v1/developer/ai-detection",
+                    "https://api.zerogpt.com/api/detect/detectText",
                     HttpMethod.POST,
                     request,
                     Map.class
@@ -55,9 +59,8 @@ public class ZeroGptDetectionService {
 
             double aiProbability = parseAiProbability(responseBody);
             boolean shouldReject = aiProbability >= aiThreshold;
-            String reason = shouldReject
-                    ? String.format("ZeroGPT AI probability %.2f%% exceeds threshold %.2f%%", aiProbability, aiThreshold)
-                    : String.format("ZeroGPT AI probability %.2f%% is below threshold %.2f%%", aiProbability, aiThreshold);
+            
+            String reason = String.format("ZeroGPT result: %.2f%% (Threshold: %.2f%%)", aiProbability, aiThreshold);
 
             return new ZeroGptDetectionResult(
                     aiProbability,
@@ -65,28 +68,32 @@ public class ZeroGptDetectionService {
                     reason,
                     responseBody
             );
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            // IMPROVED DEBUGGING: Print the actual error body from the server
+            System.err.println("API Error Response: " + e.getResponseBodyAsString());
+            throw new RuntimeException("ZeroGPT API returned " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            throw new RuntimeException("ZeroGPT detection failed", e);
+            e.printStackTrace();
+            throw new RuntimeException("ZeroGPT detection failed: " + e.getMessage(), e);
         }
     }
 
     private double parseAiProbability(Map<?, ?> responseBody) {
-        Object directValue = responseBody.get("ai_percentage");
-        if (directValue == null) {
-            directValue = responseBody.get("fakePercentage");
-        }
-        if (directValue == null) {
+        // FIX 3: Based on your screenshot, 'fakePercentage' is the key used by this API
+        Object value = responseBody.get("fakePercentage");
+        
+        if (value == null) {
+            // Fallback to check if it's nested in a 'data' object (common in some API versions)
             Object data = responseBody.get("data");
             if (data instanceof Map<?, ?> dataMap) {
-                directValue = dataMap.get("ai_percentage");
-                if (directValue == null) {
-                    directValue = dataMap.get("fakePercentage");
-                }
+                value = dataMap.get("fakePercentage");
             }
         }
-        if (directValue == null) {
-            throw new RuntimeException("ZeroGPT response missing ai percentage");
+
+        if (value == null) {
+            throw new RuntimeException("Could not find 'fakePercentage' in response: " + responseBody);
         }
-        return Double.parseDouble(directValue.toString());
+        
+        return Double.parseDouble(value.toString());
     }
 }
