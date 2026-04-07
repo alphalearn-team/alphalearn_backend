@@ -9,5 +9,7 @@ public record LearnerPublicDto(
         @Schema(description = "Learner public UUID")
         UUID publicId,
         @Schema(description = "Learner username")
-        String username
+        String username,
+        @Schema(description = "Learner profile picture URL")
+        String profilePictureUrl
 ) {}
