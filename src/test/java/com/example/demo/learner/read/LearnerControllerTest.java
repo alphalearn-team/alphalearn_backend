@@ -35,12 +35,17 @@ class LearnerControllerTest {
     void getLearnersReturnsPublicLearners() throws Exception {
         UUID learnerPublicId = UUID.randomUUID();
         when(learnerQueryService.getAllPublicLearners()).thenReturn(List.of(
-                new LearnerPublicDto(learnerPublicId, "learner-user")
+                new LearnerPublicDto(
+                        learnerPublicId,
+                        "learner-user",
+                        "https://cdn.example.com/learner-user.png"
+                )
         ));
 
         mockMvc.perform(get("/api/learners"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].publicId").value(learnerPublicId.toString()))
-                .andExpect(jsonPath("$[0].username").value("learner-user"));
+                .andExpect(jsonPath("$[0].username").value("learner-user"))
+                .andExpect(jsonPath("$[0].profilePictureUrl").value("https://cdn.example.com/learner-user.png"));
     }
 }
