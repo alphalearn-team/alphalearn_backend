@@ -1,6 +1,7 @@
 package com.example.demo.me.weeklyquest;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record QuestChallengeSubmissionResponse(
@@ -12,6 +13,7 @@ public record QuestChallengeSubmissionResponse(
         String originalFilename,
         long fileSizeBytes,
         String caption,
+        List<QuestChallengeTaggedFriendDto> taggedFriends,
         OffsetDateTime submittedAt,
         OffsetDateTime updatedAt
 ) {
@@ -25,6 +27,7 @@ public record QuestChallengeSubmissionResponse(
                 view.originalFilename(),
                 view.fileSizeBytes(),
                 view.caption(),
+                view.taggedFriends(),
                 view.submittedAt(),
                 view.updatedAt()
         );

@@ -162,6 +162,7 @@ class MeWeeklyQuestControllerTest {
                 "evidence.mp4",
                 1024L,
                 "Learner caption",
+                List.of(new QuestChallengeTaggedFriendDto(UUID.randomUUID(), "friend-one")),
                 OffsetDateTime.parse("2026-03-14T10:00:00Z"),
                 OffsetDateTime.parse("2026-03-14T10:05:00Z")
         );
@@ -173,7 +174,8 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.objectKey").value("quest-challenges/assignment/learner/object-evidence.mp4"))
                 .andExpect(jsonPath("$.contentType").value("video/mp4"))
-                .andExpect(jsonPath("$.caption").value("Learner caption"));
+                .andExpect(jsonPath("$.caption").value("Learner caption"))
+                .andExpect(jsonPath("$.taggedFriends[0].learnerUsername").value("friend-one"));
     }
 
     @Test
@@ -181,7 +183,8 @@ class MeWeeklyQuestControllerTest {
         QuestChallengeSubmissionRequest request = new QuestChallengeSubmissionRequest(
                 "quest-challenges/assignment/learner/object-evidence.mp4",
                 "evidence.mp4",
-                "Learner caption"
+                "Learner caption",
+                List.of(UUID.randomUUID())
         );
         QuestChallengeSubmissionView view = new QuestChallengeSubmissionView(
                 UUID.randomUUID(),
@@ -192,6 +195,7 @@ class MeWeeklyQuestControllerTest {
                 request.originalFilename(),
                 1024L,
                 request.caption(),
+                List.of(new QuestChallengeTaggedFriendDto(request.taggedFriendPublicIds().get(0), "friend-one")),
                 OffsetDateTime.parse("2026-03-14T10:00:00Z"),
                 OffsetDateTime.parse("2026-03-14T10:05:00Z")
         );
@@ -204,6 +208,7 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.originalFilename").value("evidence.mp4"))
                 .andExpect(jsonPath("$.caption").value("Learner caption"))
+                .andExpect(jsonPath("$.taggedFriends[0].learnerPublicId").value(request.taggedFriendPublicIds().get(0).toString()))
                 .andExpect(jsonPath("$.fileSizeBytes").value(1024));
     }
 
