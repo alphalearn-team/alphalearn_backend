@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -62,6 +63,7 @@ class FriendRequestControllerTest {
                 1L,
                 receiverPublicId,
                 "receiver",
+                "https://cdn.example.com/receiver.png",
                 FriendRequestStatus.PENDING,
                 OffsetDateTime.parse("2026-03-01T00:00:00Z")
         );
@@ -75,6 +77,7 @@ class FriendRequestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requestId").value(1))
                 .andExpect(jsonPath("$.otherUserPublicId").value(receiverPublicId.toString()))
+                .andExpect(jsonPath("$.otherUserProfilePictureUrl").value("https://cdn.example.com/receiver.png"))
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
@@ -89,16 +92,18 @@ class FriendRequestControllerTest {
                         2L,
                         otherUserPublicId,
                         "incoming-user",
+                        null,
                         FriendRequestStatus.PENDING,
                         OffsetDateTime.parse("2026-03-01T00:00:00Z")
                 )
         ));
 
         mockMvc.perform(get("/api/friend-requests?direction=incoming")
-                        .principal(authToken(authUser)))
+                .principal(authToken(authUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].requestId").value(2))
-                .andExpect(jsonPath("$[0].otherUsername").value("incoming-user"));
+                .andExpect(jsonPath("$[0].otherUsername").value("incoming-user"))
+                .andExpect(jsonPath("$[0].otherUserProfilePictureUrl").value(Matchers.nullValue()));
     }
 
     @Test

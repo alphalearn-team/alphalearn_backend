@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.OffsetDateTime;
@@ -64,12 +65,14 @@ class FriendControllerTest {
     void getFriendsReturnsOkForLearner() throws Exception {
         SupabaseAuthUser authUser = learnerUser();
         when(friendService.getFriends(eq(authUser.learner()))).thenReturn(List.of(
-                new FriendPublicDTO(UUID.randomUUID(), "friend-one")
+                new FriendPublicDTO(UUID.randomUUID(), "friend-one", "https://cdn.example.com/friend.png")
         ));
 
         mockMvc.perform(get("/api/friends")
                         .principal(authToken(authUser)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("friend-one"))
+                .andExpect(jsonPath("$[0].profilePictureUrl").value("https://cdn.example.com/friend.png"));
     }
 
     private SupabaseAuthenticationToken authToken(SupabaseAuthUser user) {
