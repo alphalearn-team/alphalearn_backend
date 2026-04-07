@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.read.LessonLookupService;
+import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizQuestionDto;
 import com.example.demo.quiz.dto.UpdateQuizRequest;
@@ -22,11 +24,13 @@ public class QuizService {
 
     private final QuizRepository quizRepository;
     private final LessonLookupService lessonLookupService;
+    private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final ObjectMapper objectMapper;
 
-    public QuizService(QuizRepository quizRepository, LessonLookupService lessonLookupService, ObjectMapper objectMapper) {
+    public QuizService(QuizRepository quizRepository, LessonLookupService lessonLookupService, LessonModerationWorkflowService lessonModerationWorkflowService, ObjectMapper objectMapper) {
         this.quizRepository = quizRepository;
         this.lessonLookupService = lessonLookupService;
+        this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.objectMapper = objectMapper;
     }
 
@@ -116,7 +120,15 @@ public class QuizService {
             quiz.getQuestions().add(question);
         }
 
-        return quizRepository.save(quiz);
+        Quiz saved = quizRepository.save(quiz);
+
+        // Reset lesson to UNPUBLISHED so it must be re-submitted for review
+        Lesson lesson = quiz.getLesson();
+        if (lesson != null && lesson.getLessonModerationStatus() != LessonModerationStatus.UNPUBLISHED) {
+            lessonModerationWorkflowService.unpublish(lesson);
+        }
+
+        return saved;
     }
 
     private void validateQuestionSpecifics(QuizQuestionDto dto) {
