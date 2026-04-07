@@ -751,6 +751,61 @@ class LearnerImposterLobbyServiceTest {
     }
 
     @Test
+    void submitVoteResolvesTieAtMaxVotingRoundsAndKeepsViewerVoteSelectionInState() {
+        UUID voterOneId = UUID.randomUUID();
+        UUID voterTwoId = UUID.randomUUID();
+
+        Learner voterOneLearner = learner(voterOneId, "voter-one");
+        Learner voterTwoLearner = learner(voterTwoId, "voter-two");
+        SupabaseAuthUser voterOne = new SupabaseAuthUser(voterOneId, voterOneLearner, null);
+        SupabaseAuthUser voterTwo = new SupabaseAuthUser(voterTwoId, voterTwoLearner, null);
+
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.VOTING);
+        lobby.setVotingRoundNumber(1);
+        lobby.setMaxVotingRounds(1);
+        lobby.setVotingDeadlineAt(OffsetDateTime.parse("2026-04-02T00:10:00Z"));
+        lobby.setCurrentImposterLearnerId(voterOneId);
+        lobby.setCurrentConceptIndex(1);
+        lobby.setCurrentConceptTitle("apple");
+        lobby.setVotingEligibleTargetLearnerIds(voterOneId + "," + voterTwoId);
+
+        ImposterGameLobbyMember voterOneMember = existingMember(lobby, voterOneId, "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember voterTwoMember = existingMember(lobby, voterTwoId, "2026-04-01T12:05:00Z");
+        List<ImposterGameLobbyMember> activeMembers = List.of(voterOneMember, voterTwoMember);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voterOneId)).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voterTwoId)).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(activeMembers);
+        when(learnerRepository.findAllById(anyList())).thenReturn(List.of(voterOneLearner, voterTwoLearner));
+
+        PrivateImposterLobbyStateDto firstVoteState = service.submitVote(
+                voterOne,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(voterTwoLearner.getPublicId())
+        );
+
+        assertThat(firstVoteState.viewerVoteTargetPublicId()).isEqualTo(voterTwoLearner.getPublicId());
+
+        PrivateImposterLobbyStateDto secondVoteState = service.submitVote(
+                voterTwo,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(voterOneLearner.getPublicId())
+        );
+
+        assertThat(lobby.getCurrentPhase()).isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.CONCEPT_RESULT);
+        assertThat(lobby.getLatestResultResolution()).isEqualTo("VOTING_TIE_LIMIT");
+        assertThat(lobby.getLatestResultWinnerSide()).isEqualTo("IMPOSTER");
+        assertThat(secondVoteState.currentPhase()).isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.CONCEPT_RESULT);
+        assertThat(secondVoteState.latestConceptResult()).isNotNull();
+        assertThat(secondVoteState.latestConceptResult().resolution().name()).isEqualTo("VOTING_TIE_LIMIT");
+    }
+
+    @Test
     void submitDrawingDoneCommitsSnapshotAdvancesTurnAndPublishesRealtime() {
         SupabaseAuthUser drawer = learnerAuthUser();
         ImposterGameLobby lobby = lobby("ABCD2345");
