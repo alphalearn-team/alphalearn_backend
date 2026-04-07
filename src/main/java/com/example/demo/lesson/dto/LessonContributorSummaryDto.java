@@ -21,5 +21,11 @@ public record LessonContributorSummaryDto(
         @Schema(description = "Lesson author")
         LessonAuthorDto author,
         @Schema(description = "Lesson creation timestamp")
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+
+        @Schema(description = "Number of learners enrolled in this lesson")
+        long enrollmentCount,
+
+        @Schema(description = "Number of learners who have completed this lesson")
+        long completionCount
 ) {}

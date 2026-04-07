@@ -14,6 +14,7 @@ import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lessonenrollment.LessonEnrollmentService;
 import com.example.demo.quiz.dto.QuizAttemptResponse;
 import com.example.demo.quiz.dto.SubmitQuizAttemptRequest;
 
@@ -24,17 +25,20 @@ public class LearnerQuizAttemptService {
     private final QuizAttemptRepository quizAttemptRepository;
     private final QuizAttemptSubmissionValidator quizAttemptSubmissionValidator;
     private final QuizAttemptScoringService quizAttemptScoringService;
+    private final LessonEnrollmentService lessonEnrollmentService;
 
     public LearnerQuizAttemptService(
             QuizRepository quizRepository,
             QuizAttemptRepository quizAttemptRepository,
             QuizAttemptSubmissionValidator quizAttemptSubmissionValidator,
-            QuizAttemptScoringService quizAttemptScoringService
+            QuizAttemptScoringService quizAttemptScoringService,
+            LessonEnrollmentService lessonEnrollmentService
     ) {
         this.quizRepository = quizRepository;
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizAttemptSubmissionValidator = quizAttemptSubmissionValidator;
         this.quizAttemptScoringService = quizAttemptScoringService;
+        this.lessonEnrollmentService = lessonEnrollmentService;
     }
 
     @Transactional
@@ -56,10 +60,14 @@ public class LearnerQuizAttemptService {
         requirePublicLesson(quiz.getLesson());
         requireNotLessonOwner(quiz.getLesson(), user);
 
+
         List<QuizQuestion> questions = quiz.getQuestions().stream()
                 .sorted(Comparator.comparingInt(QuizQuestion::getOrderIndex))
                 .toList();
         QuizAttemptSubmission submission = quizAttemptSubmissionValidator.validate(questions, request);
+
+        requireEnrolled(quiz.getLesson(), user);
+        
         int score = quizAttemptScoringService.calculateScore(questions, submission.answersByQuestionId());
 
         boolean isFirstAttempt = !quizAttemptRepository.existsByLearner_IdAndQuiz_QuizId(learner.getId(), quiz.getQuizId());
@@ -73,6 +81,7 @@ public class LearnerQuizAttemptService {
         );
 
         QuizAttempt savedAttempt = quizAttemptRepository.save(attempt);
+        lessonEnrollmentService.checkAndCompleteLesson(learner.getId(), quiz.getLesson().getPublicId());
         return toResponse(savedAttempt, submission.totalQuestions());
     }
 
@@ -83,6 +92,7 @@ public class LearnerQuizAttemptService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
         requirePublicLesson(quiz.getLesson());
         requireNotLessonOwner(quiz.getLesson(), user);
+        requireEnrolled(quiz.getLesson(), user);
 
         return quizAttemptRepository
                 .findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(learner.getId(), quiz.getQuizId())
@@ -97,6 +107,7 @@ public class LearnerQuizAttemptService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
         requirePublicLesson(quiz.getLesson());
         requireNotLessonOwner(quiz.getLesson(), user);
+        requireEnrolled(quiz.getLesson(), user);
 
         return quizAttemptRepository
                 .findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
@@ -141,6 +152,15 @@ public class LearnerQuizAttemptService {
             throw new IllegalStateException("Quiz score is out of range for persistence.");
         }
         return (short) score;
+    }
+
+    private void requireEnrolled(Lesson lesson, SupabaseAuthUser user) {
+        if (lesson == null || user == null || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Enrollment required");
+        }
+        if (!lessonEnrollmentService.isEnrolled(user.userId(), lesson.getPublicId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You must be enrolled in the lesson to access quizzes");
+        }
     }
 
     private QuizAttemptResponse toResponse(QuizAttempt attempt, int totalQuestions) {

@@ -3,6 +3,7 @@ name: Backend CD
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -12,6 +13,83 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate prod DB env
+        env:
+          PROD_DB_URL_JDBC: ${{ secrets.PROD_DB_URL_JDBC }}
+        run: |
+          if [ -z "$PROD_DB_URL_JDBC" ]; then
+            echo "PROD_DB_URL_JDBC is empty"
+            exit 1
+          fi
+          if echo "$PROD_DB_URL_JDBC" | grep -q '^\${'; then
+            echo "PROD_DB_URL_JDBC unresolved placeholder"
+            exit 1
+          fi
+          if ! echo "$PROD_DB_URL_JDBC" | grep -q '^jdbc:postgresql://'; then
+            echo "PROD_DB_URL_JDBC must start with jdbc:postgresql://"
+            exit 1
+          fi
+
+      - name: Apply pending prod migrations
+        env:
+          PROD_DB_URL_JDBC: ${{ secrets.PROD_DB_URL_JDBC }}
+          PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+        run: |
+          if ! echo "$PROD_DB_URL_JDBC" | grep -q '^jdbc:postgresql://'; then
+            echo "PROD_DB_URL_JDBC must start with jdbc:postgresql://"
+            exit 1
+          fi
+          PROD_DB_URL_PG="${PROD_DB_URL_JDBC#jdbc:}"
+          if [ -z "$PROD_DB_USER" ]; then
+            echo "PROD_DB_USER is empty"
+            exit 1
+          fi
+          if [ -z "$PROD_DB_PASSWORD" ]; then
+            echo "PROD_DB_PASSWORD is empty"
+            exit 1
+          fi
+          export PGUSER="$PROD_DB_USER"
+          export PGPASSWORD="$PROD_DB_PASSWORD"
+          supabase migration up --db-url "$PROD_DB_URL_PG"
+
+      - name: Verify critical prod schema state
+        env:
+          PROD_DB_URL_JDBC: ${{ secrets.PROD_DB_URL_JDBC }}
+          PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+        run: |
+          if ! echo "$PROD_DB_URL_JDBC" | grep -q '^jdbc:postgresql://'; then
+            echo "PROD_DB_URL_JDBC must start with jdbc:postgresql://"
+            exit 1
+          fi
+          PROD_DB_URL_PG="${PROD_DB_URL_JDBC#jdbc:}"
+          export PGUSER="$PROD_DB_USER"
+          export PGPASSWORD="$PROD_DB_PASSWORD"
+
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          CONCEPT_COUNT_PRESENT="$(psql "$PROD_DB_URL_PG" -t -A -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'imposter_game_lobbies' and column_name = 'concept_count';")"
+          QUEST_TEMPLATE_PRESENT="$(psql "$PROD_DB_URL_PG" -t -A -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'weekly_quest_assignments' and column_name = 'quest_template_id';")"
+
+          if [ "$CONCEPT_COUNT_PRESENT" != "1" ]; then
+            echo "Expected public.imposter_game_lobbies.concept_count to exist, but found count=$CONCEPT_COUNT_PRESENT"
+            exit 1
+          fi
+
+          if [ "$QUEST_TEMPLATE_PRESENT" != "0" ]; then
+            echo "Expected public.weekly_quest_assignments.quest_template_id to be removed, but found count=$QUEST_TEMPLATE_PRESENT"
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

@@ -1,0 +1,980 @@
+package com.example.demo.me.imposter;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.example.demo.concept.Concept;
+import com.example.demo.concept.ConceptRepository;
+import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
+import com.example.demo.game.imposter.lobby.ImposterGameLobby;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyMember;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyMemberRepository;
+import com.example.demo.game.imposter.lobby.ImposterGameLobbyRepository;
+import com.example.demo.game.imposter.lobby.ImposterLobbyCodeGenerator;
+import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
+import com.example.demo.game.imposter.monthly.ImposterMonthlyPack;
+import com.example.demo.game.imposter.monthly.ImposterMonthlyPackConcept;
+import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackConceptRepository;
+import com.example.demo.game.imposter.monthly.repository.ImposterMonthlyPackRepository;
+import com.example.demo.game.imposter.realtime.ImposterLobbyRealtimePublisher;
+import com.example.demo.learner.Learner;
+import com.example.demo.learner.LearnerRepository;
+import com.example.demo.me.imposter.dto.CreatePrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinPrivateImposterLobbyRequest;
+import com.example.demo.me.imposter.dto.JoinedPrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.LeavePrivateImposterLobbyResponse;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyDto;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyLeaveResult;
+import com.example.demo.me.imposter.dto.PrivateImposterLobbyStateDto;
+import com.example.demo.me.imposter.dto.SubmitImposterVoteRequest;
+import com.example.demo.me.imposter.dto.UpsertImposterDrawingSnapshotRequest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
+
+@ExtendWith(MockitoExtension.class)
+class LearnerImposterLobbyServiceTest {
+
+    @Mock
+    private ImposterGameLobbyRepository imposterGameLobbyRepository;
+
+    @Mock
+    private ImposterGameLobbyMemberRepository imposterGameLobbyMemberRepository;
+
+    @Mock
+    private ImposterLobbyCodeGenerator imposterLobbyCodeGenerator;
+
+    @Mock
+    private ImposterMonthlyPackRepository imposterMonthlyPackRepository;
+
+    @Mock
+    private ImposterMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
+
+    @Mock
+    private ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+
+    @Mock
+    private ConceptRepository conceptRepository;
+
+    @Mock
+    private LearnerRepository learnerRepository;
+
+    @Mock
+    private ImposterLobbyRealtimePublisher imposterLobbyRealtimePublisher;
+
+    @Mock
+    private ImposterLobbyRealtimePresenceTracker imposterLobbyRealtimePresenceTracker;
+
+    private LearnerImposterLobbyService service;
+
+    @BeforeEach
+    void setUp() {
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-04-02T00:00:00Z"), ZoneOffset.UTC);
+        service = new LearnerImposterLobbyService(
+                imposterGameLobbyRepository,
+                imposterGameLobbyMemberRepository,
+                imposterLobbyCodeGenerator,
+                imposterMonthlyPackRepository,
+                imposterMonthlyPackConceptRepository,
+                imposterWeeklyFeaturedConceptService,
+                conceptRepository,
+                learnerRepository,
+                imposterLobbyRealtimePublisher,
+                imposterLobbyRealtimePresenceTracker,
+                fixedClock
+        );
+        lenient().when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class))).thenAnswer(invocation -> {
+            ImposterGameLobby lobby = invocation.getArgument(0);
+            if (lobby.getPublicId() == null) {
+                ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+            }
+            return lobby;
+        });
+        lenient().when(imposterGameLobbyMemberRepository.saveAndFlush(any(ImposterGameLobbyMember.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(imposterLobbyCodeGenerator.generate()).thenReturn("ABCD2345");
+        Concept concept = new Concept();
+        ReflectionTestUtils.setField(concept, "publicId", UUID.randomUUID());
+        concept.setTitle("apple");
+        lenient().when(conceptRepository.findAll()).thenReturn(List.of(concept));
+        lenient().when(imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept(any())).thenReturn(Optional.empty());
+    }
+
+    @Test
+    void createsPrivateLobbyForFullConceptPool() {
+        SupabaseAuthUser user = learnerAuthUser();
+
+        PrivateImposterLobbyDto result = service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL)
+        );
+
+        assertThat(result.publicId()).isNotNull();
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        assertThat(result.isPrivate()).isTrue();
+        assertThat(result.conceptPoolMode()).isEqualTo(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
+        assertThat(result.pinnedYearMonth()).isNull();
+        assertThat(result.createdAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(any(ImposterGameLobbyMember.class));
+    }
+
+    @Test
+    void createsPrivateLobbyForCurrentMonthPackWhenConfigured() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterMonthlyPack pack = new ImposterMonthlyPack();
+        ReflectionTestUtils.setField(pack, "id", 91L);
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
+
+        ImposterMonthlyPackConcept conceptRow = new ImposterMonthlyPackConcept();
+        conceptRow.setPack(pack);
+        conceptRow.setSlotIndex((short) 1);
+        when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(91L))
+                .thenReturn(List.of(conceptRow));
+
+        PrivateImposterLobbyDto result = service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK)
+        );
+
+        assertThat(result.publicId()).isNotNull();
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        assertThat(result.conceptPoolMode()).isEqualTo(ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK);
+        assertThat(result.pinnedYearMonth()).isEqualTo("2026-04");
+    }
+
+    @Test
+    void rejectsCurrentMonthPackLobbyWhenPackMissing() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Current monthly imposter pack is not configured");
+    }
+
+    @Test
+    void rejectsCurrentMonthPackLobbyWhenPackHasNoConcepts() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterMonthlyPack pack = new ImposterMonthlyPack();
+        ReflectionTestUtils.setField(pack, "id", 91L);
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(pack));
+        when(imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(91L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.CURRENT_MONTH_PACK)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Current monthly imposter pack has no concepts");
+    }
+
+    @Test
+    void retriesLobbyCodeGenerationWhenUniqueCollisionOccurs() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterLobbyCodeGenerator.generate()).thenReturn("ABCD2345", "WXYZ6789");
+        when(imposterGameLobbyRepository.saveAndFlush(any(ImposterGameLobby.class)))
+                .thenThrow(new DataIntegrityViolationException("violates constraint uk_imposter_game_lobbies_lobby_code"))
+                .thenAnswer(invocation -> {
+                    ImposterGameLobby lobby = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+                    return lobby;
+                });
+
+        PrivateImposterLobbyDto result = service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL)
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("WXYZ6789");
+        verify(imposterLobbyCodeGenerator, times(2)).generate();
+        verify(imposterGameLobbyRepository, times(2)).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void createPrivateLobbyPropagatesWhenHostMembershipInsertFails() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterGameLobbyMemberRepository.saveAndFlush(any(ImposterGameLobbyMember.class)))
+                .thenThrow(new RuntimeException("membership insert failed"));
+
+        assertThatThrownBy(() -> service.createPrivateLobby(
+                user,
+                new CreatePrivateImposterLobbyRequest(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL)
+        ))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("membership insert failed");
+    }
+
+    @Test
+    void joinPrivateLobbyCreatesMembershipForValidCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.empty());
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        assertThat(result.alreadyMember()).isFalse();
+        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(any(ImposterGameLobbyMember.class));
+    }
+
+    @Test
+    void joinPrivateLobbyNormalizesLobbyCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.empty());
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("  abcd2345  ")
+        );
+
+        assertThat(result.lobbyCode()).isEqualTo("ABCD2345");
+        verify(imposterGameLobbyRepository).findByLobbyCodeForUpdate(eq("ABCD2345"));
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsSuccessWhenAlreadyActiveMember() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        ImposterGameLobbyMember member = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(member));
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        );
+
+        assertThat(result.alreadyMember()).isTrue();
+        assertThat(result.joinedAt()).isEqualTo(member.getJoinedAt());
+        verify(imposterGameLobbyMemberRepository, never()).saveAndFlush(any(ImposterGameLobbyMember.class));
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+        verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
+        verify(imposterLobbyRealtimePublisher, never()).publishViewerLobbyState(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void joinPrivateLobbyAllowsRejoinAfterLearnerHasLeft() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        ImposterGameLobbyMember historical = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        historical.setLeftAt(OffsetDateTime.parse("2026-04-01T13:00:00Z"));
+        when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.empty());
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerId(11L, user.userId()))
+                .thenReturn(Optional.of(historical));
+
+        JoinedPrivateImposterLobbyDto result = service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        );
+
+        assertThat(result.alreadyMember()).isFalse();
+        assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(historical.getLeftAt()).isNull();
+        verify(imposterGameLobbyMemberRepository).saveAndFlush(historical);
+    }
+
+    @Test
+    void joinPrivateLobbyReturnsNotFoundWhenLobbyCodeMissing() {
+        SupabaseAuthUser user = learnerAuthUser();
+        when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Imposter lobby not found");
+    }
+
+    @Test
+    void joinPrivateLobbyRejectsMissingLobbyCode() {
+        SupabaseAuthUser user = learnerAuthUser();
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                user,
+                new JoinPrivateImposterLobbyRequest("   ")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("lobbyCode is required");
+    }
+
+    @Test
+    void leavePrivateLobbyMarksActiveMemberLeftWhenLobbyNotStarted() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        ImposterGameLobbyMember self = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember other = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:30:00Z");
+        Learner otherLearner = learner(other.getLearnerId(), "peer");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(self));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(other));
+        when(learnerRepository.findAllById(List.of(other.getLearnerId()))).thenReturn(List.of(otherLearner));
+
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(user, lobbyPublicId);
+
+        assertThat(self.getLeftAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT);
+        assertThat(result.lobbyState()).isNotNull();
+        assertThat(result.lobbyState().activeMemberCount()).isEqualTo(1);
+        assertThat(result.lobbyState().viewerIsActiveMember()).isFalse();
+        assertThat(result.lobbyState().canLeave()).isFalse();
+        verify(imposterLobbyRealtimePresenceTracker).clearLobbyMembership(lobbyPublicId, user.userId());
+    }
+
+    @Test
+    void leavePrivateLobbyPromotesNextHostWhenHostLeavesWithRemainingMembers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        UUID promotedLearnerId = UUID.randomUUID();
+        ImposterGameLobbyMember promoted = existingMember(lobby, promotedLearnerId, "2026-04-01T12:05:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(promoted), List.of(promoted));
+        when(learnerRepository.findAllById(List.of(promotedLearnerId)))
+                .thenReturn(List.of(learner(promotedLearnerId, "new-host")));
+
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(host, lobbyPublicId);
+
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_PROMOTED_HOST);
+        assertThat(result.lobbyState()).isNotNull();
+        assertThat(lobby.getHostLearnerId()).isEqualTo(promotedLearnerId);
+        assertThat(result.lobbyState().activeMemberCount()).isEqualTo(1);
+    }
+
+    @Test
+    void leavePrivateLobbyDeletesLobbyWhenHostLeavesAndNoMembersRemain() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of());
+
+        LeavePrivateImposterLobbyResponse result = service.leavePrivateLobby(host, lobbyPublicId);
+
+        assertThat(result.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_LOBBY_DELETED);
+        assertThat(result.lobbyState()).isNull();
+        verify(imposterGameLobbyMemberRepository).delete(hostMember);
+        verify(imposterGameLobbyRepository).deleteById(11L);
+    }
+
+    @Test
+    void leavePrivateLobbyAbandonsSessionWhenAnyActiveMemberLeavesAfterStart() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setHostLearnerId(user.userId());
+
+        UUID remainingLearnerId = UUID.randomUUID();
+        ImposterGameLobbyMember self = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember remaining = existingMember(lobby, remainingLearnerId, "2026-04-01T12:05:00Z");
+        Learner remainingLearner = learner(remainingLearnerId, "remaining");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(self));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(remaining), List.of(remaining));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(remainingLearner, learner(user.userId(), "quitter")));
+
+        LeavePrivateImposterLobbyResponse response = service.leavePrivateLobby(user, lobbyPublicId);
+
+        assertThat(response.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT_AND_SESSION_ABANDONED);
+        assertThat(response.lobbyState()).isNotNull();
+        assertThat(response.lobbyState().activeMemberCount()).isEqualTo(1);
+        assertThat(response.lobbyState().currentPhase())
+                .isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+        assertThat(response.lobbyState().endReason()).isEqualTo("PLAYER_QUIT");
+        assertThat(response.lobbyState().endedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(response.lobbyState().endedByPublicId()).isNotNull();
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(1), eq("ABANDONED_BY_QUIT"), any());
+        verify(imposterLobbyRealtimePublisher).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(1), eq("ABANDONED_BY_QUIT"), any());
+    }
+
+    @Test
+    void leavePrivateLobbyDoesNotDeleteAbandonedLobbyWhenLastMemberLeaves() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+
+        ImposterGameLobbyMember self = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
+                .thenReturn(Optional.of(self));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(), List.of());
+        when(learnerRepository.findAllById(List.of())).thenReturn(List.of());
+
+        LeavePrivateImposterLobbyResponse response = service.leavePrivateLobby(user, lobbyPublicId);
+
+        assertThat(response.result()).isEqualTo(PrivateImposterLobbyLeaveResult.LEFT);
+        assertThat(response.lobbyState()).isNotNull();
+        assertThat(response.lobbyState().activeMemberCount()).isEqualTo(0);
+        verify(imposterGameLobbyRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void submitVoteRejectsWhenLobbySessionAbandoned() {
+        SupabaseAuthUser voter = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voter.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.submitVote(
+                voter,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(UUID.randomUUID())
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("session has been abandoned");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void processRealtimeDisconnectTimeoutsAbandonsLobbyAndPublishesRealtime() {
+        UUID disconnectedLearnerId = UUID.randomUUID();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setStateVersion(7);
+
+        ImposterGameLobbyMember disconnectedMember = existingMember(lobby, disconnectedLearnerId, "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember otherMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        when(imposterLobbyRealtimePresenceTracker.consumeDueDisconnectTimeouts(any()))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate(
+                        lobbyPublicId,
+                        disconnectedLearnerId,
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z")
+                )));
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, disconnectedLearnerId))
+                .thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(disconnectedMember, otherMember), List.of(disconnectedMember, otherMember));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(disconnectedLearnerId, "dc"),
+                        learner(otherMember.getLearnerId(), "other")
+                ));
+
+        service.processRealtimeDisconnectTimeouts();
+
+        assertThat(lobby.getCurrentPhase()).isEqualTo(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.ABANDONED);
+        assertThat(lobby.getEndedReason()).isEqualTo("PLAYER_DISCONNECTED_TIMEOUT");
+        assertThat(lobby.getEndedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(lobby.getAbandonedByLearnerId()).isEqualTo(disconnectedLearnerId);
+        verify(imposterLobbyRealtimePublisher)
+                .publishSharedLobbyState(eq(lobbyPublicId), eq(8), eq("ABANDONED_BY_DISCONNECT_TIMEOUT"), any());
+    }
+
+    @Test
+    void processRealtimeDisconnectTimeoutsSkipsLobbyWhenNotStarted() {
+        UUID disconnectedLearnerId = UUID.randomUUID();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        when(imposterLobbyRealtimePresenceTracker.consumeDueDisconnectTimeouts(any()))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.DisconnectTimeoutCandidate(
+                        lobbyPublicId,
+                        disconnectedLearnerId,
+                        OffsetDateTime.parse("2026-04-02T00:00:00Z")
+                )));
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+
+        service.processRealtimeDisconnectTimeouts();
+
+        verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
+    }
+
+    @Test
+    void startPrivateLobbySucceedsWhenHostAndEnoughActiveMembers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember secondMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember thirdMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:10:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(hostMember));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, secondMember, thirdMember));
+        when(learnerRepository.findAllById(List.of(host.userId(), secondMember.getLearnerId(), thirdMember.getLearnerId())))
+                .thenReturn(List.of(
+                        learner(host.userId(), "host"),
+                        learner(secondMember.getLearnerId(), "member-2"),
+                        learner(thirdMember.getLearnerId(), "member-3")
+                ));
+
+        PrivateImposterLobbyStateDto result = service.startPrivateLobby(host, lobbyPublicId);
+
+        assertThat(lobby.getStartedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(lobby.getStartedByLearnerId()).isEqualTo(host.userId());
+        assertThat(result.startedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        assertThat(result.canStart()).isFalse();
+    }
+
+    @Test
+    void startPrivateLobbyRejectsWhenInsufficientPlayers() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, host.userId()))
+                .thenReturn(Optional.of(existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z")));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(
+                        existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z"),
+                        existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z")
+                ));
+
+        assertThatThrownBy(() -> service.startPrivateLobby(host, lobbyPublicId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("At least 3 active players are required");
+    }
+
+    @Test
+    void startPrivateLobbyRejectsWhenRequesterIsNotHost() {
+        SupabaseAuthUser requester = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(UUID.randomUUID());
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, requester.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.startPrivateLobby(requester, lobbyPublicId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Only lobby host can start");
+    }
+
+    @Test
+    void getPrivateLobbyStateReturnsLiveSnapshot() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember secondMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember thirdMember = existingMember(lobby, UUID.randomUUID(), "2026-04-01T12:10:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, secondMember, thirdMember));
+        when(learnerRepository.findAllById(List.of(host.userId(), secondMember.getLearnerId(), thirdMember.getLearnerId())))
+                .thenReturn(List.of(
+                        learner(host.userId(), "host"),
+                        learner(secondMember.getLearnerId(), "member-2"),
+                        learner(thirdMember.getLearnerId(), "member-3")
+                ));
+
+        PrivateImposterLobbyStateDto result = service.getPrivateLobbyState(host, lobbyPublicId);
+
+        assertThat(result.activeMemberCount()).isEqualTo(3);
+        assertThat(result.viewerIsHost()).isTrue();
+        assertThat(result.viewerIsActiveMember()).isTrue();
+        assertThat(result.canLeave()).isTrue();
+        assertThat(result.canStart()).isTrue();
+    }
+
+    @Test
+    void getPrivateLobbyStateIncludesReconnectPresenceCountdown() {
+        SupabaseAuthUser host = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(host.userId());
+
+        ImposterGameLobbyMember hostMember = existingMember(lobby, host.userId(), "2026-04-01T12:00:00Z");
+        UUID reconnectingLearnerId = UUID.randomUUID();
+        ImposterGameLobbyMember reconnectingMember = existingMember(lobby, reconnectingLearnerId, "2026-04-01T12:05:00Z");
+
+        Learner hostLearner = learner(host.userId(), "host");
+        Learner reconnectingLearner = learner(reconnectingLearnerId, "reconnect");
+        OffsetDateTime deadline = OffsetDateTime.parse("2026-04-02T00:00:30Z");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, host.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(hostMember, reconnectingMember));
+        when(learnerRepository.findAllById(anyList())).thenReturn(List.of(hostLearner, reconnectingLearner));
+        when(imposterLobbyRealtimePresenceTracker.listReconnectPresence(lobbyPublicId))
+                .thenReturn(List.of(new ImposterLobbyRealtimePresenceTracker.ReconnectPresenceSnapshot(reconnectingLearnerId, deadline)));
+
+        PrivateImposterLobbyStateDto result = service.getPrivateLobbyState(host, lobbyPublicId);
+
+        assertThat(result.reconnectingLearners()).hasSize(1);
+        assertThat(result.reconnectingLearners().get(0).learnerPublicId()).isEqualTo(reconnectingLearner.getPublicId());
+        assertThat(result.reconnectingLearners().get(0).disconnectDeadlineAt()).isEqualTo(deadline);
+    }
+
+    @Test
+    void publishRealtimePresenceUpdateBroadcastsSharedAndViewerState() {
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        UUID memberOneId = UUID.randomUUID();
+        UUID memberTwoId = UUID.randomUUID();
+        ImposterGameLobbyMember memberOne = existingMember(lobby, memberOneId, "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+
+        when(imposterGameLobbyRepository.findByPublicId(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(memberOne, memberTwo));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(learner(memberOneId, "one"), learner(memberTwoId, "two")));
+
+        service.publishRealtimePresenceUpdate(lobbyPublicId, "RECONNECTING");
+
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), any(), eq("RECONNECTING"), any());
+        verify(imposterLobbyRealtimePublisher, times(2)).publishViewerLobbyState(eq(lobbyPublicId), any(), any(), eq("RECONNECTING"), any());
+    }
+
+    @Test
+    void submitVoteRejectsSelfVote() {
+        SupabaseAuthUser voter = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.VOTING);
+        lobby.setVotingRoundNumber(1);
+        lobby.setVotingDeadlineAt(OffsetDateTime.parse("2026-04-02T00:10:00Z"));
+
+        UUID otherLearnerId1 = UUID.randomUUID();
+        UUID otherLearnerId2 = UUID.randomUUID();
+        lobby.setVotingEligibleTargetLearnerIds(voter.userId() + "," + otherLearnerId1 + "," + otherLearnerId2);
+
+        ImposterGameLobbyMember voterMember = existingMember(lobby, voter.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember otherMember1 = existingMember(lobby, otherLearnerId1, "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember otherMember2 = existingMember(lobby, otherLearnerId2, "2026-04-01T12:10:00Z");
+
+        Learner voterLearner = learner(voter.userId(), "voter");
+        Learner otherLearner1 = learner(otherLearnerId1, "other-1");
+        Learner otherLearner2 = learner(otherLearnerId2, "other-2");
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, voter.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(voterMember, otherMember1, otherMember2));
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(voterLearner, otherLearner1, otherLearner2));
+
+        assertThatThrownBy(() -> service.submitVote(
+                voter,
+                lobbyPublicId,
+                new SubmitImposterVoteRequest(voterLearner.getPublicId())
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("cannot vote for yourself");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void submitDrawingDoneCommitsSnapshotAdvancesTurnAndPublishesRealtime() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(drawer.userId());
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setCurrentTurnIndex(0);
+        lobby.setRoundNumber(1);
+        lobby.setRoundsPerConcept(1);
+        lobby.setTurnDurationSeconds(25);
+        lobby.setTurnStartedAt(OffsetDateTime.parse("2026-04-01T23:59:50Z"));
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-02T00:00:10Z"));
+        lobby.setDrawingVersion(2);
+        lobby.setStateVersion(3);
+
+        UUID memberTwoId = UUID.randomUUID();
+        UUID memberThreeId = UUID.randomUUID();
+        lobby.setRoundDrawerOrder(drawer.userId() + "," + memberTwoId);
+        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember memberThree = existingMember(lobby, memberThreeId, "2026-04-01T12:10:00Z");
+        List<ImposterGameLobbyMember> activeMembers = List.of(drawerMember, memberTwo, memberThree);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L)).thenReturn(activeMembers);
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(drawer.userId(), "drawer"),
+                        learner(memberTwoId, "member-2"),
+                        learner(memberThreeId, "member-3")
+                ));
+
+        PrivateImposterLobbyStateDto state = service.submitDrawingDone(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 2)
+        );
+
+        assertThat(state.currentTurnIndex()).isEqualTo(1);
+        assertThat(state.stateVersion()).isEqualTo(4);
+        assertThat(lobby.getCurrentDrawingSnapshot()).isEqualTo("{\"final\":true}");
+        assertThat(lobby.getDrawingVersion()).isEqualTo(3);
+        assertThat(lobby.getStateVersion()).isEqualTo(4);
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(4), eq("DRAWING_DONE"), any());
+        verify(imposterLobbyRealtimePublisher, times(3)).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(4), eq("DRAWING_DONE"), any());
+    }
+
+    @Test
+    void submitDrawingDoneRejectsStaleBaseVersion() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setDrawingVersion(3);
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-02T00:00:10Z"));
+
+        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L))
+                .thenReturn(List.of(drawerMember));
+
+        assertThatThrownBy(() -> service.submitDrawingDone(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 1)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Drawing version conflict");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void submitDrawingDoneRejectsWhenViewerIsNotCurrentDrawer() {
+        SupabaseAuthUser user = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(UUID.randomUUID());
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, user.userId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.submitDrawingDone(
+                user,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 0)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Only current drawer can perform this action");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+    }
+
+    @Test
+    void submitLiveDrawingRejectsWhenDoneBasedModeIsEnabled() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        assertThatThrownBy(() -> service.submitLiveDrawing(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"live\":true}", 1)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Live drawing is disabled");
+
+        verify(imposterGameLobbyRepository, never()).saveAndFlush(any(ImposterGameLobby.class));
+        verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
+        verify(imposterLobbyRealtimePublisher, never()).publishViewerLobbyState(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void submitDrawingDoneRejectsWhenTurnAlreadyExpiredAndPublishesAuthoritativeState() {
+        SupabaseAuthUser drawer = learnerAuthUser();
+        ImposterGameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(drawer.userId());
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.imposter.lobby.ImposterLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setCurrentTurnIndex(0);
+        lobby.setRoundNumber(1);
+        lobby.setRoundsPerConcept(1);
+        lobby.setTurnDurationSeconds(25);
+        lobby.setTurnStartedAt(OffsetDateTime.parse("2026-04-01T23:59:30Z"));
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-01T23:59:59Z"));
+        lobby.setDrawingVersion(1);
+        lobby.setStateVersion(10);
+
+        UUID memberTwoId = UUID.randomUUID();
+        UUID memberThreeId = UUID.randomUUID();
+        lobby.setRoundDrawerOrder(drawer.userId() + "," + memberTwoId);
+        ImposterGameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        ImposterGameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+        ImposterGameLobbyMember memberThree = existingMember(lobby, memberThreeId, "2026-04-01T12:10:00Z");
+        List<ImposterGameLobbyMember> activeMembers = List.of(drawerMember, memberTwo, memberThree);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L)).thenReturn(activeMembers, activeMembers);
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(drawer.userId(), "drawer"),
+                        learner(memberTwoId, "member-2"),
+                        learner(memberThreeId, "member-3")
+                ));
+
+        assertThatThrownBy(() -> service.submitDrawingDone(
+                drawer,
+                lobbyPublicId,
+                new UpsertImposterDrawingSnapshotRequest("{\"final\":true}", 1)
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Drawing turn has ended");
+
+        assertThat(lobby.getStateVersion()).isEqualTo(11);
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(11), eq("TURN_EXPIRED"), any());
+        verify(imposterLobbyRealtimePublisher, times(3)).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(11), eq("TURN_EXPIRED"), any());
+    }
+
+    @Test
+    void joinPrivateLobbyRejectsWhenUserIsNotLearner() {
+        SupabaseAuthUser notLearner = new SupabaseAuthUser(UUID.randomUUID(), null, null);
+
+        assertThatThrownBy(() -> service.joinPrivateLobby(
+                notLearner,
+                new JoinPrivateImposterLobbyRequest("ABCD2345")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Learner account required");
+    }
+
+    private SupabaseAuthUser learnerAuthUser() {
+        UUID userId = UUID.randomUUID();
+        Learner learner = new Learner();
+        learner.setId(userId);
+        learner.setPublicId(UUID.randomUUID());
+        learner.setUsername("learner-" + userId.toString().substring(0, 8));
+        learner.setCreatedAt(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
+        learner.setTotalPoints((short) 0);
+        return new SupabaseAuthUser(userId, learner, null);
+    }
+
+    private Learner learner(UUID id, String username) {
+        Learner learner = new Learner();
+        learner.setId(id);
+        learner.setPublicId(UUID.randomUUID());
+        learner.setUsername(username);
+        learner.setCreatedAt(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        learner.setTotalPoints((short) 0);
+        return learner;
+    }
+
+    private ImposterGameLobby lobby(String lobbyCode) {
+        ImposterGameLobby lobby = new ImposterGameLobby();
+        ReflectionTestUtils.setField(lobby, "id", 11L);
+        ReflectionTestUtils.setField(lobby, "publicId", UUID.randomUUID());
+        lobby.setLobbyCode(lobbyCode);
+        lobby.setPrivateLobby(true);
+        lobby.setConceptPoolMode(ImposterLobbyConceptPoolMode.FULL_CONCEPT_POOL);
+        lobby.setCreatedAt(OffsetDateTime.parse("2026-04-01T00:00:00Z"));
+        lobby.setHostLearnerId(UUID.randomUUID());
+        return lobby;
+    }
+
+    private ImposterGameLobbyMember existingMember(ImposterGameLobby lobby, UUID learnerId, String joinedAt) {
+        ImposterGameLobbyMember member = new ImposterGameLobbyMember();
+        member.setLobby(lobby);
+        member.setLearnerId(learnerId);
+        member.setJoinedAt(OffsetDateTime.parse(joinedAt));
+        return member;
+    }
+}

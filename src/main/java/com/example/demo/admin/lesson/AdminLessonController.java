@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -87,6 +88,25 @@ public class AdminLessonController {
             @AuthenticationPrincipal SupabaseAuthUser user
     ){
         return adminLessonService.rejectLesson(lessonPublicId, request, user);
+    }
+
+    @PatchMapping("/{lessonPublicId}/moderation-status")
+    @Operation(
+            summary = "Update lesson moderation status",
+            description = "Updates lesson moderation status for admin actions. Currently supports setting status to UNPUBLISHED and auto-resolving pending reports."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lesson moderation status updated"),
+            @ApiResponse(responseCode = "400", description = "Unsupported target status or invalid payload"),
+            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
+            @ApiResponse(responseCode = "404", description = "Lesson not found")
+    })
+    public AdminLessonDetailDto updateLessonModerationStatus(
+            @PathVariable UUID lessonPublicId,
+            @org.springframework.web.bind.annotation.RequestBody AdminUpdateLessonModerationStatusRequest request,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return adminLessonService.updateLessonModerationStatus(lessonPublicId, request, user);
     }
 
 }

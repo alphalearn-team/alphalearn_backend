@@ -1,0 +1,64 @@
+package com.example.demo.me.imposter.dto;
+
+import com.example.demo.game.imposter.lobby.ImposterLobbyConceptPoolMode;
+import com.example.demo.game.imposter.lobby.ImposterLobbyPhase;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record PrivateImposterLobbyStateDto(
+        UUID publicId,
+        String lobbyCode,
+        boolean isPrivate,
+        ImposterLobbyConceptPoolMode conceptPoolMode,
+        String pinnedYearMonth,
+        Integer conceptCount,
+        Integer roundsPerConcept,
+        Integer discussionTimerSeconds,
+        Integer imposterGuessTimerSeconds,
+        OffsetDateTime createdAt,
+        OffsetDateTime startedAt,
+        long activeMemberCount,
+        List<PrivateImposterLobbyMemberStateDto> activeMembers,
+        boolean viewerIsHost,
+        boolean viewerIsActiveMember,
+        boolean canLeave,
+        boolean canStart,
+        UUID currentDrawerPublicId,
+        Integer currentTurnIndex,
+        Integer totalTurns,
+        Integer turnDurationSeconds,
+        OffsetDateTime turnStartedAt,
+        OffsetDateTime turnEndsAt,
+        boolean viewerIsCurrentDrawer,
+        boolean canSubmitSnapshot,
+        boolean canPressDone,
+        boolean isRoundComplete,
+        String currentDrawingSnapshot,
+        Integer drawingVersion,
+        ImposterLobbyPhase currentPhase,
+        String endReason,
+        OffsetDateTime endedAt,
+        UUID endedByPublicId,
+        List<PrivateImposterLobbyReconnectStateDto> reconnectingLearners,
+        Integer currentConceptIndex,
+        Integer totalConcepts,
+        List<PrivateImposterLobbyPlayerScoreDto> playerScores,
+        PrivateImposterLobbyConceptResultDto latestConceptResult,
+        Integer maxVotingRounds,
+        Integer minTimerSeconds,
+        Integer maxTimerSeconds,
+        Integer stateVersion,
+        OffsetDateTime conceptResultDeadlineAt,
+        UUID viewerVoteTargetPublicId,
+        List<UUID> eligibleVoteTargetPublicIds,
+        Integer votingRoundNumber,
+        OffsetDateTime votingDeadlineAt,
+        UUID votedOutPublicId,
+        OffsetDateTime imposterGuessDeadlineAt,
+        boolean viewerIsImposter,
+        String viewerConceptTitle,
+        String lastImposterGuess,
+        Boolean lastImposterGuessCorrect
+) {
+}

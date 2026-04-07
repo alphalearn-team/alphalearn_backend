@@ -39,6 +39,7 @@ public class SupabaseJwtAuthenticationConverter implements Converter<Jwt, Abstra
         authorities.add(new SimpleGrantedAuthority("ROLE_AUTHENTICATED"));
 
         UUID userId = parseSubject(jwt.getSubject());
+        String email = jwt.getClaimAsString("email");
         Learner learner = null;
         Contributor contributor = null;
         if (userId != null) {
@@ -54,7 +55,7 @@ public class SupabaseJwtAuthenticationConverter implements Converter<Jwt, Abstra
             }
         }
 
-        SupabaseAuthUser authUser = new SupabaseAuthUser(userId, learner, contributor);
+        SupabaseAuthUser authUser = new SupabaseAuthUser(userId, learner, contributor, email);
         return new SupabaseAuthenticationToken(authUser, jwt, authorities);
     }
 

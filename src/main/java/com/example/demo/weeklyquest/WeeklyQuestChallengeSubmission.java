@@ -11,9 +11,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -74,6 +77,9 @@ public class WeeklyQuestChallengeSubmission {
     @Enumerated(EnumType.STRING)
     @Column(name = "visibility", nullable = false, columnDefinition = "quest_submission_visibility")
     private SubmissionVisibility visibility;
+
+    @OneToMany(mappedBy = "submission", orphanRemoval = true, cascade = jakarta.persistence.CascadeType.ALL)
+    private List<WeeklyQuestChallengeSubmissionTag> taggedFriends = new ArrayList<>();
 
     @PrePersist
     void assignPublicIdIfMissing() {

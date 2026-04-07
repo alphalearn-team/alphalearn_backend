@@ -38,6 +38,7 @@ application-local.properties
 .env.shared
 .env.local
 .env.production
+.env.ci
 docker/backend.env
 
 ### Node ###
