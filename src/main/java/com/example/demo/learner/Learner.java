@@ -32,9 +32,26 @@ public class Learner {
     @Column(unique= true)
     private String username;
 
+    @Column(name = "bio", columnDefinition = "text")
+    private String bio;
+
+    @Column(name = "profile_picture", columnDefinition = "text")
+    private String profilePicture;
+
+    @Column(name = "profile_picture_object_key", columnDefinition = "text")
+    private String profilePictureObjectKey;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "total_points", nullable = false)
     private short totalPoints;
+
+    public Learner(UUID id, UUID publicId, String username, OffsetDateTime createdAt, short totalPoints) {
+        this.id = id;
+        this.publicId = publicId;
+        this.username = username;
+        this.createdAt = createdAt;
+        this.totalPoints = totalPoints;
+    }
 }

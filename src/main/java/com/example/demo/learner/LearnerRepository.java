@@ -13,6 +13,7 @@ public interface  LearnerRepository extends JpaRepository<Learner, UUID>{
     Optional<Learner> findByPublicId(UUID publicId);
 
     List<Learner> findAllByPublicIdIn(Collection<UUID> publicIds);
+    boolean existsByUsernameAndIdNot(String username, UUID id);
 
     boolean existsByPublicId(UUID publicId);
 
