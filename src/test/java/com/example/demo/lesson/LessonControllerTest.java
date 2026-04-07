@@ -174,7 +174,7 @@ class LessonControllerTest {
                 .andExpect(jsonPath("$.lessonPublicId").value(lessonPublicId.toString()))
                 .andExpect(jsonPath("$.moderationStatus").value("PENDING"))
                 .andExpect(jsonPath("$.latestModerationEventType").value("AUTO_FLAGGED"))
-                .andExpect(jsonPath("$.latestModerationReasons[0]").value("Needs manual review"));
+                .andExpect(jsonPath("$.latestModerationReasons[0]").value("Ollama moderation: Needs manual review"));
     }
 
     private void setAuthentication(SupabaseAuthUser user) {

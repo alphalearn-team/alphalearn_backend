@@ -61,7 +61,7 @@ class CompositeLessonAutoModerationServiceTest {
         assertThat(result.decision()).isEqualTo(LessonModerationDecision.REJECT);
         assertThat(result.reasons()).contains(
                 "ZeroGPT AI probability 95.00% exceeds threshold 80.00%",
-                "Looks acceptable"
+                "Ollama moderation: Looks acceptable"
         );
     }
 
@@ -89,7 +89,7 @@ class CompositeLessonAutoModerationServiceTest {
         assertThat(result.decision()).isEqualTo(LessonModerationDecision.FLAG);
         assertThat(result.reasons()).contains(
                 "ZeroGPT AI probability 12.00% is below threshold 80.00%",
-                "Needs manual review"
+                "Ollama moderation: Needs manual review"
         );
     }
 
