@@ -2,16 +2,20 @@ package com.example.demo.me.weeklyquest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.friendship.friend.FriendRepository;
 import com.example.demo.learner.Learner;
+import com.example.demo.learner.LearnerRepository;
 import com.example.demo.storage.r2.QuestChallengeStorageService;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmission;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
+import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionTag;
 import com.example.demo.weeklyquest.WeeklyQuestWeek;
 import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentSourceType;
@@ -21,6 +25,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +47,10 @@ class LearnerQuestChallengeSubmissionServiceTest {
     private WeeklyQuestChallengeSubmissionRepository submissionRepository;
     @Mock
     private QuestChallengeStorageService questChallengeStorageService;
+        @Mock
+        private LearnerRepository learnerRepository;
+        @Mock
+        private FriendRepository friendRepository;
 
     private LearnerQuestChallengeSubmissionService service;
     private SupabaseAuthUser learnerUser;
@@ -58,7 +67,9 @@ class LearnerQuestChallengeSubmissionServiceTest {
                 weeklyQuestAssignmentRepository,
                 submissionRepository,
                 calendarService,
-                questChallengeStorageService
+                questChallengeStorageService,
+                learnerRepository,
+                friendRepository
         );
 
         UUID learnerId = UUID.randomUUID();
@@ -73,7 +84,15 @@ class LearnerQuestChallengeSubmissionServiceTest {
         QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
                 "quest-challenges/%s/%s/object-evidence.mp4".formatted(activeAssignment.getPublicId(), learner.getId()),
                 "evidence.mp4",
-                "Learner caption"
+                "Learner caption",
+                List.of(UUID.randomUUID())
+        );
+        Learner taggedFriend = new Learner(
+                UUID.randomUUID(),
+                command.taggedFriendPublicIds().get(0),
+                "friend-one",
+                OffsetDateTime.parse("2026-03-10T00:00:00Z"),
+                (short) 0
         );
         WeeklyQuestChallengeSubmission saved = new WeeklyQuestChallengeSubmission();
         ReflectionTestUtils.setField(saved, "publicId", UUID.randomUUID());
@@ -87,6 +106,11 @@ class LearnerQuestChallengeSubmissionServiceTest {
         saved.setCaption("Learner caption");
         saved.setSubmittedAt(OffsetDateTime.parse("2026-03-22T01:00:00+08:00"));
         saved.setUpdatedAt(OffsetDateTime.parse("2026-03-22T01:00:00+08:00"));
+        saved.getTaggedFriends().add(new WeeklyQuestChallengeSubmissionTag(
+                saved,
+                taggedFriend,
+                OffsetDateTime.parse("2026-03-22T01:00:00+08:00")
+        ));
 
         mockActiveAssignment();
         when(questChallengeStorageService.expectedObjectKeyPrefix(activeAssignment.getPublicId(), learner.getId()))
@@ -96,12 +120,16 @@ class LearnerQuestChallengeSubmissionServiceTest {
         when(questChallengeStorageService.maxUploadSizeBytes()).thenReturn(52428800L);
         when(submissionRepository.findByLearner_IdAndWeeklyQuestAssignment_Id(learner.getId(), activeAssignment.getId()))
                 .thenReturn(Optional.empty());
-        when(submissionRepository.save(org.mockito.ArgumentMatchers.any(WeeklyQuestChallengeSubmission.class))).thenReturn(saved);
+        when(learnerRepository.findAllByPublicIdIn(command.taggedFriendPublicIds())).thenReturn(List.of(taggedFriend));
+        when(friendRepository.existsFriendship(learner.getId(), taggedFriend.getId())).thenReturn(true);
+        when(submissionRepository.save(any(WeeklyQuestChallengeSubmission.class))).thenReturn(saved);
 
         QuestChallengeSubmissionView result = service.saveCurrentSubmission(command, learnerUser);
 
         assertThat(result.objectKey()).isEqualTo(command.objectKey());
         assertThat(result.originalFilename()).isEqualTo("evidence.mp4");
+        assertThat(result.taggedFriends()).hasSize(1);
+        assertThat(result.taggedFriends().get(0).learnerUsername()).isEqualTo("friend-one");
     }
 
     @Test
@@ -109,6 +137,7 @@ class LearnerQuestChallengeSubmissionServiceTest {
         QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
                 "quest-challenges/other-assignment/other-learner/object.mp4",
                 "evidence.mp4",
+                null,
                 null
         );
 
@@ -126,6 +155,7 @@ class LearnerQuestChallengeSubmissionServiceTest {
         QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
                 "quest-challenges/%s/%s/object.mp4".formatted(activeAssignment.getPublicId(), learner.getId()),
                 "evidence.mp4",
+                null,
                 null
         );
 
@@ -163,6 +193,60 @@ class LearnerQuestChallengeSubmissionServiceTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().originalFilename()).isEqualTo("evidence.mp4");
+    }
+
+    @Test
+    void rejectsTaggedLearnerWhoIsNotFriend() {
+        UUID taggedFriendPublicId = UUID.randomUUID();
+        QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
+                "quest-challenges/%s/%s/object-evidence.mp4".formatted(activeAssignment.getPublicId(), learner.getId()),
+                "evidence.mp4",
+                "Learner caption",
+                List.of(taggedFriendPublicId)
+        );
+        Learner taggedLearner = new Learner(
+                UUID.randomUUID(),
+                taggedFriendPublicId,
+                "stranger",
+                OffsetDateTime.parse("2026-03-10T00:00:00Z"),
+                (short) 0
+        );
+
+        mockActiveAssignment();
+        when(questChallengeStorageService.expectedObjectKeyPrefix(activeAssignment.getPublicId(), learner.getId()))
+                .thenReturn("quest-challenges/%s/%s/".formatted(activeAssignment.getPublicId(), learner.getId()));
+        when(questChallengeStorageService.fetchObjectMetadata(command.objectKey()))
+                .thenReturn(new QuestChallengeStorageService.StoredObjectMetadata("video/mp4", 1024L, "https://pub.example/" + command.objectKey()));
+        when(questChallengeStorageService.maxUploadSizeBytes()).thenReturn(52428800L);
+        when(learnerRepository.findAllByPublicIdIn(command.taggedFriendPublicIds())).thenReturn(List.of(taggedLearner));
+        when(friendRepository.existsFriendship(learner.getId(), taggedLearner.getId())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.saveCurrentSubmission(command, learnerUser))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Tagged learner is not your friend");
+    }
+
+    @Test
+    void rejectsUnknownTaggedLearner() {
+        UUID missingPublicId = UUID.randomUUID();
+        QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
+                "quest-challenges/%s/%s/object-evidence.mp4".formatted(activeAssignment.getPublicId(), learner.getId()),
+                "evidence.mp4",
+                "Learner caption",
+                List.of(missingPublicId)
+        );
+
+        mockActiveAssignment();
+        when(questChallengeStorageService.expectedObjectKeyPrefix(activeAssignment.getPublicId(), learner.getId()))
+                .thenReturn("quest-challenges/%s/%s/".formatted(activeAssignment.getPublicId(), learner.getId()));
+        when(questChallengeStorageService.fetchObjectMetadata(command.objectKey()))
+                .thenReturn(new QuestChallengeStorageService.StoredObjectMetadata("video/mp4", 1024L, "https://pub.example/" + command.objectKey()));
+        when(questChallengeStorageService.maxUploadSizeBytes()).thenReturn(52428800L);
+        when(learnerRepository.findAllByPublicIdIn(command.taggedFriendPublicIds())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.saveCurrentSubmission(command, learnerUser))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Tagged learner does not exist");
     }
 
     private void mockActiveAssignment() {
