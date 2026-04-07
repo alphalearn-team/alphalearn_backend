@@ -50,6 +50,7 @@ public class FriendRequestService {
                 req.getFriendRequestId(),
                 otherUser.getPublicId(),
                 otherUser.getUsername(),
+                otherUser.getProfilePicture(),
                 req.getStatus(),
                 req.getCreatedAt()
         );
