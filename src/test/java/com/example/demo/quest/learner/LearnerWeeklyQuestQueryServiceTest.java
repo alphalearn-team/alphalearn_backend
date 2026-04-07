@@ -1,25 +1,28 @@
 package com.example.demo.quest.learner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.example.demo.concept.Concept;
-import com.example.demo.quest.weekly.WeeklyQuestAssignment;
-import com.example.demo.quest.weekly.WeeklyQuestAssignmentRepository;
-import com.example.demo.quest.weekly.WeeklyQuestCalendarService;
-import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmissionRepository;
-import com.example.demo.quest.weekly.WeeklyQuestWeek;
-import com.example.demo.quest.weekly.WeeklyQuestWeekRepository;
-import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentSourceType;
-import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentStatus;
-import com.example.demo.quest.weekly.enums.WeeklyQuestWeekStatus;
+import com.example.demo.weeklyquest.WeeklyQuestAssignment;
+import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
+import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
+import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
+import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmission;
+import com.example.demo.weeklyquest.WeeklyQuestWeek;
+import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
+import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentSourceType;
+import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentStatus;
+import com.example.demo.weeklyquest.enums.WeeklyQuestWeekStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +68,39 @@ class LearnerWeeklyQuestQueryServiceTest {
         assertThat(result.get().concept().title()).isEqualTo("fire");
         assertThat(result.get().quest().instructionText()).contains("this week's concept");
         assertThat(result.get().questChallengeSubmission()).isNull();
+    }
+
+    @Test
+    void returnsCurrentWeeklyQuestWithTaggedSubmission() {
+        WeeklyQuestWeek week = activeWeek(3L);
+        WeeklyQuestAssignment assignment = activeAssignment(week, WeeklyQuestAssignmentSourceType.ADMIN);
+        UUID learnerId = UUID.randomUUID();
+        WeeklyQuestChallengeSubmission submission = new WeeklyQuestChallengeSubmission();
+        ReflectionTestUtils.setField(submission, "publicId", UUID.randomUUID());
+        com.example.demo.learner.Learner learner = new com.example.demo.learner.Learner(learnerId, UUID.randomUUID(), "learner", OffsetDateTime.parse("2026-03-01T00:00:00Z"), (short) 0);
+        submission.setLearner(learner);
+        submission.setWeeklyQuestAssignment(assignment);
+        submission.setMediaObjectKey("quest-challenges/assignment/learner/object.mp4");
+        submission.setMediaPublicUrl("https://pub.example/object.mp4");
+        submission.setMediaContentType("video/mp4");
+        submission.setOriginalFilename("evidence.mp4");
+        submission.setFileSizeBytes(1024L);
+        submission.setCaption("caption");
+        submission.setSubmittedAt(OffsetDateTime.parse("2026-03-22T01:00:00+08:00"));
+        submission.setUpdatedAt(OffsetDateTime.parse("2026-03-22T01:05:00+08:00"));
+        com.example.demo.learner.Learner taggedLearner = new com.example.demo.learner.Learner(UUID.randomUUID(), UUID.randomUUID(), "friend-one", OffsetDateTime.parse("2026-03-01T00:00:00Z"), (short) 0);
+        submission.getTaggedFriends().add(new com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionTag(submission, taggedLearner, OffsetDateTime.parse("2026-03-22T01:00:00+08:00")));
+
+        when(weeklyQuestWeekRepository.findByWeekStartAt(week.getWeekStartAt())).thenReturn(Optional.of(week));
+        when(weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(3L)).thenReturn(Optional.of(assignment));
+    when(weeklyQuestChallengeSubmissionRepository.findByLearner_IdAndWeeklyQuestAssignment_Id(eq(learnerId), eq(assignment.getId())))
+                .thenReturn(Optional.of(submission));
+
+    Optional<LearnerCurrentWeeklyQuestDto> result = service.getCurrentWeeklyQuest(new com.example.demo.config.SupabaseAuthUser(learnerId, learner, null));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().questChallengeSubmission()).isNotNull();
+        assertThat(result.get().questChallengeSubmission().taggedFriends()).isEqualTo(List.of(new QuestChallengeTaggedFriendDto(taggedLearner.getPublicId(), "friend-one")));
     }
 
     @Test
