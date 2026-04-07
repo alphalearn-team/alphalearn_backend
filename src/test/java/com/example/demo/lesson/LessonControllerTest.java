@@ -1,5 +1,7 @@
 package com.example.demo.lesson;
 
+import com.example.demo.lesson.authoring.*;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -34,6 +36,7 @@ import com.example.demo.config.SupabaseAuthenticationToken;
 import com.example.demo.contributor.Contributor;
 import com.example.demo.learner.Learner;
 import com.example.demo.lesson.dto.LessonDetailDto;
+import com.example.demo.lesson.read.LessonController;
 import com.example.demo.quiz.QuizQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

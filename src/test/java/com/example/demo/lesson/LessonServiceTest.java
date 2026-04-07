@@ -1,5 +1,7 @@
 package com.example.demo.lesson;
 
+import com.example.demo.lesson.authoring.*;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +35,7 @@ import com.example.demo.lesson.moderation.LessonModerationDecisionSource;
 import com.example.demo.lesson.moderation.LessonModerationEventType;
 import com.example.demo.lesson.moderation.LessonModerationRecord;
 import com.example.demo.lesson.moderation.LessonModerationRecordRepository;
+import com.example.demo.lesson.read.LessonLookupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,7 +69,7 @@ class LessonServiceTest {
     private LessonSectionService lessonSectionService;
 
     @Mock
-    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+    private com.example.demo.lesson.enrollment.LessonEnrollmentService lessonEnrollmentService;
 
     private LessonService lessonService;
 

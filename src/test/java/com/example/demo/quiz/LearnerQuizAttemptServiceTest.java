@@ -42,7 +42,7 @@ class LearnerQuizAttemptServiceTest {
     private QuizAttemptRepository quizAttemptRepository;
 
     @Mock
-    private com.example.demo.lessonenrollment.LessonEnrollmentService lessonEnrollmentService;
+    private com.example.demo.lesson.enrollment.LessonEnrollmentService lessonEnrollmentService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

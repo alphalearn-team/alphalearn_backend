@@ -11,7 +11,7 @@ import com.example.demo.contributor.ContributorRepository;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.lesson.LessonRepository;
 import com.example.demo.lesson.LessonModerationStatus;
-import com.example.demo.lessonenrollment.LessonEnrollmentRepository;
+import com.example.demo.lesson.enrollment.LessonEnrollmentRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
