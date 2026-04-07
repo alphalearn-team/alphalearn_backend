@@ -1,0 +1,54 @@
+package com.example.demo.game.lobby.dto;
+
+import com.example.demo.game.lobby.GameLobbyConceptPoolMode;
+import com.example.demo.game.lobby.GameLobbyPhase;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record PrivateGameLobbySharedStateDto(
+        UUID publicId,
+        String lobbyCode,
+        boolean isPrivate,
+        GameLobbyConceptPoolMode conceptPoolMode,
+        String pinnedYearMonth,
+        Integer conceptCount,
+        Integer roundsPerConcept,
+        Integer discussionTimerSeconds,
+        Integer imposterGuessTimerSeconds,
+        OffsetDateTime createdAt,
+        OffsetDateTime startedAt,
+        long activeMemberCount,
+        List<PrivateGameLobbyMemberStateDto> activeMembers,
+        UUID currentDrawerPublicId,
+        Integer currentTurnIndex,
+        Integer totalTurns,
+        Integer turnDurationSeconds,
+        OffsetDateTime turnStartedAt,
+        OffsetDateTime turnEndsAt,
+        boolean isRoundComplete,
+        String currentDrawingSnapshot,
+        Integer drawingVersion,
+        GameLobbyPhase currentPhase,
+        String endReason,
+        OffsetDateTime endedAt,
+        UUID endedByPublicId,
+        List<PrivateGameLobbyReconnectStateDto> reconnectingLearners,
+        Integer currentConceptIndex,
+        Integer totalConcepts,
+        List<PrivateGameLobbyPlayerScoreDto> playerScores,
+        PrivateGameLobbyConceptResultDto latestConceptResult,
+        Integer maxVotingRounds,
+        Integer minTimerSeconds,
+        Integer maxTimerSeconds,
+        Integer stateVersion,
+        OffsetDateTime conceptResultDeadlineAt,
+        List<UUID> eligibleVoteTargetPublicIds,
+        Integer votingRoundNumber,
+        OffsetDateTime votingDeadlineAt,
+        UUID votedOutPublicId,
+        OffsetDateTime imposterGuessDeadlineAt,
+        String lastGameGuess,
+        Boolean lastGameGuessCorrect
+) {
+}

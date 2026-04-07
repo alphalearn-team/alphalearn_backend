@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import com.example.demo.concept.Concept;
-import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
+import com.example.demo.game.GameWeeklyFeaturedConceptService;
 import com.example.demo.quest.weekly.enums.WeeklyQuestActivationSource;
 import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentSourceType;
 import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentStatus;
@@ -25,14 +25,14 @@ public class WeeklyQuestAutomationService {
 
     private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
     private final WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
-    private final ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+    private final GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
     private final Clock clock;
 
     public WeeklyQuestAutomationService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
             WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository,
-            ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
+            GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
             WeeklyQuestCalendarService weeklyQuestCalendarService,
             Clock clock
     ) {

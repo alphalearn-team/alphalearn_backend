@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.example.demo.concept.Concept;
-import com.example.demo.game.imposter.ImposterWeeklyFeaturedConceptService;
+import com.example.demo.game.GameWeeklyFeaturedConceptService;
 import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentSourceType;
 import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentStatus;
 import com.example.demo.quest.weekly.enums.WeeklyQuestWeekStatus;
@@ -35,7 +35,7 @@ class WeeklyQuestAutomationServiceTest {
     @Mock
     private WeeklyQuestAssignmentRepository assignmentRepository;
     @Mock
-    private ImposterWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+    private GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
 
     private WeeklyQuestAutomationService service;
 
