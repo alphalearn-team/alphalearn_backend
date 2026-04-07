@@ -1,18 +1,28 @@
 package com.example.demo.me.weeklyquest;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.friendship.friend.FriendRepository;
 import com.example.demo.learner.Learner;
+import com.example.demo.learner.LearnerRepository;
 import com.example.demo.storage.r2.QuestChallengeStorageService;
 import com.example.demo.weeklyquest.WeeklyQuestAssignment;
 import com.example.demo.weeklyquest.WeeklyQuestAssignmentRepository;
 import com.example.demo.weeklyquest.WeeklyQuestCalendarService;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmission;
 import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionRepository;
+import com.example.demo.weeklyquest.WeeklyQuestChallengeSubmissionTag;
 import com.example.demo.weeklyquest.WeeklyQuestWeekRepository;
 import com.example.demo.weeklyquest.enums.WeeklyQuestAssignmentStatus;
 import com.example.demo.weeklyquest.enums.WeeklyQuestWeekStatus;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,19 +36,25 @@ public class LearnerQuestChallengeSubmissionService {
     private final WeeklyQuestChallengeSubmissionRepository submissionRepository;
     private final WeeklyQuestCalendarService weeklyQuestCalendarService;
     private final QuestChallengeStorageService questChallengeStorageService;
+    private final LearnerRepository learnerRepository;
+    private final FriendRepository friendRepository;
 
     public LearnerQuestChallengeSubmissionService(
             WeeklyQuestWeekRepository weeklyQuestWeekRepository,
             WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository,
             WeeklyQuestChallengeSubmissionRepository submissionRepository,
             WeeklyQuestCalendarService weeklyQuestCalendarService,
-            QuestChallengeStorageService questChallengeStorageService
+            QuestChallengeStorageService questChallengeStorageService,
+            LearnerRepository learnerRepository,
+            FriendRepository friendRepository
     ) {
         this.weeklyQuestWeekRepository = weeklyQuestWeekRepository;
         this.weeklyQuestAssignmentRepository = weeklyQuestAssignmentRepository;
         this.submissionRepository = submissionRepository;
         this.weeklyQuestCalendarService = weeklyQuestCalendarService;
         this.questChallengeStorageService = questChallengeStorageService;
+        this.learnerRepository = learnerRepository;
+        this.friendRepository = friendRepository;
     }
 
     @Transactional
@@ -78,6 +94,7 @@ public class LearnerQuestChallengeSubmissionService {
         }
 
         OffsetDateTime now = weeklyQuestCalendarService.now();
+        List<Learner> taggedFriends = resolveTaggedFriends(learner, command.taggedFriendPublicIds());
         WeeklyQuestChallengeSubmission submission = submissionRepository
                 .findByLearner_IdAndWeeklyQuestAssignment_Id(learner.getId(), assignment.getId())
                 .orElseGet(WeeklyQuestChallengeSubmission::new);
@@ -91,6 +108,7 @@ public class LearnerQuestChallengeSubmissionService {
         submission.setFileSizeBytes(metadata.fileSizeBytes());
         submission.setCaption(normalizeCaption(command.caption()));
         submission.setUpdatedAt(now);
+        replaceTaggedFriends(submission, taggedFriends, now);
         if (submission.getSubmittedAt() == null) {
             submission.setSubmittedAt(now);
         }
@@ -137,5 +155,51 @@ public class LearnerQuestChallengeSubmissionService {
         }
         String normalized = caption.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void replaceTaggedFriends(
+            WeeklyQuestChallengeSubmission submission,
+            List<Learner> taggedFriends,
+            OffsetDateTime now
+    ) {
+        submission.getTaggedFriends().clear();
+        for (Learner taggedFriend : taggedFriends) {
+            submission.getTaggedFriends().add(new WeeklyQuestChallengeSubmissionTag(submission, taggedFriend, now));
+        }
+    }
+
+    private List<Learner> resolveTaggedFriends(Learner learner, List<UUID> taggedFriendPublicIds) {
+        List<UUID> normalizedPublicIds = normalizeTaggedFriendPublicIds(taggedFriendPublicIds);
+        if (normalizedPublicIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Learner> taggedLearners = learnerRepository.findAllByPublicIdIn(normalizedPublicIds);
+        Map<UUID, Learner> learnerByPublicId = taggedLearners.stream()
+                .collect(Collectors.toMap(Learner::getPublicId, Function.identity()));
+
+        List<Learner> orderedTaggedLearners = new ArrayList<>(normalizedPublicIds.size());
+        for (UUID taggedFriendPublicId : normalizedPublicIds) {
+            Learner taggedLearner = learnerByPublicId.get(taggedFriendPublicId);
+            if (taggedLearner == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tagged learner does not exist: " + taggedFriendPublicId);
+            }
+            if (learner.getId().equals(taggedLearner.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot tag yourself in a quest submission");
+            }
+            if (!friendRepository.existsFriendship(learner.getId(), taggedLearner.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tagged learner is not your friend: " + taggedFriendPublicId);
+            }
+            orderedTaggedLearners.add(taggedLearner);
+        }
+
+        return orderedTaggedLearners;
+    }
+
+    private List<UUID> normalizeTaggedFriendPublicIds(List<UUID> taggedFriendPublicIds) {
+        if (taggedFriendPublicIds == null || taggedFriendPublicIds.isEmpty()) {
+            return List.of();
+        }
+        return new ArrayList<>(new LinkedHashSet<>(taggedFriendPublicIds));
     }
 }
