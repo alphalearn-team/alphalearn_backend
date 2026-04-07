@@ -1,4 +1,4 @@
-package com.example.demo.learner.api;
+package com.example.demo.notification.api;
 
 import java.util.List;
 import java.util.UUID;
