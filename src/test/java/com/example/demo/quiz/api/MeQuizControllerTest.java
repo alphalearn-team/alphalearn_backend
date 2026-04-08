@@ -251,6 +251,42 @@ class MeQuizControllerTest {
                 });
     }
 
+    @Test
+    void getQuizAttemptHistoryReturnsListOfAttempts() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser learnerUser = learnerUser();
+        setAuthentication(learnerUser, "ROLE_LEARNER");
+
+        List<QuizAttemptResponse> history = List.of(
+                new QuizAttemptResponse(quizPublicId, OffsetDateTime.parse("2026-03-16T15:00:00Z"), 4, 5, false),
+                new QuizAttemptResponse(quizPublicId, OffsetDateTime.parse("2026-03-15T10:00:00Z"), 2, 5, true)
+        );
+
+        when(learnerQuizAttemptService.getQuizAttemptHistory(eq(quizPublicId), eq(learnerUser)))
+                .thenReturn(history);
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/history", quizPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].score").value(4))
+                .andExpect(jsonPath("$[0].totalQuestions").value(5))
+                .andExpect(jsonPath("$[1].score").value(2))
+                .andExpect(jsonPath("$[1].isFirstAttempt").value(true));
+    }
+
+    @Test
+    void getQuizAttemptHistoryReturnsForbiddenForContributor() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+        SupabaseAuthUser contributorUser = contributorUser();
+        setAuthentication(contributorUser, "ROLE_CONTRIBUTOR");
+
+        when(learnerQuizAttemptService.getQuizAttemptHistory(eq(quizPublicId), eq(contributorUser)))
+                .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Lesson creators cannot answer their own quiz"));
+
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/history", quizPublicId))
+                .andExpect(status().isForbidden());
+    }
+
     private void setAuthentication(SupabaseAuthUser user, String authority) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(new SupabaseAuthenticationToken(
