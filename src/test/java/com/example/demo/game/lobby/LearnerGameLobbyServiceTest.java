@@ -103,7 +103,8 @@ class LearnerGameLobbyServiceTest {
                 learnerRepository,
                 imposterLobbyRealtimePublisher,
                 imposterLobbyRealtimePresenceTracker,
-                fixedClock
+                fixedClock,
+                false
         );
         lenient().when(imposterGameLobbyRepository.saveAndFlush(any(GameLobby.class))).thenAnswer(invocation -> {
             GameLobby lobby = invocation.getArgument(0);
@@ -929,6 +930,74 @@ class LearnerGameLobbyServiceTest {
         verify(imposterGameLobbyRepository, never()).saveAndFlush(any(GameLobby.class));
         verify(imposterLobbyRealtimePublisher, never()).publishSharedLobbyState(any(), any(), any(), any());
         verify(imposterLobbyRealtimePublisher, never()).publishViewerLobbyState(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void submitLiveDrawingCommitsSnapshotWhenLiveModeEnabled() {
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-04-02T00:00:00Z"), ZoneOffset.UTC);
+        LearnerGameLobbyService liveDrawingService = new LearnerGameLobbyService(
+                imposterGameLobbyRepository,
+                imposterGameLobbyMemberRepository,
+                imposterLobbyCodeGenerator,
+                imposterMonthlyPackRepository,
+                imposterMonthlyPackConceptRepository,
+                imposterWeeklyFeaturedConceptService,
+                conceptRepository,
+                learnerRepository,
+                imposterLobbyRealtimePublisher,
+                imposterLobbyRealtimePresenceTracker,
+                fixedClock,
+                true
+        );
+
+        SupabaseAuthUser drawer = learnerAuthUser();
+        GameLobby lobby = lobby("ABCD2345");
+        UUID lobbyPublicId = lobby.getPublicId();
+        lobby.setHostLearnerId(drawer.userId());
+        lobby.setStartedAt(OffsetDateTime.parse("2026-04-01T15:00:00Z"));
+        lobby.setCurrentPhase(com.example.demo.game.lobby.GameLobbyPhase.DRAWING);
+        lobby.setCurrentDrawerLearnerId(drawer.userId());
+        lobby.setCurrentTurnIndex(0);
+        lobby.setRoundNumber(1);
+        lobby.setRoundsPerConcept(1);
+        lobby.setTurnDurationSeconds(25);
+        lobby.setTurnStartedAt(OffsetDateTime.parse("2026-04-01T23:59:50Z"));
+        lobby.setTurnEndsAt(OffsetDateTime.parse("2026-04-02T00:00:10Z"));
+        lobby.setDrawingVersion(2);
+        lobby.setStateVersion(3);
+
+        UUID memberTwoId = UUID.randomUUID();
+        UUID memberThreeId = UUID.randomUUID();
+        lobby.setRoundDrawerOrder(drawer.userId() + "," + memberTwoId);
+        GameLobbyMember drawerMember = existingMember(lobby, drawer.userId(), "2026-04-01T12:00:00Z");
+        GameLobbyMember memberTwo = existingMember(lobby, memberTwoId, "2026-04-01T12:05:00Z");
+        GameLobbyMember memberThree = existingMember(lobby, memberThreeId, "2026-04-01T12:10:00Z");
+        List<GameLobbyMember> activeMembers = List.of(drawerMember, memberTwo, memberThree);
+
+        when(imposterGameLobbyRepository.findByPublicIdForUpdate(lobbyPublicId)).thenReturn(Optional.of(lobby));
+        when(imposterGameLobbyMemberRepository.existsByLobby_IdAndLearnerId(11L, drawer.userId())).thenReturn(true);
+        when(imposterGameLobbyMemberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(11L)).thenReturn(activeMembers);
+        when(learnerRepository.findAllById(anyList()))
+                .thenReturn(List.of(
+                        learner(drawer.userId(), "drawer"),
+                        learner(memberTwoId, "member-2"),
+                        learner(memberThreeId, "member-3")
+                ));
+
+        PrivateGameLobbyStateDto state = liveDrawingService.submitLiveDrawing(
+                drawer,
+                lobbyPublicId,
+                new UpsertGameDrawingSnapshotRequest("{\"live\":true}", 2)
+        );
+
+        assertThat(state.currentTurnIndex()).isEqualTo(0);
+        assertThat(state.currentPhase()).isEqualTo(com.example.demo.game.lobby.GameLobbyPhase.DRAWING);
+        assertThat(state.stateVersion()).isEqualTo(4);
+        assertThat(lobby.getCurrentDrawingSnapshot()).isEqualTo("{\"live\":true}");
+        assertThat(lobby.getDrawingVersion()).isEqualTo(3);
+        assertThat(lobby.getStateVersion()).isEqualTo(4);
+        verify(imposterLobbyRealtimePublisher).publishSharedLobbyState(eq(lobbyPublicId), eq(4), eq("DRAWING_LIVE"), any());
+        verify(imposterLobbyRealtimePublisher, times(3)).publishViewerLobbyState(eq(lobbyPublicId), any(), eq(4), eq("DRAWING_LIVE"), any());
     }
 
     @Test
