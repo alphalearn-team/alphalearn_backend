@@ -3,8 +3,12 @@ package com.example.demo.quiz;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.demo.quiz.dto.QuizOptionDto;
 import com.example.demo.quiz.dto.QuizQuestionResponseDto;
 import com.example.demo.quiz.dto.QuizResponseDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class QuizControllerTest {
@@ -36,6 +41,7 @@ class QuizControllerTest {
     private QuizQueryService quizQueryService;
 
     private MockMvc mockMvc;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -109,6 +115,80 @@ class QuizControllerTest {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
                     assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
                             .isEqualTo("Lesson not found");
+                });
+    }
+
+    // --- createQuiz ---
+
+    @Test
+    void createQuizReturns201() throws Exception {
+        UUID lessonPublicId = UUID.randomUUID();
+
+        String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "lessonPublicId", lessonPublicId.toString(),
+                "questions", List.of(java.util.Map.of(
+                        "type", "single-choice",
+                        "prompt", "What is 2 + 2?",
+                        "properties", java.util.Map.of(
+                                "options", List.of(
+                                        java.util.Map.of("id", "1", "text", "3"),
+                                        java.util.Map.of("id", "2", "text", "4")),
+                                "correctOptionId", "2")))
+        ));
+
+        when(quizService.createQuiz(any())).thenReturn(new Quiz(new com.example.demo.lesson.Lesson(), java.time.OffsetDateTime.now()));
+
+        mockMvc.perform(post("/api/quizzes")
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isCreated());
+    }
+
+    // --- updateQuiz ---
+
+    @Test
+    void updateQuizReturns204() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+
+        String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "questions", List.of(java.util.Map.of(
+                        "type", "true-false",
+                        "prompt", "The sky is blue.",
+                        "properties", java.util.Map.of("correctBoolean", true)))
+        ));
+
+        when(quizService.updateQuiz(eq(quizPublicId), any()))
+                .thenReturn(new Quiz(new com.example.demo.lesson.Lesson(), java.time.OffsetDateTime.now()));
+
+        mockMvc.perform(put("/api/quizzes/{quizPublicId}", quizPublicId)
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void updateQuizReturns404WhenQuizNotFound() throws Exception {
+        UUID quizPublicId = UUID.randomUUID();
+
+        String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "questions", List.of(java.util.Map.of(
+                        "type", "true-false",
+                        "prompt", "The sky is blue.",
+                        "properties", java.util.Map.of("correctBoolean", true)))
+        ));
+
+        when(quizService.updateQuiz(eq(quizPublicId), any())).thenThrow(
+                new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Quiz not found")
+        );
+
+        mockMvc.perform(put("/api/quizzes/{quizPublicId}", quizPublicId)
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(result -> {
+                    assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) result.getResolvedException()).getReason())
+                            .isEqualTo("Quiz not found");
                 });
     }
 }
