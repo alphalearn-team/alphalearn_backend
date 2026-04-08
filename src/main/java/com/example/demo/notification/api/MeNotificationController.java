@@ -1,10 +1,8 @@
-package com.example.demo.learner.api;
+package com.example.demo.notification.api;
 
 import java.util.List;
 import java.util.UUID;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.notification.NotificationDto;
 import com.example.demo.notification.NotificationService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/me/notifications")
