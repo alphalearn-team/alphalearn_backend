@@ -84,6 +84,59 @@ public interface WeeklyQuestChallengeSubmissionRepository extends JpaRepository<
             Pageable pageable
     );
 
+        @Query("""
+          select
+        s.publicId as submissionPublicId,
+        l.publicId as learnerPublicId,
+        l.username as learnerUsername,
+        c.publicId as conceptPublicId,
+        c.title as conceptTitle,
+        a.publicId as assignmentPublicId,
+        s.mediaPublicUrl as mediaPublicUrl,
+        s.mediaContentType as mediaContentType,
+        s.originalFilename as originalFilename,
+        s.caption as caption,
+        s.submittedAt as submittedAt
+          from WeeklyQuestChallengeSubmission s
+          join s.learner l
+          join s.weeklyQuestAssignment a
+          join a.concept c
+          join s.taggedFriends t
+          where t.taggedLearner.id = :taggedLearnerId
+          order by s.submittedAt desc, s.id desc
+          """)
+        Slice<FriendQuestChallengeFeedProjection> findTaggedChallengeFeedByTaggedLearnerId(UUID taggedLearnerId, Pageable pageable);
+
+        @Query("""
+          select
+        s.publicId as submissionPublicId,
+        l.publicId as learnerPublicId,
+        l.username as learnerUsername,
+        c.publicId as conceptPublicId,
+        c.title as conceptTitle,
+        a.publicId as assignmentPublicId,
+        s.mediaPublicUrl as mediaPublicUrl,
+        s.mediaContentType as mediaContentType,
+        s.originalFilename as originalFilename,
+        s.caption as caption,
+        s.submittedAt as submittedAt
+          from WeeklyQuestChallengeSubmission s
+          join s.learner l
+          join s.weeklyQuestAssignment a
+          join a.concept c
+          join s.taggedFriends t
+          where t.taggedLearner.id = :taggedLearnerId
+            and c.publicId in :conceptPublicIds
+          order by s.submittedAt desc, s.id desc
+          """)
+        Slice<FriendQuestChallengeFeedProjection> findTaggedChallengeFeedByTaggedLearnerIdAndConceptPublicIds(
+          UUID taggedLearnerId,
+          List<UUID> conceptPublicIds,
+          Pageable pageable
+        );
+
+
+
     @Query("""
             select
                 s.publicId as submissionPublicId,
