@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -51,19 +52,6 @@ public class LessonController {
         return lessonService.findPublicLessons(conceptPublicIds);
     }
 
-    @GetMapping("/mine")
-    @Operation(summary = "List my authored lessons", description = "Returns non-deleted lessons authored by the authenticated contributor")
-    public List<LessonContributorSummaryDto> getMyLessons(
-            @AuthenticationPrincipal SupabaseAuthUser user,
-            @RequestParam(required = false) List<UUID> conceptPublicIds
-    ) {
-        if (user == null || user.userId() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user required");
-        }
-        UUID ownerUserId = user.userId();
-        return lessonService.getMyAuthoredLessons(ownerUserId, conceptPublicIds);
-    }
-
     @GetMapping("/{lessonPublicId}")
     @Operation(summary = "Get lesson detail", description = "Owner gets full contributor view; others get public-approved lesson view")
     public LessonDetailView getLesson(
@@ -96,29 +84,28 @@ public class LessonController {
         return lessonService.updateLesson(lessonPublicId, request, user);
     }
 
-    @PostMapping("/{lessonPublicId}/submit")
+    @PatchMapping("/{lessonPublicId}")
     @Operation(
-            summary = "Submit lesson for review",
-            description = "Sends UNPUBLISHED or REJECTED lessons into moderation review. Automatic moderation may reject immediately for detected policy violations; otherwise the lesson remains in PENDING for manual admin review. Note: This throws a 400 error if the lesson does not have a quiz attached to it"
+            summary = "Apply lesson publication action",
+            description = "Applies SUBMIT or UNPUBLISH publication action for contributor-owned lessons."
     )
-    public LessonDetailDto submitLesson(
+    public LessonDetailDto applyPublicationAction(
             @PathVariable UUID lessonPublicId,
+            @RequestBody LessonPublicationActionRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        List<QuizResponseDto> quizzes = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
-        if (quizzes.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please add at least one quiz before publishing.");
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        if ("SUBMIT".equals(action)) {
+            List<QuizResponseDto> quizzes = quizQueryService.getQuizzesForLesson(lessonPublicId, user);
+            if (quizzes.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please add at least one quiz before publishing.");
+            }
+            return lessonService.submitLesson(lessonPublicId, user);
         }
-        return lessonService.submitLesson(lessonPublicId, user);
-    }
-    
-    @PostMapping("/{lessonPublicId}/unpublish")
-    @Operation(summary = "Unpublish lesson", description = "Sets moderation status to UNPUBLISHED")
-    public LessonDetailDto unpublishLesson(
-            @PathVariable UUID lessonPublicId,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return lessonService.unpublishLesson(lessonPublicId, user);
+        if ("UNPUBLISH".equals(action)) {
+            return lessonService.unpublishLesson(lessonPublicId, user);
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported action");
     }
 
     @DeleteMapping("/{lessonPublicId}")

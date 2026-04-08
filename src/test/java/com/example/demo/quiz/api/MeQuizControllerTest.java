@@ -112,7 +112,7 @@ class MeQuizControllerTest {
         when(learnerQuizAttemptService.getLatestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/latest", quizPublicId))
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts?view=LATEST", quizPublicId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quizPublicId").value(quizPublicId.toString()))
                 .andExpect(jsonPath("$.score").value(3))
@@ -137,7 +137,7 @@ class MeQuizControllerTest {
         when(learnerQuizAttemptService.getBestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/best", quizPublicId))
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts?view=BEST", quizPublicId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quizPublicId").value(quizPublicId.toString()))
                 .andExpect(jsonPath("$.score").value(5))
@@ -154,7 +154,7 @@ class MeQuizControllerTest {
         when(learnerQuizAttemptService.getLatestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
                 .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "No quiz attempt found"));
 
-        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/latest", quizPublicId))
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts?view=LATEST", quizPublicId))
                 .andExpect(status().isNotFound())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
@@ -172,7 +172,7 @@ class MeQuizControllerTest {
         when(learnerQuizAttemptService.getBestQuizAttempt(eq(quizPublicId), eq(learnerUser)))
                 .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "No quiz attempt found"));
 
-        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts/best", quizPublicId))
+        mockMvc.perform(get("/api/me/quizzes/{quizPublicId}/attempts?view=BEST", quizPublicId))
                 .andExpect(status().isNotFound())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);

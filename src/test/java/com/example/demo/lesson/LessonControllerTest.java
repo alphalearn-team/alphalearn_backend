@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -81,7 +82,9 @@ class LessonControllerTest {
                 "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
         ));
 
-        mockMvc.perform(post("/api/lessons/{lessonPublicId}/submit", lessonPublicId))
+        mockMvc.perform(patch("/api/lessons/{lessonPublicId}", lessonPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"SUBMIT\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
@@ -106,7 +109,9 @@ class LessonControllerTest {
                 "Only UNPUBLISHED or REJECTED lessons can be submitted for review."
         ));
 
-        mockMvc.perform(post("/api/lessons/{lessonPublicId}/submit", lessonPublicId))
+        mockMvc.perform(patch("/api/lessons/{lessonPublicId}", lessonPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"SUBMIT\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);
@@ -124,7 +129,9 @@ class LessonControllerTest {
 
         when(quizQueryService.getQuizzesForLesson(eq(lessonPublicId), any())).thenReturn(List.of());
 
-        mockMvc.perform(post("/api/lessons/{lessonPublicId}/submit", lessonPublicId))
+        mockMvc.perform(patch("/api/lessons/{lessonPublicId}", lessonPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"SUBMIT\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(result -> {
                     assertThat(result.getResolvedException()).isInstanceOf(ResponseStatusException.class);

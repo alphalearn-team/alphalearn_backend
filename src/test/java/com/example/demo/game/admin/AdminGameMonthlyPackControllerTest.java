@@ -50,7 +50,8 @@ class AdminGameMonthlyPackControllerTest {
                         List.of(featuredConceptPublicId)
                 ));
 
-        mockMvc.perform(get("/api/admin/imposter/monthly-packs/2026-04"))
+        mockMvc.perform(get("/api/admin/games/monthly-packs")
+                        .queryParam("yearMonth", "2026-04"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.yearMonth").value("2026-04"))
                 .andExpect(jsonPath("$.exists").value(true))
@@ -64,7 +65,7 @@ class AdminGameMonthlyPackControllerTest {
         when(adminGameMonthlyPackService.getCurrentMonthlyPack())
                 .thenReturn(new AdminGameMonthlyPackDto("2026-04", false, List.of(), List.of()));
 
-        mockMvc.perform(get("/api/admin/imposter/monthly-packs/current"))
+        mockMvc.perform(get("/api/admin/games/monthly-packs?scope=CURRENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.yearMonth").value("2026-04"))
                 .andExpect(jsonPath("$.exists").value(false))
@@ -97,7 +98,7 @@ class AdminGameMonthlyPackControllerTest {
                         List.of(firstConcept, secondConcept, thirdConcept, fourthConcept)
                 ));
 
-        mockMvc.perform(put("/api/admin/imposter/monthly-packs/2026-04")
+        mockMvc.perform(put("/api/admin/games/monthly-packs/2026-04")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())

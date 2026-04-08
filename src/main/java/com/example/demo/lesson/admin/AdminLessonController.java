@@ -14,12 +14,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
+import com.example.demo.lesson.LessonModerationStatus;
 import com.example.demo.lesson.LessonModerationStatus;
 
 @RestController()
@@ -50,63 +51,31 @@ public class AdminLessonController {
         return adminLessonService.getLessonByPublicId(lessonPublicId);
     }
 
-    @PutMapping("/{lessonPublicId}/approve")
-    @Operation(summary = "Approve lesson", description = "Moves lesson moderation status from PENDING to APPROVED.")
+    @PatchMapping("/{lessonPublicId}")
+    @Operation(summary = "Moderate lesson", description = "Applies moderation action APPROVE, REJECT, or UNPUBLISH to lesson.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lesson approved successfully"),
+            @ApiResponse(responseCode = "200", description = "Lesson moderation action applied"),
+            @ApiResponse(responseCode = "400", description = "Invalid action payload"),
             @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
             @ApiResponse(responseCode = "404", description = "Lesson not found"),
-            @ApiResponse(responseCode = "409", description = "Only PENDING lessons can be approved")
+            @ApiResponse(responseCode = "409", description = "Action is not valid for lesson state")
     })
-    public AdminLessonDetailDto approveLesson(
+    public AdminLessonDetailDto moderateLesson(
             @PathVariable UUID lessonPublicId,
+            @org.springframework.web.bind.annotation.RequestBody AdminLessonModerationActionRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ){
-        return adminLessonService.approveLesson(lessonPublicId, user);
-    }
-
-    @PutMapping("/{lessonPublicId}/reject")
-    @Operation(
-            summary = "Reject lesson",
-            description = "Moves lesson moderation status from PENDING to REJECTED and stores a required admin rejection reason in moderation history."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lesson rejected successfully"),
-            @ApiResponse(responseCode = "400", description = "Reject reason is missing or blank"),
-            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
-            @ApiResponse(responseCode = "404", description = "Lesson not found"),
-            @ApiResponse(responseCode = "409", description = "Only PENDING lessons can be rejected")
-    })
-    public AdminLessonDetailDto rejectLesson(
-            @PathVariable UUID lessonPublicId,
-            @RequestBody(
-                    required = true,
-                    description = "Manual rejection payload containing the admin's reason.",
-                    content = @Content(schema = @Schema(implementation = AdminRejectLessonRequest.class))
-            )
-            @org.springframework.web.bind.annotation.RequestBody AdminRejectLessonRequest request,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ){
-        return adminLessonService.rejectLesson(lessonPublicId, request, user);
-    }
-
-    @PatchMapping("/{lessonPublicId}/moderation-status")
-    @Operation(
-            summary = "Update lesson moderation status",
-            description = "Updates lesson moderation status for admin actions. Currently supports setting status to UNPUBLISHED and auto-resolving pending reports."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lesson moderation status updated"),
-            @ApiResponse(responseCode = "400", description = "Unsupported target status or invalid payload"),
-            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
-            @ApiResponse(responseCode = "404", description = "Lesson not found")
-    })
-    public AdminLessonDetailDto updateLessonModerationStatus(
-            @PathVariable UUID lessonPublicId,
-            @org.springframework.web.bind.annotation.RequestBody AdminUpdateLessonModerationStatusRequest request,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return adminLessonService.updateLessonModerationStatus(lessonPublicId, request, user);
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        return switch (action) {
+            case "APPROVE" -> adminLessonService.approveLesson(lessonPublicId, user);
+            case "REJECT" -> adminLessonService.rejectLesson(lessonPublicId, new AdminRejectLessonRequest(request.reason()), user);
+            case "UNPUBLISH" -> adminLessonService.updateLessonModerationStatus(
+                    lessonPublicId,
+                    new AdminUpdateLessonModerationStatusRequest(LessonModerationStatus.UNPUBLISHED, request.resolvePendingReports()),
+                    user
+            );
+            default -> throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Unsupported action");
+        };
     }
 
 }

@@ -2,9 +2,9 @@ package com.example.demo.game.lobby;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.game.lobby.dto.CreatePrivateGameLobbyRequest;
+import com.example.demo.game.lobby.dto.GameLobbyTransitionActionRequest;
 import com.example.demo.game.lobby.dto.JoinPrivateGameLobbyRequest;
 import com.example.demo.game.lobby.dto.JoinedPrivateGameLobbyDto;
-import com.example.demo.game.lobby.dto.LeavePrivateGameLobbyResponse;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyDto;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyStateDto;
 import com.example.demo.game.lobby.dto.UpdatePrivateGameLobbySettingsRequest;
@@ -21,9 +21,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/me/imposter/lobbies")
+@RequestMapping("/api/me/game-lobbies")
 @Tag(name = "My Game Lobbies", description = "Learner-only private imposter lobby endpoints")
 public class MeGameLobbyController {
 
@@ -33,7 +34,7 @@ public class MeGameLobbyController {
         this.learnerGameLobbyService = learnerGameLobbyService;
     }
 
-    @PostMapping("/private")
+    @PostMapping("/private-lobbies")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create private imposter lobby", description = "Creates a private imposter lobby with concept pool mode set to current month pack or full concept pool")
     public PrivateGameLobbyDto createPrivateLobby(
@@ -43,7 +44,7 @@ public class MeGameLobbyController {
         return learnerGameLobbyService.createPrivateLobby(user, request);
     }
 
-    @PostMapping("/private/join")
+    @PostMapping("/private-memberships")
     @Operation(summary = "Join private imposter lobby by code", description = "Learner joins an existing private imposter lobby using an invite code")
     public JoinedPrivateGameLobbyDto joinPrivateLobby(
             @AuthenticationPrincipal SupabaseAuthUser user,
@@ -52,25 +53,22 @@ public class MeGameLobbyController {
         return learnerGameLobbyService.joinPrivateLobby(user, request);
     }
 
-    @PostMapping("/private/{lobbyPublicId}/leave")
-    @Operation(summary = "Leave private imposter lobby", description = "Learner leaves a private imposter lobby before the game starts")
-    public LeavePrivateGameLobbyResponse leavePrivateLobby(
+    @PatchMapping("/private-lobbies/{lobbyPublicId}")
+    @Operation(summary = "Apply private lobby transition action", description = "Applies START or LEAVE action to private lobby")
+    public Object applyLobbyTransition(
             @AuthenticationPrincipal SupabaseAuthUser user,
-            @PathVariable UUID lobbyPublicId
+            @PathVariable UUID lobbyPublicId,
+            @RequestBody GameLobbyTransitionActionRequest request
     ) {
-        return learnerGameLobbyService.leavePrivateLobby(user, lobbyPublicId);
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        return switch (action) {
+            case "START" -> learnerGameLobbyService.startPrivateLobby(user, lobbyPublicId);
+            case "LEAVE" -> learnerGameLobbyService.leavePrivateLobby(user, lobbyPublicId);
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported action");
+        };
     }
 
-    @PostMapping("/private/{lobbyPublicId}/start")
-    @Operation(summary = "Start private imposter lobby game", description = "Host starts the lobby once minimum active players have joined")
-    public PrivateGameLobbyStateDto startPrivateLobby(
-            @AuthenticationPrincipal SupabaseAuthUser user,
-            @PathVariable UUID lobbyPublicId
-    ) {
-        return learnerGameLobbyService.startPrivateLobby(user, lobbyPublicId);
-    }
-
-    @PatchMapping("/private/{lobbyPublicId}/settings")
+    @PatchMapping("/private-lobbies/{lobbyPublicId}/settings")
     @Operation(summary = "Update private imposter lobby settings", description = "Host updates pre-game settings before the lobby starts")
     public PrivateGameLobbyStateDto updatePrivateLobbySettings(
             @AuthenticationPrincipal SupabaseAuthUser user,
@@ -80,7 +78,7 @@ public class MeGameLobbyController {
         return learnerGameLobbyService.updatePrivateLobbySettings(user, lobbyPublicId, request);
     }
 
-    @GetMapping("/private/{lobbyPublicId}/state")
+    @GetMapping("/private-lobbies/{lobbyPublicId}")
     @Operation(summary = "Get private imposter lobby state", description = "Returns live lobby state snapshot for polling clients")
     public PrivateGameLobbyStateDto getPrivateLobbyState(
             @AuthenticationPrincipal SupabaseAuthUser user,

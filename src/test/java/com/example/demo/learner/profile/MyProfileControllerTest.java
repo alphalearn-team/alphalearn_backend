@@ -153,7 +153,7 @@ class MyProfileControllerTest {
                 Map.of("Content-Type", "image/png")
         ));
 
-        mockMvc.perform(post("/api/me/profile/picture/upload")
+        mockMvc.perform(post("/api/me/profile/picture/uploads")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -170,7 +170,7 @@ class MyProfileControllerTest {
                 "Only image uploads are supported"
         ));
 
-        mockMvc.perform(post("/api/me/profile/picture/upload")
+        mockMvc.perform(post("/api/me/profile/picture/uploads")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isUnsupportedMediaType());

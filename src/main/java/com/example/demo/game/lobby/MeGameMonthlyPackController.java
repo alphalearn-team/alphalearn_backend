@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/me/imposter/monthly-pack")
+@RequestMapping("/api/me/game-monthly-pack")
 @Tag(name = "My Game Monthly Pack", description = "Learner-facing current monthly imposter pack endpoint")
 public class MeGameMonthlyPackController {
 
@@ -20,7 +20,7 @@ public class MeGameMonthlyPackController {
         this.learnerGameMonthlyPackService = learnerGameMonthlyPackService;
     }
 
-    @GetMapping("/current")
+    @GetMapping
     @Operation(summary = "Get current monthly imposter pack", description = "Returns learner-safe current monthly imposter pack concepts and weekly featured slots")
     public LearnerCurrentGameMonthlyPackDto getCurrentMonthlyPack(
             @AuthenticationPrincipal SupabaseAuthUser user

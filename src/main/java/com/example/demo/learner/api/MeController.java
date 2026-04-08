@@ -17,9 +17,9 @@ import com.example.demo.config.SupabaseAuthUser;
 @Tag(name = "Me", description = "Authenticated utility endpoints for current user context")
 public class MeController {
 
-    @GetMapping("/role")
-    @Operation(summary = "Get my role", description = "Resolves effective role from JWT and role tables (admins/contributors/learners)")
-    public UserRoleDto getRole(
+    @GetMapping
+    @Operation(summary = "Get my profile context", description = "Returns authenticated user context including resolved role from JWT and role tables")
+    public UserRoleDto getMe(
             Authentication authentication,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {

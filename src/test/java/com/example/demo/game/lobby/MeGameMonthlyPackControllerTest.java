@@ -58,7 +58,7 @@ class MeGameMonthlyPackControllerTest {
                         )
                 ));
 
-        mockMvc.perform(get("/api/me/imposter/monthly-pack/current")
+        mockMvc.perform(get("/api/me/game-monthly-pack")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes("{}")))
                 .andExpect(status().isOk())

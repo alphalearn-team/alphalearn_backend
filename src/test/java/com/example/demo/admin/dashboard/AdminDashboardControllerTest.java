@@ -49,7 +49,7 @@ class AdminDashboardControllerTest {
                 List.of(new AdminDashboardTopConceptDto(conceptId, "Algebra", 23L))
         ));
 
-        mockMvc.perform(get("/api/admin/dashboard/summary"))
+        mockMvc.perform(get("/api/admin/dashboard").queryParam("view", "OVERVIEW"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lessonsCreated").value(44))
                 .andExpect(jsonPath("$.usersSignedUp").value(300))
@@ -82,7 +82,7 @@ class AdminDashboardControllerTest {
                 LocalDate.parse("2026-02-13")
             ));
 
-            mockMvc.perform(get("/api/admin/dashboard/summary").queryParam("range", "30d"))
+            mockMvc.perform(get("/api/admin/dashboard").queryParam("view", "OVERVIEW").queryParam("range", "30d"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deltas.lessonsCreated").value(5))
                 .andExpect(jsonPath("$.appliedRange").value("30d"))
@@ -117,7 +117,8 @@ class AdminDashboardControllerTest {
                     LocalDate.parse("2026-02-28")
                 ));
 
-            mockMvc.perform(get("/api/admin/dashboard/summary")
+            mockMvc.perform(get("/api/admin/dashboard")
+                    .queryParam("view", "OVERVIEW")
                     .queryParam("startDate", "2026-03-01")
                     .queryParam("endDate", "2026-03-15"))
                 .andExpect(status().isOk())

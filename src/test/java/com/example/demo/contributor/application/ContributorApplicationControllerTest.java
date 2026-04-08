@@ -38,7 +38,10 @@ class ContributorApplicationControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ContributorApplicationController(contributorApplicationService))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new ContributorApplicationController(contributorApplicationService),
+                        new MeContributorApplicationController(contributorApplicationService)
+                )
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -100,7 +103,7 @@ class ContributorApplicationControllerTest {
                 )
         ));
 
-        mockMvc.perform(get("/api/contributor-applications/mine"))
+        mockMvc.perform(get("/api/me/contributor-applications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].publicId").value(newestApplicationId.toString()))
                 .andExpect(jsonPath("$[0].status").value("PENDING"))
