@@ -8,20 +8,29 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.lesson.Lesson;
 import com.example.demo.lesson.read.LessonLookupService;
+import com.example.demo.lesson.LessonModerationStatus;
+import com.example.demo.lesson.LessonModerationWorkflowService;
 import com.example.demo.quiz.dto.CreateQuizRequest;
 import com.example.demo.quiz.dto.QuizQuestionDto;
+import com.example.demo.quiz.dto.UpdateQuizRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.UUID;
 
 @Service
 public class QuizService {
 
     private final QuizRepository quizRepository;
     private final LessonLookupService lessonLookupService;
+    private final LessonModerationWorkflowService lessonModerationWorkflowService;
     private final ObjectMapper objectMapper;
 
-    public QuizService(QuizRepository quizRepository, LessonLookupService lessonLookupService, ObjectMapper objectMapper) {
+    public QuizService(QuizRepository quizRepository, LessonLookupService lessonLookupService, LessonModerationWorkflowService lessonModerationWorkflowService, ObjectMapper objectMapper) {
         this.quizRepository = quizRepository;
         this.lessonLookupService = lessonLookupService;
+        this.lessonModerationWorkflowService = lessonModerationWorkflowService;
         this.objectMapper = objectMapper;
     }
 
@@ -77,6 +86,49 @@ public class QuizService {
         }
 
         return quizRepository.save(quiz);
+    }
+
+    @Transactional
+    public Quiz updateQuiz(UUID quizPublicId, UpdateQuizRequest request) {
+        Quiz quiz = quizRepository.findByPublicId(quizPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+
+        quiz.getQuestions().clear();
+
+        List<QuizQuestionDto> requestedQuestions = request.questions();
+        for (int i = 0; i < requestedQuestions.size(); i++) {
+            QuizQuestionDto dto = requestedQuestions.get(i);
+            Map<String, Object> props = dto.properties();
+
+            QuizQuestion question;
+            if ("multiple-choice".equals(dto.type())) {
+                com.fasterxml.jackson.databind.JsonNode options = objectMapper.valueToTree(props.get("options"));
+                com.fasterxml.jackson.databind.JsonNode correctOptionIds = objectMapper.valueToTree(props.get("correctOptionIds"));
+                question = new MultiSelectQuestion(quiz, dto.prompt(), i, options, correctOptionIds);
+            } else if ("single-choice".equals(dto.type())) {
+                com.fasterxml.jackson.databind.JsonNode options = objectMapper.valueToTree(props.get("options"));
+                String correctOptionId = (String) props.get("correctOptionId");
+                question = new MCQQuestion(quiz, dto.prompt(), i, options, correctOptionId);
+            } else if ("true-false".equals(dto.type())) {
+                boolean correctBoolean = (Boolean) props.get("correctBoolean");
+                question = new TrueFalseQuestion(quiz, dto.prompt(), i, correctBoolean);
+            } else {
+                throw new IllegalArgumentException("Unknown question type: " + dto.type());
+            }
+
+            validateQuestionSpecifics(dto);
+            quiz.getQuestions().add(question);
+        }
+
+        Quiz saved = quizRepository.save(quiz);
+
+        // Reset lesson to UNPUBLISHED so it must be re-submitted for review
+        Lesson lesson = quiz.getLesson();
+        if (lesson != null && lesson.getLessonModerationStatus() != LessonModerationStatus.UNPUBLISHED) {
+            lessonModerationWorkflowService.unpublish(lesson);
+        }
+
+        return saved;
     }
 
     private void validateQuestionSpecifics(QuizQuestionDto dto) {

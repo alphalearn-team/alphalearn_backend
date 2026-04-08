@@ -240,10 +240,14 @@ class MeWeeklyQuestControllerTest {
                 false
         );
 
-        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(any(), eq(0), eq(20))).thenReturn(response);
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
+                any(),
+                eq(0),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull()
+        )).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/entries")
-                        .queryParam("view", "FEED")
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -257,18 +261,67 @@ class MeWeeklyQuestControllerTest {
     }
 
     @Test
+        void returnsFriendsQuestChallengeFeedWithMultipleConceptFilters() throws Exception {
+        FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(List.of(), 0, 20, false);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
+                any(),
+                eq(0),
+                eq(20),
+                eq(conceptPublicIds)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(0).toString())
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(1).toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
     void returnsBadRequestWhenFeedPageIsInvalid() throws Exception {
-        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(any(), eq(-1), eq(20)))
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
+                any(),
+                eq(-1),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull()
+        ))
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.BAD_REQUEST,
                         "page must be greater than or equal to 0"
                 ));
 
-        mockMvc.perform(get("/api/me/weekly-quests/entries")
-                        .queryParam("view", "FEED")
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
                         .queryParam("page", "-1")
                         .queryParam("size", "20"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsFriendsQuestChallengeFeedWithConceptFilter() throws Exception {
+        FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(List.of(), 0, 20, false);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID());
+
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
+                any(),
+                eq(0),
+                eq(20),
+                eq(conceptPublicIds)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(0).toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
     }
 
     @Test
@@ -295,10 +348,17 @@ class MeWeeklyQuestControllerTest {
                 false
         );
 
-        when(questHistoryQueryService.getMyHistory(any(), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
+        when(questHistoryQueryService.getMyHistory(
+                any(),
+                eq(0),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull()
+        ))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/records")
+        mockMvc.perform(get("/api/me/weekly-quests/history")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -308,17 +368,78 @@ class MeWeeklyQuestControllerTest {
     }
 
     @Test
+    void returnsMyQuestHistoryWithSubmittedAtRange() throws Exception {
+        QuestHistoryDto response = new QuestHistoryDto(List.of(), 0, 20, false);
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-31T23:59:59Z");
+
+        when(questHistoryQueryService.getMyHistory(
+                any(),
+                eq(0),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq(submittedFrom),
+                eq(submittedTo)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/history")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("submittedFrom", "2026-03-01T00:00:00Z")
+                        .queryParam("submittedTo", "2026-03-31T23:59:59Z")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
     void returnsFriendQuestHistory() throws Exception {
         UUID friendPublicId = UUID.randomUUID();
         QuestHistoryDto response = new QuestHistoryDto(List.of(), 0, 20, false);
 
-        when(questHistoryQueryService.getFriendHistory(any(), eq(friendPublicId), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
+        when(questHistoryQueryService.getFriendHistory(
+                any(),
+                eq(friendPublicId),
+                eq(0),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull()
+        ))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/records")
-                        .queryParam("friendPublicId", friendPublicId.toString())
+        mockMvc.perform(get("/api/me/weekly-quests/friends/{friendPublicId}/history", friendPublicId)
                         .queryParam("page", "0")
                         .queryParam("size", "20")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
+    void returnsFriendQuestHistoryWithSubmittedAtRange() throws Exception {
+        UUID friendPublicId = UUID.randomUUID();
+        QuestHistoryDto response = new QuestHistoryDto(List.of(), 0, 20, false);
+        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-01T00:00:00Z");
+        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-31T23:59:59Z");
+
+        when(questHistoryQueryService.getFriendHistory(
+                any(),
+                eq(friendPublicId),
+                eq(0),
+                eq(20),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq(submittedFrom),
+                eq(submittedTo)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/friends/{friendPublicId}/history", friendPublicId)
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("submittedFrom", "2026-03-01T00:00:00Z")
+                        .queryParam("submittedTo", "2026-03-31T23:59:59Z")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))

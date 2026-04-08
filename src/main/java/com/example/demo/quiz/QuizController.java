@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.quiz.dto.CreateQuizRequest;
+import com.example.demo.quiz.dto.UpdateQuizRequest;
 import com.example.demo.quiz.dto.QuizResponseDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,5 +50,14 @@ public class QuizController {
     @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson.")
     public void createQuiz(@Valid @RequestBody CreateQuizRequest request) {
         quizService.createQuiz(request);
+    }
+
+    @PutMapping("/{quizPublicId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Update quiz", description = "Replaces all questions in an existing quiz.")
+    public void updateQuiz(
+            @PathVariable UUID quizPublicId,
+            @Valid @RequestBody UpdateQuizRequest request) {
+        quizService.updateQuiz(quizPublicId, request);
     }
 }

@@ -4,5 +4,6 @@ import java.util.UUID;
 
 public record FriendPublicDTO(
         UUID publicId,
-        String username
+        String username,
+        String profilePictureUrl
 ) {}

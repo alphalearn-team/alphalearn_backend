@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.OffsetDateTime;
@@ -34,7 +35,10 @@ class FriendControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new FriendController(friendService)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new FriendController(friendService),
+                new LegacyFriendController(friendService)
+        ).build();
     }
 
     @Test
@@ -42,7 +46,7 @@ class FriendControllerTest {
         SupabaseAuthUser authUser = learnerUser();
         UUID friendPublicId = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/friends/{friendPublicId}", friendPublicId)
+        mockMvc.perform(delete("/api/me/friends/{friendPublicId}", friendPublicId)
                         .principal(authToken(authUser)))
                 .andExpect(status().isNoContent());
     }
@@ -51,11 +55,11 @@ class FriendControllerTest {
     void getAndDeleteRejectWhenLearnerMissing() throws Exception {
         SupabaseAuthUser userWithoutLearner = new SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        mockMvc.perform(get("/api/friends")
+        mockMvc.perform(get("/api/me/friends")
                         .principal(authToken(userWithoutLearner)))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(delete("/api/friends/{friendPublicId}", UUID.randomUUID())
+        mockMvc.perform(delete("/api/me/friends/{friendPublicId}", UUID.randomUUID())
                         .principal(authToken(userWithoutLearner)))
                 .andExpect(status().isForbidden());
     }
@@ -64,12 +68,29 @@ class FriendControllerTest {
     void getFriendsReturnsOkForLearner() throws Exception {
         SupabaseAuthUser authUser = learnerUser();
         when(friendService.getFriends(eq(authUser.learner()))).thenReturn(List.of(
-                new FriendPublicDTO(UUID.randomUUID(), "friend-one")
+                new FriendPublicDTO(UUID.randomUUID(), "friend-one", "https://cdn.example.com/friend.png")
         ));
+
+        mockMvc.perform(get("/api/me/friends")
+                        .principal(authToken(authUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("friend-one"))
+                .andExpect(jsonPath("$[0].profilePictureUrl").value("https://cdn.example.com/friend.png"));
+    }
+
+    @Test
+    void legacyFriendRoutesRemainAvailableDuringMigration() throws Exception {
+        SupabaseAuthUser authUser = learnerUser();
+        UUID friendPublicId = UUID.randomUUID();
+        when(friendService.getFriends(eq(authUser.learner()))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/friends")
                         .principal(authToken(authUser)))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/friends/{friendPublicId}", friendPublicId)
+                        .principal(authToken(authUser)))
+                .andExpect(status().isNoContent());
     }
 
     private SupabaseAuthenticationToken authToken(SupabaseAuthUser user) {
