@@ -55,6 +55,7 @@ class GameLobbyOperationsSupport {
     private final GameLobbyRoundEngine roundEngine;
     private final GameLobbyRealtimePresenceTracker presenceTracker;
     private final Clock clock;
+    private final boolean liveDrawingEnabled;
 
     private final int lobbyCodeMaxRetries;
     private final int minActiveMembersToStart;
@@ -84,6 +85,7 @@ class GameLobbyOperationsSupport {
             GameLobbyRoundEngine roundEngine,
             GameLobbyRealtimePresenceTracker presenceTracker,
             Clock clock,
+            boolean liveDrawingEnabled,
             int lobbyCodeMaxRetries,
             int minActiveMembersToStart,
             int defaultConceptCount,
@@ -111,6 +113,7 @@ class GameLobbyOperationsSupport {
         this.roundEngine = roundEngine;
         this.presenceTracker = presenceTracker;
         this.clock = clock;
+        this.liveDrawingEnabled = liveDrawingEnabled;
         this.lobbyCodeMaxRetries = lobbyCodeMaxRetries;
         this.minActiveMembersToStart = minActiveMembersToStart;
         this.defaultConceptCount = defaultConceptCount;
@@ -378,7 +381,30 @@ class GameLobbyOperationsSupport {
         validationSupport.ensureLobbyStarted(lobby);
         validationSupport.ensurePhase(lobby, GameLobbyPhase.DRAWING, "Drawing is not active");
         validationSupport.ensureViewerIsCurrentDrawer(lobby, user.userId());
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Live drawing is disabled; submit drawing with done");
+        if (!liveDrawingEnabled) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Live drawing is disabled; submit drawing with done");
+        }
+
+        List<GameLobbyMember> activeMembers = memberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        boolean transitioned = gameFlowSupport.resolveTimedTransitionsIfNeeded(lobby, activeMembers, now);
+        if (transitioned) {
+            lifecycleSupport.incrementStateVersion(lobby);
+            GameLobby savedLobby = lobbyRepository.saveAndFlush(lobby);
+            realtimeSupport.publishRealtimeState(savedLobby, "TURN_EXPIRED");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing turn has ended");
+        }
+
+        Integer currentVersion = lobby.getDrawingVersion() == null ? 0 : lobby.getDrawingVersion();
+        validationSupport.validateBaseVersion(request.baseVersion(), currentVersion);
+        lobby.setCurrentDrawingSnapshot(request.snapshot());
+        lobby.setDrawingVersion(currentVersion + 1);
+
+        lifecycleSupport.incrementStateVersion(lobby);
+        GameLobby savedLobby = lobbyRepository.saveAndFlush(lobby);
+        PrivateGameLobbyStateDto state = stateAssembler.buildLobbyState(savedLobby, user.userId(), activeMembers);
+        realtimeSupport.publishRealtimeState(savedLobby, "DRAWING_LIVE");
+        return state;
     }
 
     PrivateGameLobbyStateDto submitDrawingDone(

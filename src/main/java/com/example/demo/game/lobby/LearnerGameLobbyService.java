@@ -52,6 +52,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -111,7 +112,8 @@ public class LearnerGameLobbyService {
             LearnerRepository learnerRepository,
             GameLobbyRealtimePublisher realtimePublisher,
             GameLobbyRealtimePresenceTracker realtimePresenceTracker,
-            Clock clock
+            Clock clock,
+            @Value("${imposter.lobby.live-drawing.enabled:false}") boolean liveDrawingEnabled
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
         this.imposterGameLobbyMemberRepository = imposterGameLobbyMemberRepository;
@@ -182,6 +184,7 @@ public class LearnerGameLobbyService {
                 roundEngine,
                 realtimePresenceTracker,
                 clock,
+                liveDrawingEnabled,
                 LOBBY_CODE_MAX_RETRIES,
                 MIN_ACTIVE_MEMBERS_TO_START,
                 DEFAULT_CONCEPT_COUNT,
