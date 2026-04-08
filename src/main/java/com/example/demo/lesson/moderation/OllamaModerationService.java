@@ -39,7 +39,7 @@ public class OllamaModerationService {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(
-                    "http://localhost:11434/api/generate",
+                    "http://20.239.71.5:11434/api/generate",
                     HttpMethod.POST,
                     entity,
                     String.class
