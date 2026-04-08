@@ -138,7 +138,7 @@ class QuizControllerTest {
 
         when(quizService.createQuiz(any())).thenReturn(new Quiz(new com.example.demo.lesson.Lesson(), java.time.OffsetDateTime.now()));
 
-        mockMvc.perform(post("/api/quizzes/create")
+        mockMvc.perform(post("/api/quizzes")
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isCreated());
