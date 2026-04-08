@@ -2,7 +2,6 @@ package com.example.demo.quest.learner;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -99,25 +98,6 @@ public class LearnerQuestChallengeFeedQueryService {
                     pageable
                 )
                 : weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(user.userId(), pageable);
-        }
-
-        // Extract submission public IDs from projections
-        List<UUID> submissionPublicIds = slice.getContent().stream()
-                .map(FriendQuestChallengeFeedProjection::getSubmissionPublicId)
-                .toList();
-
-        // Fetch full submissions with tagged friends (if there are any)
-        final Map<UUID, WeeklyQuestChallengeSubmission> submissionsByPublicId;
-        if (!submissionPublicIds.isEmpty()) {
-            List<WeeklyQuestChallengeSubmission> submissions = weeklyQuestChallengeSubmissionRepository
-                    .findByPublicIdIn(submissionPublicIds);
-            submissionsByPublicId = submissions.stream()
-                    .collect(Collectors.toMap(
-                            WeeklyQuestChallengeSubmission::getPublicId,
-                            s -> s
-                    ));
-        } else {
-            submissionsByPublicId = Map.of();
         }
 
         // Extract submission public IDs from projections
