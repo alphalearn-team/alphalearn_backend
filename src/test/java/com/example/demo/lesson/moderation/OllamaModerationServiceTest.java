@@ -29,7 +29,7 @@ class OllamaModerationServiceTest {
 
     @Test
     void moderateParsesJsonEmbeddedInResponseText() {
-        mockServer.expect(requestTo("http://localhost:11434/api/generate"))
+        mockServer.expect(requestTo("http://20.239.71.5:11434/api/generate"))
                 .andExpect(method(POST))
                 .andRespond(withSuccess(
                         "{\"response\":\"Some text before {\\\"status\\\":\\\"APPROVED\\\",\\\"reason\\\":\\\"looks safe\\\"} some text after\"}",
@@ -45,7 +45,7 @@ class OllamaModerationServiceTest {
 
     @Test
     void moderateFallsBackToNeedsReviewOnInvalidAiResponse() {
-        mockServer.expect(requestTo("http://localhost:11434/api/generate"))
+        mockServer.expect(requestTo("http://20.239.71.5:11434/api/generate"))
                 .andExpect(method(POST))
                 .andRespond(withSuccess(
                         "{\"response\":\"no json payload\"}",

@@ -106,7 +106,71 @@ Windows:
 run_local.cmd production
 ```
 
-## 7) Run tests
+## 7) Set up Ollama for local moderation
+
+The lesson moderation flow expects an Ollama server and the `phi3` model.
+
+### 7.1 Install and start Ollama
+
+Install Ollama from the official site, then start the Ollama app/service on your machine.
+
+Check that Ollama is running locally:
+
+```bash
+ollama list
+```
+
+If the command works, Ollama is available on the default local port `11434`.
+
+### 7.2 Pull the required model
+
+Pull `phi3` locally:
+
+```bash
+ollama pull phi3
+```
+
+Verify it is installed:
+
+```bash
+ollama list
+```
+
+Make sure `phi3` appears in the output before running the backend.
+
+### 7.3 Update backend Ollama URL to localhost
+
+Open:
+
+- `src/main/java/com/example/demo/lesson/moderation/OllamaModerationService.java`
+
+Find the Ollama API URL inside `restTemplate.exchange(...)`.
+
+If it is pointing to a remote IP such as:
+
+```java
+"http://20.239.71.5:11434/api/generate"
+```
+
+change it to:
+
+```java
+"http://localhost:11434/api/generate"
+```
+
+This makes the backend talk to your local Ollama instance instead of a remote server.
+
+### 7.4 Optional quick local check
+
+You can test the local model directly:
+
+```bash
+ollama run phi3
+```
+
+If Ollama responds in the terminal, local model setup is working.
+
+## 8) Run tests
 
 Default mode:
 
@@ -132,7 +196,7 @@ Windows:
 test_local.cmd production
 ```
 
-## 8) Run CI-parity check against hosted Supabase
+## 9) Run CI-parity check against hosted Supabase
 
 Create CI env file template:
 
