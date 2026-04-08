@@ -49,7 +49,8 @@ public class OllamaModerationService {
 
         } catch (Exception e) {
             // fallback: treat as NEEDS_REVIEW
-            return new ModerationResult("NEEDS_REVIEW", "AI failure: " + e.getMessage());
+            return new ModerationResult("NEEDS_REVIEW", "Needs manual review");
+            // return new ModerationResult("NEEDS_REVIEW", "AI failure: " + e.getMessage());
         }
     }
 
@@ -61,11 +62,11 @@ public class OllamaModerationService {
 
                 Important guidelines:
                 - APPROVE most educational, neutral, or casual content
+                - ANY PROFANITY IS AUTOMATICALLY REJECTED (e.g. fuck, shit, bitch, sex, ass, dick)
                 - Casual or informal student language (e.g. "cringe", "boring", "weird") is NOT offensive
-                - Do NOT treat mild slang or opinions as harmful
 
                 Only REJECT if the content clearly contains:
-                - strong profanity (e.g. explicit swear words)
+                - profanity (e.g. fuck, sex, shit)
                 - hate speech or discrimination toward a group
                 - explicit harmful or dangerous instructions
                 - sexual or highly inappropriate content
