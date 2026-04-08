@@ -43,7 +43,7 @@ public class QuizController {
         return quizQueryService.getQuizzesForLesson(lessonPublicId, user);
     }
 
-    @PostMapping("/create")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create quiz", description = "Creates a new quiz linked to a specific lesson.")
     public void createQuiz(@Valid @RequestBody CreateQuizRequest request) {

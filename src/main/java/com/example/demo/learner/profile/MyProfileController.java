@@ -40,7 +40,7 @@ public class MyProfileController {
         return myProfileService.updateProfile(request, user);
     }
 
-    @PostMapping("/picture/upload")
+    @PostMapping("/picture/uploads")
     @Operation(summary = "Create profile picture upload instructions", description = "Returns a presigned Cloudflare R2 upload URL for the authenticated learner's profile picture")
     public ProfilePictureUploadResponse createProfilePictureUpload(
             @RequestBody ProfilePictureUploadRequest request,

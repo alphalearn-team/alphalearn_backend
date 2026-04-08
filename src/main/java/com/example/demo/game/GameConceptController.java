@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.config.SupabaseAuthUser;
 
 @RestController
-@RequestMapping("/api/games/imposter/concepts")
+@RequestMapping("/api/games/concepts")
 @Tag(name = "Game Game Concepts", description = "Concept assignment endpoints for the imposter game")
 public class GameConceptController {
 
@@ -22,7 +22,7 @@ public class GameConceptController {
         this.imposterGameConceptService = imposterGameConceptService;
     }
 
-    @PostMapping("/next")
+    @PostMapping("/selections")
     @Operation(summary = "Assign next imposter game concept", description = "Returns one concept for a new imposter game round, excluding any provided concept public IDs")
     public GameAssignedConceptDto assignNextConcept(
             @AuthenticationPrincipal SupabaseAuthUser user,
