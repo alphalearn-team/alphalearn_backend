@@ -1,6 +1,9 @@
 package com.example.demo.quest.learner;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.quest.weekly.FriendQuestChallengeFeedProjection;
+import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmission;
 import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmissionRepository;
 
 @Service
@@ -21,11 +25,14 @@ public class LearnerQuestChallengeFeedQueryService {
     private static final int MAX_SIZE = 50;
 
     private final WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository;
+    private final QuestChallengeTaggedFriendDtoMapper questChallengeTaggedFriendDtoMapper;
 
     public LearnerQuestChallengeFeedQueryService(
-            WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository
+            WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository,
+            QuestChallengeTaggedFriendDtoMapper questChallengeTaggedFriendDtoMapper
     ) {
         this.weeklyQuestChallengeSubmissionRepository = weeklyQuestChallengeSubmissionRepository;
+        this.questChallengeTaggedFriendDtoMapper = questChallengeTaggedFriendDtoMapper;
     }
 
     @Transactional(readOnly = true)
@@ -48,8 +55,35 @@ public class LearnerQuestChallengeFeedQueryService {
         Slice<FriendQuestChallengeFeedProjection> slice = weeklyQuestChallengeSubmissionRepository
                 .findFriendChallengeFeedByLearnerId(user.userId(), pageable);
 
+        // Extract submission public IDs from projections
+        List<UUID> submissionPublicIds = slice.getContent().stream()
+                .map(FriendQuestChallengeFeedProjection::getSubmissionPublicId)
+                .toList();
+
+        // Fetch full submissions with tagged friends (if there are any)
+        final Map<UUID, WeeklyQuestChallengeSubmission> submissionsByPublicId;
+        if (!submissionPublicIds.isEmpty()) {
+            List<WeeklyQuestChallengeSubmission> submissions = weeklyQuestChallengeSubmissionRepository
+                    .findByPublicIdIn(submissionPublicIds);
+            submissionsByPublicId = submissions.stream()
+                    .collect(Collectors.toMap(
+                            WeeklyQuestChallengeSubmission::getPublicId,
+                            s -> s
+                    ));
+        } else {
+            submissionsByPublicId = Map.of();
+        }
+
         List<FriendQuestChallengeFeedItemDto> items = slice.getContent().stream()
-                .map(FriendQuestChallengeFeedItemDto::from)
+                .map(projection -> {
+                    WeeklyQuestChallengeSubmission submission = submissionsByPublicId.get(projection.getSubmissionPublicId());
+                    List<QuestChallengeTaggedFriendDto> taggedFriends = submission != null
+                            ? submission.getTaggedFriends().stream()
+                                    .map(questChallengeTaggedFriendDtoMapper::toDto)
+                                    .toList()
+                            : List.of();
+                    return FriendQuestChallengeFeedItemDto.from(projection, taggedFriends);
+                })
                 .toList();
 
         return new FriendQuestChallengeFeedDto(items, resolvedPage, resolvedSize, slice.hasNext());

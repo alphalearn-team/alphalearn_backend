@@ -133,6 +133,42 @@ class LearnerQuestChallengeSubmissionServiceTest {
     }
 
     @Test
+    void createsSubmissionWithoutTaggedFriends() {
+        QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
+                "quest-challenges/%s/%s/object-evidence.mp4".formatted(activeAssignment.getPublicId(), learner.getId()),
+                "evidence.mp4",
+                "Learner caption",
+                List.of()
+        );
+        WeeklyQuestChallengeSubmission saved = new WeeklyQuestChallengeSubmission();
+        ReflectionTestUtils.setField(saved, "publicId", UUID.randomUUID());
+        saved.setLearner(learner);
+        saved.setWeeklyQuestAssignment(activeAssignment);
+        saved.setMediaObjectKey(command.objectKey());
+        saved.setMediaPublicUrl("https://pub.example/" + command.objectKey());
+        saved.setMediaContentType("video/mp4");
+        saved.setOriginalFilename(command.originalFilename());
+        saved.setFileSizeBytes(1024L);
+        saved.setCaption("Learner caption");
+        saved.setSubmittedAt(OffsetDateTime.parse("2026-03-22T01:00:00+08:00"));
+        saved.setUpdatedAt(OffsetDateTime.parse("2026-03-22T01:00:00+08:00"));
+
+        mockActiveAssignment();
+        when(questChallengeStorageService.expectedObjectKeyPrefix(activeAssignment.getPublicId(), learner.getId()))
+                .thenReturn("quest-challenges/%s/%s/".formatted(activeAssignment.getPublicId(), learner.getId()));
+        when(questChallengeStorageService.fetchObjectMetadata(command.objectKey()))
+                .thenReturn(new QuestChallengeStorageService.StoredObjectMetadata("video/mp4", 1024L, "https://pub.example/" + command.objectKey()));
+        when(questChallengeStorageService.maxUploadSizeBytes()).thenReturn(52428800L);
+        when(submissionRepository.findByLearner_IdAndWeeklyQuestAssignment_Id(learner.getId(), activeAssignment.getId()))
+                .thenReturn(Optional.empty());
+        when(submissionRepository.save(any(WeeklyQuestChallengeSubmission.class))).thenReturn(saved);
+
+        QuestChallengeSubmissionView result = service.saveCurrentSubmission(command, learnerUser);
+
+        assertThat(result.taggedFriends()).isEmpty();
+    }
+
+    @Test
     void rejectsObjectKeyOutsideLearnerNamespace() {
         QuestChallengeSubmissionCommand command = new QuestChallengeSubmissionCommand(
                 "quest-challenges/other-assignment/other-learner/object.mp4",

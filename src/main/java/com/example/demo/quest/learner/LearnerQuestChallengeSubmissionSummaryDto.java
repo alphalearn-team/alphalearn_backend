@@ -2,6 +2,7 @@ package com.example.demo.quest.learner;
 
 import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmission;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record LearnerQuestChallengeSubmissionSummaryDto(
@@ -12,6 +13,7 @@ public record LearnerQuestChallengeSubmissionSummaryDto(
         String originalFilename,
         long fileSizeBytes,
         String caption,
+        List<QuestChallengeTaggedFriendDto> taggedFriends,
         OffsetDateTime submittedAt,
         OffsetDateTime updatedAt
 ) {
@@ -24,6 +26,12 @@ public record LearnerQuestChallengeSubmissionSummaryDto(
                 submission.getOriginalFilename(),
                 submission.getFileSizeBytes(),
                 submission.getCaption(),
+                submission.getTaggedFriends().stream()
+                    .map(tag -> new QuestChallengeTaggedFriendDto(
+                        tag.getTaggedLearner().getPublicId(),
+                        tag.getTaggedLearner().getUsername()
+                    ))
+                    .toList(),
                 submission.getSubmittedAt(),
                 submission.getUpdatedAt()
         );

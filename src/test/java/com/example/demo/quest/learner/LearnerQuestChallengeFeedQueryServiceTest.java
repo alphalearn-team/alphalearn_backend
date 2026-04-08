@@ -29,12 +29,17 @@ class LearnerQuestChallengeFeedQueryServiceTest {
 
     @Mock
     private WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository;
+    @Mock
+    private QuestChallengeTaggedFriendDtoMapper questChallengeTaggedFriendDtoMapper;
 
     private LearnerQuestChallengeFeedQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new LearnerQuestChallengeFeedQueryService(weeklyQuestChallengeSubmissionRepository);
+        service = new LearnerQuestChallengeFeedQueryService(
+            weeklyQuestChallengeSubmissionRepository,
+            questChallengeTaggedFriendDtoMapper
+        );
     }
 
     @Test
@@ -107,6 +112,10 @@ class LearnerQuestChallengeFeedQueryServiceTest {
 
         when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(learnerId, PageRequest.of(0, 20)))
                 .thenReturn(slice);
+        when(weeklyQuestChallengeSubmissionRepository.findByPublicIdIn(
+            List.of(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))))
+            .thenReturn(List.of());
+
 
         FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20);
 

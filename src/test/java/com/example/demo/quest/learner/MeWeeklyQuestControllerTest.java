@@ -98,6 +98,7 @@ class MeWeeklyQuestControllerTest {
                         "evidence.mp4",
                         1024L,
                         "Learner caption",
+                        List.of(new QuestChallengeTaggedFriendDto(UUID.randomUUID(), "friend-one")),
                         OffsetDateTime.parse("2026-03-22T01:00:00+08:00"),
                         OffsetDateTime.parse("2026-03-22T01:05:00+08:00")
                 )
@@ -110,6 +111,7 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(jsonPath("$.concept.title").value("fire"))
                 .andExpect(jsonPath("$.quest.title").value("Video + Caption"))
                 .andExpect(jsonPath("$.questChallengeSubmission.originalFilename").value("evidence.mp4"))
+                .andExpect(jsonPath("$.questChallengeSubmission.taggedFriends[0].learnerUsername").value("friend-one"))
                 .andExpect(jsonPath("$.editable").doesNotExist())
                 .andExpect(jsonPath("$.activationSource").doesNotExist())
                 .andExpect(jsonPath("$.createdByAdminId").doesNotExist());
@@ -226,7 +228,10 @@ class MeWeeklyQuestControllerTest {
                         "video/mp4",
                         "media.mp4",
                         "Great challenge this week",
-                        OffsetDateTime.parse("2026-03-24T09:00:00Z")
+                        OffsetDateTime.parse("2026-03-24T09:00:00Z"),
+                        List.of(
+                                new QuestChallengeTaggedFriendDto(UUID.randomUUID(), "tagged-friend-one")
+                        )
                 )),
                 0,
                 20,
@@ -244,7 +249,8 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.items[0].learnerUsername").value("friend-one"))
-                .andExpect(jsonPath("$.items[0].conceptTitle").value("Algebra"));
+                .andExpect(jsonPath("$.items[0].conceptTitle").value("Algebra"))
+                .andExpect(jsonPath("$.items[0].taggedFriends[0].learnerUsername").value("tagged-friend-one"));
     }
 
     @Test
