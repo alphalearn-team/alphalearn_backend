@@ -37,6 +37,16 @@ public class LearnerQuestChallengeFeedQueryService {
 
     @Transactional(readOnly = true)
     public FriendQuestChallengeFeedDto getFriendsFeed(SupabaseAuthUser user, Integer page, Integer size) {
+        return getFriendsFeed(user, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public FriendQuestChallengeFeedDto getFriendsFeed(
+            SupabaseAuthUser user,
+            Integer page,
+            Integer size,
+            List<UUID> conceptPublicIds
+    ) {
         if (user == null || !user.isLearner() || user.userId() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
         }
@@ -52,15 +62,19 @@ public class LearnerQuestChallengeFeedQueryService {
         }
 
         Pageable pageable = PageRequest.of(resolvedPage, resolvedSize);
-        Slice<FriendQuestChallengeFeedProjection> slice = weeklyQuestChallengeSubmissionRepository
-                .findFriendChallengeFeedByLearnerId(user.userId(), pageable);
+        boolean hasConcepts = conceptPublicIds != null && !conceptPublicIds.isEmpty();
+        Slice<FriendQuestChallengeFeedProjection> slice = hasConcepts
+                ? weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerIdAndConceptPublicIds(
+                        user.userId(),
+                        conceptPublicIds,
+                        pageable
+                )
+                : weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(user.userId(), pageable);
 
-        // Extract submission public IDs from projections
         List<UUID> submissionPublicIds = slice.getContent().stream()
                 .map(FriendQuestChallengeFeedProjection::getSubmissionPublicId)
                 .toList();
 
-        // Fetch full submissions with tagged friends (if there are any)
         final Map<UUID, WeeklyQuestChallengeSubmission> submissionsByPublicId;
         if (!submissionPublicIds.isEmpty()) {
             List<WeeklyQuestChallengeSubmission> submissions = weeklyQuestChallengeSubmissionRepository

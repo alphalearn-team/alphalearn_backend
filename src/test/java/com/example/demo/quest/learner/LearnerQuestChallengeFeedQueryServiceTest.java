@@ -111,13 +111,13 @@ class LearnerQuestChallengeFeedQueryServiceTest {
         );
 
         when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(learnerId, PageRequest.of(0, 20)))
-                .thenReturn(slice);
+            .thenReturn(slice);
         when(weeklyQuestChallengeSubmissionRepository.findByPublicIdIn(
             List.of(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))))
             .thenReturn(List.of());
 
 
-        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20);
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, null);
 
         assertThat(result.page()).isEqualTo(0);
         assertThat(result.size()).isEqualTo(20);
@@ -131,7 +131,7 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsForbiddenWhenUserIsNotLearner() {
         SupabaseAuthUser user = new SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 20))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 20, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -143,7 +143,7 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsBadRequestWhenPageIsNegative() {
         SupabaseAuthUser user = learnerUser(UUID.randomUUID());
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, -1, 20))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, -1, 20, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -155,19 +155,75 @@ class LearnerQuestChallengeFeedQueryServiceTest {
     void throwsBadRequestWhenSizeIsOutOfRange() {
         SupabaseAuthUser user = learnerUser(UUID.randomUUID());
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 0))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 0, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 });
 
-        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 51))
+        assertThatThrownBy(() -> service.getFriendsFeed(user, 0, 51, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 });
+    }
+
+    @Test
+    void returnsPaginatedFriendsFeedWhenConceptFilterProvided() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerIdAndConceptPublicIds(
+                learnerId,
+                conceptPublicIds,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, conceptPublicIds);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void returnsPaginatedFriendsFeedWhenNoConceptFilterProvided() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerId(learnerId, PageRequest.of(0, 20)))
+                .thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, null);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void supportsConceptFilterWithoutWeekFilter() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findFriendChallengeFeedByLearnerIdAndConceptPublicIds(
+                learnerId,
+                conceptPublicIds,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getFriendsFeed(user, 0, 20, conceptPublicIds);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.items()).isEmpty();
     }
 
     private SupabaseAuthUser learnerUser(UUID learnerId) {
