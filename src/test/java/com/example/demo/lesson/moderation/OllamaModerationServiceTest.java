@@ -55,7 +55,7 @@ class OllamaModerationServiceTest {
         ModerationResult result = service.moderate("lesson content");
 
         assertThat(result.getStatus()).isEqualTo("NEEDS_REVIEW");
-        assertThat(result.getReason()).startsWith("AI failure:");
+        assertThat(result.getReason()).isEqualTo("Needs manual review");
         mockServer.verify();
     }
 }
