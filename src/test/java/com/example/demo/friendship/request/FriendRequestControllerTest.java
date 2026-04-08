@@ -49,7 +49,10 @@ class FriendRequestControllerTest {
         objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mockMvc = MockMvcBuilders.standaloneSetup(new FriendRequestController(friendRequestService))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new FriendRequestController(friendRequestService),
+                        new LegacyFriendRequestController(friendRequestService)
+                )
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
     }
@@ -70,7 +73,7 @@ class FriendRequestControllerTest {
 
         when(friendRequestService.sendRequest(eq(learner), eq(receiverPublicId))).thenReturn(dto);
 
-        mockMvc.perform(post("/api/friend-requests")
+        mockMvc.perform(post("/api/me/friend-requests")
                         .principal(authToken(authUser))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"receiverPublicId\":\"" + receiverPublicId + "\"}"))
@@ -98,7 +101,7 @@ class FriendRequestControllerTest {
                 )
         ));
 
-        mockMvc.perform(get("/api/friend-requests?direction=incoming")
+        mockMvc.perform(get("/api/me/friend-requests?direction=incoming")
                 .principal(authToken(authUser)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].requestId").value(2))
@@ -110,7 +113,7 @@ class FriendRequestControllerTest {
     void patchFriendRequestStatusReturnsNoContent() throws Exception {
         SupabaseAuthUser authUser = learnerUser();
 
-        mockMvc.perform(patch("/api/friend-requests/{requestId}", 5L)
+        mockMvc.perform(patch("/api/me/friend-requests/{requestId}", 5L)
                         .principal(authToken(authUser))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"APPROVED\"}"))
@@ -121,7 +124,7 @@ class FriendRequestControllerTest {
     void getFriendRequestsRejectsInvalidDirection() throws Exception {
         SupabaseAuthUser authUser = learnerUser();
 
-        mockMvc.perform(get("/api/friend-requests?direction=sideways")
+        mockMvc.perform(get("/api/me/friend-requests?direction=sideways")
                         .principal(authToken(authUser)))
                 .andExpect(status().isBadRequest());
     }
@@ -134,7 +137,7 @@ class FriendRequestControllerTest {
                 .when(friendRequestService)
                 .updateRequestStatus(eq(learner), eq(9L), eq(FriendRequestStatus.PENDING));
 
-        mockMvc.perform(patch("/api/friend-requests/{requestId}", 9L)
+        mockMvc.perform(patch("/api/me/friend-requests/{requestId}", 9L)
                         .principal(authToken(authUser))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"PENDING\"}"))
@@ -145,25 +148,64 @@ class FriendRequestControllerTest {
     void allEndpointsRejectWhenLearnerMissing() throws Exception {
         SupabaseAuthUser userWithoutLearner = new SupabaseAuthUser(UUID.randomUUID(), null, null);
 
-        mockMvc.perform(post("/api/friend-requests")
+        mockMvc.perform(post("/api/me/friend-requests")
                         .principal(authToken(userWithoutLearner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"receiverPublicId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(get("/api/friend-requests?direction=incoming")
+        mockMvc.perform(get("/api/me/friend-requests?direction=incoming")
                         .principal(authToken(userWithoutLearner)))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(patch("/api/friend-requests/{requestId}", 1L)
+        mockMvc.perform(patch("/api/me/friend-requests/{requestId}", 1L)
                         .principal(authToken(userWithoutLearner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"APPROVED\"}"))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(delete("/api/friend-requests/{requestId}", 1L)
+        mockMvc.perform(delete("/api/me/friend-requests/{requestId}", 1L)
                         .principal(authToken(userWithoutLearner)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void legacyFriendRequestRoutesRemainAvailableDuringMigration() throws Exception {
+        SupabaseAuthUser authUser = learnerUser();
+        Learner learner = authUser.learner();
+        UUID receiverPublicId = UUID.randomUUID();
+
+        when(friendRequestService.sendRequest(eq(learner), eq(receiverPublicId))).thenReturn(
+                new FriendRequestDTO(
+                        1L,
+                        receiverPublicId,
+                        "receiver",
+                        null,
+                        FriendRequestStatus.PENDING,
+                        OffsetDateTime.parse("2026-03-01T00:00:00Z")
+                )
+        );
+        when(friendRequestService.getPendingRequests(eq(learner))).thenReturn(List.of());
+
+        mockMvc.perform(post("/api/friend-requests")
+                        .principal(authToken(authUser))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"receiverPublicId\":\"" + receiverPublicId + "\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/friend-requests?direction=incoming")
+                        .principal(authToken(authUser)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/friend-requests/{requestId}", 5L)
+                        .principal(authToken(authUser))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"APPROVED\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(delete("/api/friend-requests/{requestId}", 5L)
+                        .principal(authToken(authUser)))
+                .andExpect(status().isNoContent());
     }
 
     private SupabaseAuthenticationToken authToken(SupabaseAuthUser user) {
