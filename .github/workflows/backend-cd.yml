@@ -127,11 +127,16 @@ jobs:
             ${{ steps.image.outputs.sha_tag }}
             ${{ steps.image.outputs.latest_tag }}
 
-      - name: Trigger App Runner deployment
+      - name: Deploy exact SHA image to App Runner
         if: ${{ vars.APP_RUNNER_SERVICE_ARN != '' }}
-        run: aws apprunner start-deployment --service-arn "$APP_RUNNER_SERVICE_ARN"
         env:
           APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
+          ECR_REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+        run: |
+          IMAGE="${ECR_REPOSITORY_URI}:${GITHUB_SHA}"
+          aws apprunner update-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --source-configuration "ImageRepository={ImageIdentifier=$IMAGE,ImageRepositoryType=ECR}"
 
       - name: Skip App Runner deployment
         if: ${{ vars.APP_RUNNER_SERVICE_ARN == '' }}
