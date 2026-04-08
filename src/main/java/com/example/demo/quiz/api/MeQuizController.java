@@ -1,5 +1,6 @@
 package com.example.demo.quiz.api;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -47,6 +48,15 @@ public class MeQuizController {
                     "view must be BEST or LATEST"
             );
         };
+    }
+
+    @GetMapping("/{quizPublicId}/attempts/history")
+    @Operation(summary = "Get quiz attempt history", description = "Returns all attempts for the learner on this quiz, newest first")
+    public List<QuizAttemptResponse> getQuizAttemptHistory(
+            @PathVariable UUID quizPublicId,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        return learnerQuizAttemptService.getQuizAttemptHistory(quizPublicId, user);
     }
 
     @PostMapping("/{quizPublicId}/attempts")
