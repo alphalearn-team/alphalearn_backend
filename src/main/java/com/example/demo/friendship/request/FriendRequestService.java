@@ -17,6 +17,7 @@ import com.example.demo.friendship.request.dto.FriendRequestDTO;
 import com.example.demo.friendship.shared.OrderedUuidPair;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
+import com.example.demo.notification.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +28,7 @@ public class FriendRequestService {
     private final FriendRequestRepository friendRequestRepository;
     private final LearnerRepository learnerRepository;
     private final FriendRepository friendRepository;
+    private final NotificationService notificationService;
 
     private FriendId normalizeFriendId(UUID id1, UUID id2) {
         OrderedUuidPair pair = OrderedUuidPair.of(id1, id2);
@@ -185,6 +187,13 @@ public class FriendRequestService {
 
             friendRepository.save(friend);
         }
+
+        Learner receiver = resolveLearnerOrThrow(request.getReceiverId());
+        String receiverName = normalizeDisplayName(receiver);
+        notificationService.create(
+                request.getSenderId(),
+                receiverName + " accepted your friend request. You are now friends."
+        );
     }
 
     public void rejectRequest(Learner currentUser, Long requestId) {
@@ -207,6 +216,13 @@ public class FriendRequestService {
         request.setRespondedAt(OffsetDateTime.now());
 
         friendRequestRepository.save(request);
+
+        Learner receiver = resolveLearnerOrThrow(request.getReceiverId());
+        String receiverName = normalizeDisplayName(receiver);
+        notificationService.create(
+                request.getSenderId(),
+                receiverName + " rejected your friend request."
+        );
     }
 
     public void cancelRequest(Learner currentUser, Long requestId) {
@@ -225,6 +241,18 @@ public class FriendRequestService {
         }
 
         friendRequestRepository.delete(request);
+    }
+
+    private Learner resolveLearnerOrThrow(UUID learnerId) {
+        return learnerRepository.findById(learnerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private String normalizeDisplayName(Learner learner) {
+        if (learner == null || learner.getUsername() == null || learner.getUsername().isBlank()) {
+            return "Someone";
+        }
+        return learner.getUsername().trim();
     }
 
 }

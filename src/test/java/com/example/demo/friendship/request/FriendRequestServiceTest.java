@@ -27,6 +27,7 @@ import com.example.demo.friendship.friend.FriendRepository;
 import com.example.demo.friendship.request.dto.FriendRequestDTO;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
+import com.example.demo.notification.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class FriendRequestServiceTest {
@@ -40,11 +41,19 @@ class FriendRequestServiceTest {
     @Mock
     private FriendRepository friendRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private FriendRequestService service;
 
     @BeforeEach
     void setUp() {
-        service = new FriendRequestService(friendRequestRepository, learnerRepository, friendRepository);
+        service = new FriendRequestService(
+                friendRequestRepository,
+                learnerRepository,
+                friendRepository,
+                notificationService
+        );
     }
 
     @Test
@@ -216,6 +225,7 @@ class FriendRequestServiceTest {
 
         when(friendRequestRepository.findById(requestId)).thenReturn(Optional.of(pending));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
 
         service.acceptRequest(receiver, requestId);
 
@@ -228,6 +238,7 @@ class FriendRequestServiceTest {
         verify(friendRepository).save(friendCaptor.capture());
         assertThat(friendCaptor.getValue().getUserId1().toString())
                 .isLessThan(friendCaptor.getValue().getUserId2().toString());
+        verify(notificationService).create(senderId, "receiver accepted your friend request. You are now friends.");
     }
 
     @Test
@@ -245,10 +256,33 @@ class FriendRequestServiceTest {
 
         when(friendRequestRepository.findById(requestId)).thenReturn(Optional.of(pending));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(true);
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
 
         service.acceptRequest(receiver, requestId);
 
         verify(friendRepository, never()).save(any(Friend.class));
+        verify(notificationService).create(senderId, "receiver accepted your friend request. You are now friends.");
+    }
+
+    @Test
+    void rejectRequestSendsNotificationToSender() {
+        Learner receiver = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "receiver");
+        UUID senderId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Long requestId = 13L;
+        FriendRequest pending = FriendRequest.builder()
+                .friendRequestId(requestId)
+                .senderId(senderId)
+                .receiverId(receiver.getId())
+                .status(FriendRequestStatus.PENDING)
+                .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                .build();
+
+        when(friendRequestRepository.findById(requestId)).thenReturn(Optional.of(pending));
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+
+        service.rejectRequest(receiver, requestId);
+
+        verify(notificationService).create(senderId, "receiver rejected your friend request.");
     }
 
     @Test
