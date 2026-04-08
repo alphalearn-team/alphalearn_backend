@@ -2,9 +2,12 @@
 
 ## Guides
 
+- API endpoint conventions: [docs/api-endpoint-conventions.md](docs/api-endpoint-conventions.md)
 - Local setup and run: [docs/guides/local-development.md](docs/guides/local-development.md)
 - Supabase schema changes and migrations: [docs/guides/schema-changes.md](docs/guides/schema-changes.md)
 - Supabase CLI install (Windows + macOS): [docs/guides/supabase-cli-install.md](docs/guides/supabase-cli-install.md)
+- Friendship endpoint rename release note: [docs/release-notes/2026-04-08-friendship-endpoint-rename.md](docs/release-notes/2026-04-08-friendship-endpoint-rename.md)
+- Friendship endpoint frontend migration: [docs/frontend-migration/friendship-endpoint-rename.md](docs/frontend-migration/friendship-endpoint-rename.md)
 
 ## Seeded Demo Accounts
 
