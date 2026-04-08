@@ -8,11 +8,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/admin/imposter")
+@RequestMapping("/api/admin/games")
 @Tag(name = "Admin Game Monthly Packs", description = "Admin endpoints for monthly imposter game concept packs")
 public class AdminGameMonthlyPackController {
 
@@ -22,15 +24,29 @@ public class AdminGameMonthlyPackController {
         this.adminGameMonthlyPackService = adminGameMonthlyPackService;
     }
 
-    @GetMapping("/monthly-packs/{yearMonth}")
-    @Operation(summary = "Get monthly imposter pack", description = "Returns one month pack or an exists=false scaffold when the month is not configured")
-    public AdminGameMonthlyPackDto getMonthlyPack(@PathVariable String yearMonth) {
-        return adminGameMonthlyPackService.getMonthlyPack(yearMonth);
-    }
+    @GetMapping("/monthly-packs")
+    @Operation(summary = "Get monthly pack by selector", description = "Returns monthly pack by yearMonth or supported scope CURRENT")
+    public AdminGameMonthlyPackDto getMonthlyPack(
+            @RequestParam(required = false) String yearMonth,
+            @RequestParam(required = false) String scope
+    ) {
+        boolean hasYearMonth = yearMonth != null && !yearMonth.isBlank();
+        boolean hasScope = scope != null && !scope.isBlank();
+        if (hasYearMonth == hasScope) {
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Specify exactly one selector: yearMonth or scope"
+            );
+        }
 
-    @GetMapping("/monthly-packs/current")
-    @Operation(summary = "Get current monthly imposter pack", description = "Returns the current UTC month pack or an exists=false scaffold when the month is not configured")
-    public AdminGameMonthlyPackDto getCurrentMonthlyPack() {
+        if (hasYearMonth) {
+            return adminGameMonthlyPackService.getMonthlyPack(yearMonth.trim());
+        }
+
+        String normalizedScope = scope.trim().toUpperCase();
+        if (!"CURRENT".equals(normalizedScope)) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "scope must be CURRENT");
+        }
         return adminGameMonthlyPackService.getCurrentMonthlyPack();
     }
 

@@ -2,7 +2,7 @@ package com.example.demo.contributor.application.admin;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -65,7 +65,9 @@ class AdminContributorApplicationControllerTest {
                         null
                 ));
 
-        mockMvc.perform(put("/api/admin/contributor-applications/{applicationPublicId}/approve", applicationPublicId))
+        mockMvc.perform(patch("/api/admin/contributor-applications/{applicationPublicId}", applicationPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"APPROVE\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(applicationPublicId.toString()))
                 .andExpect(jsonPath("$.status").value("APPROVED"));
@@ -89,7 +91,7 @@ class AdminContributorApplicationControllerTest {
                 )
         ));
 
-        mockMvc.perform(get("/api/admin/contributor-applications/pending"))
+        mockMvc.perform(get("/api/admin/contributor-applications?status=PENDING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].publicId").value(pendingApplicationId.toString()))
                 .andExpect(jsonPath("$[0].learnerUsername").value("learner-pending"))
@@ -140,9 +142,9 @@ class AdminContributorApplicationControllerTest {
                 "Need more activity"
         ));
 
-        mockMvc.perform(put("/api/admin/contributor-applications/{applicationPublicId}/reject", applicationPublicId)
+        mockMvc.perform(patch("/api/admin/contributor-applications/{applicationPublicId}", applicationPublicId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"Need more activity\"}"))
+                        .content("{\"action\":\"REJECT\",\"reason\":\"Need more activity\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(applicationPublicId.toString()))
                 .andExpect(jsonPath("$.status").value("REJECTED"))

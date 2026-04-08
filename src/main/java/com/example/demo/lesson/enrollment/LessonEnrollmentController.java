@@ -18,7 +18,7 @@ import com.example.demo.lesson.enrollment.dto.LessonEnrollmentSummaryDto;
 import com.example.demo.lesson.enrollment.dto.LessonProgressDto;
 
 @RestController
-@RequestMapping("/api/lessonenrollments")
+@RequestMapping("/api/lesson-enrollments")
 @Tag(name = "Lesson Enrollments", description = "Endpoints for lesson enrollment progress")
 public class LessonEnrollmentController {
 
@@ -40,21 +40,4 @@ public class LessonEnrollmentController {
         return service.enroll(lessonPublicId, user);
     }
 
-    @GetMapping("/me")
-    @Operation(summary = "List my enrollments", description = "Returns all lessons the current user is enrolled in")
-    public List<LessonEnrollmentSummaryDto> getMyEnrollments(@AuthenticationPrincipal SupabaseAuthUser user) {
-        return service.getMyEnrollments(user);
-    }
-
-    @GetMapping("/me/{lessonPublicId}")
-    @Operation(summary = "Check enrollment status", description = "Returns whether the current user is enrolled in the specified lesson")
-    public LessonEnrollmentStatusDto getEnrollmentStatus(@PathVariable UUID lessonPublicId, @AuthenticationPrincipal SupabaseAuthUser user) {
-        return service.getEnrollmentStatus(lessonPublicId, user);
-    }
-
-    @GetMapping("/me/progress")
-    @Operation(summary = "My lesson progress", description = "Returns progress for all enrolled lessons, including passed/total quiz counts and completion status.")
-    public List<LessonProgressDto> getMyProgress(@AuthenticationPrincipal SupabaseAuthUser user) {
-        return service.getMyProgress(user);
-    }
 }

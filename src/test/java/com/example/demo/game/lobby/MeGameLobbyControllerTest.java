@@ -68,7 +68,7 @@ class MeGameLobbyControllerTest {
                         OffsetDateTime.parse("2026-04-02T00:00:00Z")
                 ));
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private")
+        mockMvc.perform(post("/api/me/game-lobbies/private-lobbies")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isCreated())
@@ -96,7 +96,7 @@ class MeGameLobbyControllerTest {
                         false
                 ));
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
+        mockMvc.perform(post("/api/me/game-lobbies/private-memberships")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -117,7 +117,9 @@ class MeGameLobbyControllerTest {
 
         when(learnerGameLobbyService.leavePrivateLobby(any(), eq(lobbyPublicId))).thenReturn(response);
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/leave", lobbyPublicId))
+        mockMvc.perform(patch("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}", lobbyPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"LEAVE\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result").value("LEFT_AND_PROMOTED_HOST"))
                 .andExpect(jsonPath("$.lobbyState.publicId").value(lobbyPublicId.toString()))
@@ -138,7 +140,9 @@ class MeGameLobbyControllerTest {
 
         when(learnerGameLobbyService.startPrivateLobby(any(), eq(lobbyPublicId))).thenReturn(state);
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/start", lobbyPublicId))
+        mockMvc.perform(patch("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}", lobbyPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"START\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
                 .andExpect(jsonPath("$.startedAt").value("2026-04-02T00:00:00Z"))
@@ -152,7 +156,7 @@ class MeGameLobbyControllerTest {
 
         when(learnerGameLobbyService.getPrivateLobbyState(any(), eq(lobbyPublicId))).thenReturn(state);
 
-        mockMvc.perform(get("/api/me/imposter/lobbies/private/{lobbyPublicId}/state", lobbyPublicId))
+        mockMvc.perform(get("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}", lobbyPublicId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
                 .andExpect(jsonPath("$.activeMemberCount").value(3))
@@ -167,7 +171,7 @@ class MeGameLobbyControllerTest {
 
         when(learnerGameLobbyService.updatePrivateLobbySettings(any(), eq(lobbyPublicId), eq(request))).thenReturn(state);
 
-        mockMvc.perform(patch("/api/me/imposter/lobbies/private/{lobbyPublicId}/settings", lobbyPublicId)
+        mockMvc.perform(patch("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}/settings", lobbyPublicId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -181,7 +185,7 @@ class MeGameLobbyControllerTest {
         when(learnerGameLobbyService.joinPrivateLobby(any(), eq(request)))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "lobbyCode is required"));
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/join")
+        mockMvc.perform(post("/api/me/game-lobbies/private-memberships")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isBadRequest());
@@ -194,7 +198,9 @@ class MeGameLobbyControllerTest {
         when(learnerGameLobbyService.startPrivateLobby(any(), eq(lobbyPublicId)))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "At least 3 active players are required to start"));
 
-        mockMvc.perform(post("/api/me/imposter/lobbies/private/{lobbyPublicId}/start", lobbyPublicId))
+        mockMvc.perform(patch("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}", lobbyPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"START\"}"))
                 .andExpect(status().isConflict());
     }
 

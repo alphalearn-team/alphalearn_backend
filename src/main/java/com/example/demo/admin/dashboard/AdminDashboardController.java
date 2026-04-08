@@ -23,7 +23,7 @@ public class AdminDashboardController {
         this.adminDashboardService = adminDashboardService;
     }
 
-    @GetMapping("/summary")
+    @GetMapping(params = "view=OVERVIEW")
     @Operation(
             summary = "Get admin dashboard summary",
             description = "Returns lesson, learner, enrollment, contributor, and top-concept metrics used by the admin dashboard"

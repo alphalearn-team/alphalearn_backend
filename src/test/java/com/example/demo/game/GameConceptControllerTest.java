@@ -50,7 +50,7 @@ class GameConceptControllerTest {
         when(imposterGameConceptService.assignNextConcept(any(), eq(request)))
                 .thenReturn(new GameAssignedConceptDto(assignedConceptId, "binary tree"));
 
-        mockMvc.perform(post("/api/games/imposter/concepts/next")
+        mockMvc.perform(post("/api/games/concepts/selections")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -70,7 +70,7 @@ class GameConceptControllerTest {
         when(imposterGameConceptService.assignNextConcept(any(), eq(request)))
                 .thenReturn(new GameAssignedConceptDto(assignedConceptId, "merge sort"));
 
-        mockMvc.perform(post("/api/games/imposter/concepts/next")
+        mockMvc.perform(post("/api/games/concepts/selections")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())

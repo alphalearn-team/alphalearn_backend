@@ -9,12 +9,12 @@ import com.example.demo.contributor.dto.ContributorPublicDto;
 import com.example.demo.contributor.dto.DemoteContributorsRequest;
 import com.example.demo.contributor.dto.PromoteContributorsRequest;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/admin/contributors")
@@ -33,17 +33,18 @@ public class AdminContributorController {
         return contributorAdminFacade.getAllContributors();
     }
 
-    @PostMapping("/promote")
-    @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Promote learners", description = "Creates or reactivates contributor records for the provided learner public IDs")
-    public List<ContributorPublicDto> promoteLearners(@RequestBody PromoteContributorsRequest request) {
-        return contributorAdminFacade.promoteLearners(request);
-    }
-
-    @DeleteMapping("/demote")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Demote contributors", description = "Demotes contributors and unpublishes their non-deleted lessons")
-    public void demoteContributors(@RequestBody DemoteContributorsRequest request) {
-        contributorAdminFacade.demoteContributors(request);
+    @PatchMapping
+    @Operation(summary = "Apply contributor role action", description = "Applies role action PROMOTE or DEMOTE for contributors")
+    public ResponseEntity<?> applyContributorRoleAction(@RequestBody AdminContributorRoleActionRequest request) {
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        return switch (action) {
+            case "PROMOTE" -> ResponseEntity.status(HttpStatus.CREATED)
+                    .body(contributorAdminFacade.promoteLearners(new PromoteContributorsRequest(request.learnerPublicIds())));
+            case "DEMOTE" -> {
+                contributorAdminFacade.demoteContributors(new DemoteContributorsRequest(request.contributorPublicIds()));
+                yield ResponseEntity.noContent().build();
+            }
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported action");
+        };
     }
 }

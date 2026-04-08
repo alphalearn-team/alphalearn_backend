@@ -98,18 +98,20 @@ class MeWeeklyQuestControllerTest {
                         "evidence.mp4",
                         1024L,
                         "Learner caption",
+                        List.of(new QuestChallengeTaggedFriendDto(UUID.randomUUID(), "friend-one")),
                         OffsetDateTime.parse("2026-03-22T01:00:00+08:00"),
                         OffsetDateTime.parse("2026-03-22T01:05:00+08:00")
                 )
         );
         when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest(any())).thenReturn(Optional.of(dto));
 
-        mockMvc.perform(get("/api/me/weekly-quest/current").accept(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/me/weekly-quests").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.weekStartAt").value("2026-03-22T00:00:00+08:00"))
                 .andExpect(jsonPath("$.concept.title").value("fire"))
                 .andExpect(jsonPath("$.quest.title").value("Video + Caption"))
                 .andExpect(jsonPath("$.questChallengeSubmission.originalFilename").value("evidence.mp4"))
+                .andExpect(jsonPath("$.questChallengeSubmission.taggedFriends[0].learnerUsername").value("friend-one"))
                 .andExpect(jsonPath("$.editable").doesNotExist())
                 .andExpect(jsonPath("$.activationSource").doesNotExist())
                 .andExpect(jsonPath("$.createdByAdminId").doesNotExist());
@@ -119,7 +121,7 @@ class MeWeeklyQuestControllerTest {
     void returnsEmptyBodyWhenNoCurrentWeeklyQuestExists() throws Exception {
         when(learnerWeeklyQuestQueryService.getCurrentWeeklyQuest(any())).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/me/weekly-quest/current").accept(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/me/weekly-quests").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().string(""));
     }
@@ -142,7 +144,7 @@ class MeWeeklyQuestControllerTest {
 
         when(learnerQuestChallengeUploadService.createUploadInstruction(eq(request), any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/me/weekly-quest/current/quest-challenge/upload")
+        mockMvc.perform(post("/api/me/weekly-quests/quest-challenge-uploads")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -169,7 +171,8 @@ class MeWeeklyQuestControllerTest {
 
         when(learnerQuestChallengeSubmissionService.getCurrentSubmission(any())).thenReturn(Optional.of(view));
 
-        mockMvc.perform(get("/api/me/weekly-quest/current/quest-challenge/submission")
+        mockMvc.perform(get("/api/me/weekly-quests/quest-challenge-submissions")
+                        .queryParam("scope", "CURRENT")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.objectKey").value("quest-challenges/assignment/learner/object-evidence.mp4"))
@@ -202,7 +205,8 @@ class MeWeeklyQuestControllerTest {
 
         when(learnerQuestChallengeSubmissionService.saveCurrentSubmission(eq(request.toCommand()), any())).thenReturn(view);
 
-        mockMvc.perform(put("/api/me/weekly-quest/current/quest-challenge/submission")
+        mockMvc.perform(put("/api/me/weekly-quests/quest-challenge-submissions")
+                        .queryParam("scope", "CURRENT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk())
@@ -226,7 +230,10 @@ class MeWeeklyQuestControllerTest {
                         "video/mp4",
                         "media.mp4",
                         "Great challenge this week",
-                        OffsetDateTime.parse("2026-03-24T09:00:00Z")
+                        OffsetDateTime.parse("2026-03-24T09:00:00Z"),
+                        List.of(
+                                new QuestChallengeTaggedFriendDto(UUID.randomUUID(), "tagged-friend-one")
+                        )
                 )),
                 0,
                 20,
@@ -235,7 +242,8 @@ class MeWeeklyQuestControllerTest {
 
         when(learnerQuestChallengeFeedQueryService.getFriendsFeed(any(), eq(0), eq(20))).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/friends/feed")
+        mockMvc.perform(get("/api/me/weekly-quests/entries")
+                        .queryParam("view", "FEED")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -244,7 +252,8 @@ class MeWeeklyQuestControllerTest {
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.items[0].learnerUsername").value("friend-one"))
-                .andExpect(jsonPath("$.items[0].conceptTitle").value("Algebra"));
+                .andExpect(jsonPath("$.items[0].conceptTitle").value("Algebra"))
+                .andExpect(jsonPath("$.items[0].taggedFriends[0].learnerUsername").value("tagged-friend-one"));
     }
 
     @Test
@@ -255,7 +264,8 @@ class MeWeeklyQuestControllerTest {
                         "page must be greater than or equal to 0"
                 ));
 
-        mockMvc.perform(get("/api/me/weekly-quest/friends/feed")
+        mockMvc.perform(get("/api/me/weekly-quests/entries")
+                        .queryParam("view", "FEED")
                         .queryParam("page", "-1")
                         .queryParam("size", "20"))
                 .andExpect(status().isBadRequest());
@@ -288,7 +298,7 @@ class MeWeeklyQuestControllerTest {
         when(questHistoryQueryService.getMyHistory(any(), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/history")
+        mockMvc.perform(get("/api/me/weekly-quests/records")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -305,7 +315,8 @@ class MeWeeklyQuestControllerTest {
         when(questHistoryQueryService.getFriendHistory(any(), eq(friendPublicId), eq(0), eq(20), org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/friends/{friendPublicId}/history", friendPublicId)
+        mockMvc.perform(get("/api/me/weekly-quests/records")
+                        .queryParam("friendPublicId", friendPublicId.toString())
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))

@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.contributor.application.dto.ContributorApplicationDto;
@@ -18,9 +19,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/admin/contributor-applications")
@@ -33,18 +35,23 @@ public class AdminContributorApplicationController {
         this.adminContributorApplicationService = adminContributorApplicationService;
     }
 
-    @GetMapping("/pending")
+    @GetMapping
     @Operation(
-            summary = "List pending contributor applications",
-            description = "Returns all pending contributor applications ordered by oldest submission first for admin review."
+            summary = "List contributor applications by status",
+            description = "Returns contributor applications by status. Currently supported status: PENDING."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pending contributor applications returned"),
             @ApiResponse(responseCode = "403", description = "Authenticated admin user required")
     })
     public List<ContributorApplicationDto> getPendingApplications(
+            @RequestParam String status,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!"PENDING".equals(normalized)) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "status must be PENDING");
+        }
         return adminContributorApplicationService.getPendingApplications(user);
     }
 
@@ -65,46 +72,34 @@ public class AdminContributorApplicationController {
         return adminContributorApplicationService.getApplicationByPublicId(applicationPublicId, user);
     }
 
-    @PutMapping("/{applicationPublicId}/approve")
-    @Operation(
-            summary = "Approve contributor application",
-            description = "Approves a PENDING contributor application and promotes/re-activates the learner as a contributor."
-    )
+    @PatchMapping("/{applicationPublicId}")
+    @Operation(summary = "Moderate contributor application", description = "Applies moderation action APPROVE or REJECT.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Contributor application approved"),
+            @ApiResponse(responseCode = "200", description = "Contributor application updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid moderation action payload"),
             @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
             @ApiResponse(responseCode = "404", description = "Contributor application not found"),
-            @ApiResponse(responseCode = "409", description = "Only PENDING contributor applications can be approved")
+            @ApiResponse(responseCode = "409", description = "Only PENDING contributor applications can be moderated")
     })
-    public ContributorApplicationDto approveApplication(
-            @PathVariable UUID applicationPublicId,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return adminContributorApplicationService.approveApplication(applicationPublicId, user);
-    }
-
-    @PutMapping("/{applicationPublicId}/reject")
-    @Operation(
-            summary = "Reject contributor application",
-            description = "Rejects a PENDING contributor application and records the admin rejection reason."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Contributor application rejected"),
-            @ApiResponse(responseCode = "400", description = "Reject reason is missing or blank"),
-            @ApiResponse(responseCode = "403", description = "Authenticated admin user required"),
-            @ApiResponse(responseCode = "404", description = "Contributor application not found"),
-            @ApiResponse(responseCode = "409", description = "Only PENDING contributor applications can be rejected")
-    })
-    public ContributorApplicationDto rejectApplication(
+    public ContributorApplicationDto moderateApplication(
             @PathVariable UUID applicationPublicId,
             @RequestBody(
                     required = true,
-                    description = "Manual rejection payload containing the admin reason.",
-                    content = @Content(schema = @Schema(implementation = RejectContributorApplicationRequest.class))
+                    description = "Contributor application moderation action payload.",
+                    content = @Content(schema = @Schema(implementation = AdminContributorApplicationModerationActionRequest.class))
             )
-            @org.springframework.web.bind.annotation.RequestBody RejectContributorApplicationRequest request,
+            @org.springframework.web.bind.annotation.RequestBody AdminContributorApplicationModerationActionRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        return adminContributorApplicationService.rejectApplication(applicationPublicId, request, user);
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        return switch (action) {
+            case "APPROVE" -> adminContributorApplicationService.approveApplication(applicationPublicId, user);
+            case "REJECT" -> adminContributorApplicationService.rejectApplication(
+                    applicationPublicId,
+                    new RejectContributorApplicationRequest(request.reason()),
+                    user
+            );
+            default -> throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Unsupported action");
+        };
     }
 }

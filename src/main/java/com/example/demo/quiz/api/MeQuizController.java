@@ -7,8 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.demo.config.SupabaseAuthUser;
 import com.example.demo.quiz.LearnerQuizAttemptService;
@@ -29,22 +31,22 @@ public class MeQuizController {
         this.learnerQuizAttemptService = learnerQuizAttemptService;
     }
 
-    @GetMapping("/{quizPublicId}/attempts/best")
-    @Operation(summary = "Get best quiz attempt", description = "Returns the authenticated learner's highest-scoring attempt summary for the quiz")
-    public QuizAttemptResponse getBestQuizAttempt(
+    @GetMapping("/{quizPublicId}/attempts")
+    @Operation(summary = "Get quiz attempt summary", description = "Returns learner attempt summary by view: BEST or LATEST")
+    public QuizAttemptResponse getQuizAttempt(
             @PathVariable UUID quizPublicId,
+            @RequestParam String view,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
-        return learnerQuizAttemptService.getBestQuizAttempt(quizPublicId, user);
-    }
-
-    @GetMapping("/{quizPublicId}/attempts/latest")
-    @Operation(summary = "Get latest quiz attempt", description = "Returns the authenticated learner's most recent attempt summary for the quiz")
-    public QuizAttemptResponse getLatestQuizAttempt(
-            @PathVariable UUID quizPublicId,
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return learnerQuizAttemptService.getLatestQuizAttempt(quizPublicId, user);
+        String normalized = view == null ? "" : view.trim().toUpperCase();
+        return switch (normalized) {
+            case "BEST" -> learnerQuizAttemptService.getBestQuizAttempt(quizPublicId, user);
+            case "LATEST" -> learnerQuizAttemptService.getLatestQuizAttempt(quizPublicId, user);
+            default -> throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "view must be BEST or LATEST"
+            );
+        };
     }
 
     @PostMapping("/{quizPublicId}/attempts")

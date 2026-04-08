@@ -8,7 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,21 +39,33 @@ public class MeNotificationController {
         return notificationService.getForLearner(learnerInternalId);
     }
 
-    @PatchMapping("/{publicId}/read")
+    @PatchMapping("/{publicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Mark a notification as read")
     public void markRead(
             @PathVariable UUID publicId,
+            @RequestBody NotificationActionRequest request,
             @AuthenticationPrincipal SupabaseAuthUser user
     ) {
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        if (!"READ".equals(action)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "action must be READ");
+        }
         UUID learnerInternalId = requireLearnerInternalId(user);
         notificationService.markRead(learnerInternalId, publicId);
     }
 
-    @PostMapping("/read-all")
+    @PatchMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Mark all notifications as read")
-    public void markAllRead(@AuthenticationPrincipal SupabaseAuthUser user) {
+    public void markAllRead(
+            @RequestBody NotificationActionRequest request,
+            @AuthenticationPrincipal SupabaseAuthUser user
+    ) {
+        String action = request == null || request.action() == null ? "" : request.action().trim().toUpperCase();
+        if (!"READ_ALL".equals(action)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "action must be READ_ALL");
+        }
         UUID learnerInternalId = requireLearnerInternalId(user);
         notificationService.markAllRead(learnerInternalId);
     }

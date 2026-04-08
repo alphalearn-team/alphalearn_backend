@@ -57,7 +57,7 @@ jobs:
           fi
           export PGUSER="$PROD_DB_USER"
           export PGPASSWORD="$PROD_DB_PASSWORD"
-          supabase migration up --db-url "$PROD_DB_URL_PG"
+          supabase migration up --db-url "$PROD_DB_URL_PG" --include-all
 
       - name: Verify critical prod schema state
         env:

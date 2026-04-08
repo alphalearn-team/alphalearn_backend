@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -29,27 +28,6 @@ public class ContributorApplicationController {
 
     public ContributorApplicationController(ContributorApplicationService contributorApplicationService) {
         this.contributorApplicationService = contributorApplicationService;
-    }
-
-    @GetMapping("/mine")
-    @Operation(summary = "List my contributor applications", description = "Returns contributor applications for the authenticated learner ordered by most recently submitted")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Applications returned"),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Authenticated user required",
-                    content = @Content(schema = @Schema(implementation = String.class))
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Learner record not found for the authenticated user",
-                    content = @Content(schema = @Schema(implementation = String.class))
-            )
-    })
-    public List<ContributorApplicationDto> getMyApplications(
-            @AuthenticationPrincipal SupabaseAuthUser user
-    ) {
-        return contributorApplicationService.getMyApplications(user);
     }
 
     @PostMapping

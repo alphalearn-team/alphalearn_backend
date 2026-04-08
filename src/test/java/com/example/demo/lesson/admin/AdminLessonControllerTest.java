@@ -66,9 +66,9 @@ class AdminLessonControllerTest {
                 LessonModerationStatus.UNPUBLISHED
         ));
 
-        mockMvc.perform(patch("/api/admin/lessons/{lessonPublicId}/moderation-status", lessonPublicId)
+        mockMvc.perform(patch("/api/admin/lessons/{lessonPublicId}", lessonPublicId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"UNPUBLISHED\",\"resolvePendingReports\":true}"))
+                        .content("{\"action\":\"UNPUBLISH\",\"resolvePendingReports\":true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lessonPublicId").value(lessonPublicId.toString()))
                 .andExpect(jsonPath("$.lessonModerationStatus").value("UNPUBLISHED"));
