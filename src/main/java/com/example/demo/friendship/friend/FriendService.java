@@ -42,7 +42,8 @@ public class FriendService {
 
                 return new FriendPublicDTO(
                         friendLearner.getPublicId(),
-                        friendLearner.getUsername()
+                        friendLearner.getUsername(),
+                        friendLearner.getProfilePicture()
                 );
 
             })

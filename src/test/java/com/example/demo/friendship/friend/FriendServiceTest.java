@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,6 +35,35 @@ class FriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new FriendService(friendRepository, learnerRepository);
+    }
+
+    @Test
+    void getFriendsIncludesProfilePictureUrl() {
+        Learner currentLearner = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "self");
+        Learner friend = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "friend");
+        friend.setProfilePicture("https://cdn.example.com/friend.png");
+        Learner friendWithoutPicture = learner("cccccccc-cccc-cccc-cccc-cccccccccccc", "friend-two");
+
+        when(friendRepository.findFriends(currentLearner.getId())).thenReturn(List.of(
+                Friend.builder()
+                        .userId1(currentLearner.getId())
+                        .userId2(friend.getId())
+                        .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                        .build(),
+                Friend.builder()
+                        .userId1(currentLearner.getId())
+                        .userId2(friendWithoutPicture.getId())
+                        .createdAt(OffsetDateTime.parse("2026-03-01T00:00:00Z"))
+                        .build()
+        ));
+        when(learnerRepository.findById(friend.getId())).thenReturn(Optional.of(friend));
+        when(learnerRepository.findById(friendWithoutPicture.getId())).thenReturn(Optional.of(friendWithoutPicture));
+
+        var friends = service.getFriends(currentLearner);
+
+        assertThat(friends).hasSize(2);
+        assertThat(friends.get(0).profilePictureUrl()).isEqualTo("https://cdn.example.com/friend.png");
+        assertThat(friends.get(1).profilePictureUrl()).isNull();
     }
 
     @Test

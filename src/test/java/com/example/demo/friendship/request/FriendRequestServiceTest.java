@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -53,16 +54,12 @@ class FriendRequestServiceTest {
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.empty());
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                receiver.getId(),
-                sender.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.of(FriendRequest.builder().build()));
+        when(friendRequestRepository.findPendingBetween(sender.getId(), receiver.getId()))
+                .thenReturn(Optional.of(FriendRequest.builder()
+                        .senderId(receiver.getId())
+                        .receiverId(sender.getId())
+                        .status(FriendRequestStatus.PENDING)
+                        .build()));
 
         assertThatThrownBy(() -> service.sendRequest(sender, receiver.getPublicId()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -122,11 +119,12 @@ class FriendRequestServiceTest {
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.of(FriendRequest.builder().build()));
+        when(friendRequestRepository.findPendingBetween(sender.getId(), receiver.getId()))
+                .thenReturn(Optional.of(FriendRequest.builder()
+                        .senderId(sender.getId())
+                        .receiverId(receiver.getId())
+                        .status(FriendRequestStatus.PENDING)
+                        .build()));
 
         assertThatThrownBy(() -> service.sendRequest(sender, receiver.getPublicId()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -143,16 +141,8 @@ class FriendRequestServiceTest {
 
         when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
         when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                sender.getId(),
-                receiver.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.empty());
-        when(friendRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                receiver.getId(),
-                sender.getId(),
-                FriendRequestStatus.PENDING
-        )).thenReturn(Optional.empty());
+        when(friendRequestRepository.findPendingBetween(sender.getId(), receiver.getId()))
+                .thenReturn(Optional.empty());
         when(friendRequestRepository.save(any(FriendRequest.class))).thenAnswer(invocation -> {
             FriendRequest value = invocation.getArgument(0, FriendRequest.class);
             value.setFriendRequestId(99L);
@@ -165,6 +155,50 @@ class FriendRequestServiceTest {
         assertThat(response.requestId()).isEqualTo(99L);
         assertThat(response.otherUserPublicId()).isEqualTo(receiver.getPublicId());
         assertThat(response.status()).isEqualTo(FriendRequestStatus.PENDING);
+    }
+
+    @Test
+    void sendRequestAllowsResendAfterApprovedWhenNoLongerFriends() {
+        Learner sender = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "sender");
+        Learner receiver = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "receiver");
+
+        when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
+        when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
+        when(friendRequestRepository.findPendingBetween(sender.getId(), receiver.getId()))
+                .thenReturn(Optional.empty());
+        when(friendRequestRepository.save(any(FriendRequest.class))).thenAnswer(invocation -> {
+            FriendRequest value = invocation.getArgument(0, FriendRequest.class);
+            value.setFriendRequestId(100L);
+            return value;
+        });
+        when(learnerRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+
+        FriendRequestDTO response = service.sendRequest(sender, receiver.getPublicId());
+
+        assertThat(response.requestId()).isEqualTo(100L);
+        assertThat(response.otherUserPublicId()).isEqualTo(receiver.getPublicId());
+        assertThat(response.status()).isEqualTo(FriendRequestStatus.PENDING);
+    }
+
+    @Test
+    void sendRequestTranslatesUniqueConstraintViolationToConflict() {
+        Learner sender = learner("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "sender");
+        Learner receiver = learner("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "receiver");
+
+        when(learnerRepository.findByPublicId(receiver.getPublicId())).thenReturn(Optional.of(receiver));
+        when(friendRepository.existsById(any(FriendId.class))).thenReturn(false);
+        when(friendRequestRepository.findPendingBetween(sender.getId(), receiver.getId()))
+                .thenReturn(Optional.empty());
+        when(friendRequestRepository.save(any(FriendRequest.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate pending request"));
+
+        assertThatThrownBy(() -> service.sendRequest(sender, receiver.getPublicId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(rse.getReason()).isEqualTo("A pending friend request already exists");
+                });
     }
 
     @Test

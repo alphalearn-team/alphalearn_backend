@@ -52,6 +52,7 @@ class LearnerQueryServiceTest {
                 OffsetDateTime.parse("2026-03-01T00:00:00Z"),
                 (short) 0
         );
+        learner.setProfilePicture("https://cdn.example.com/public-learner.png");
         when(learnerRepository.findAll()).thenReturn(List.of(learner));
 
         List<LearnerPublicDto> result = service.getAllPublicLearners();
@@ -59,5 +60,6 @@ class LearnerQueryServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().publicId()).isEqualTo(learner.getPublicId());
         assertThat(result.getFirst().username()).isEqualTo("public-learner");
+        assertThat(result.getFirst().profilePictureUrl()).isEqualTo("https://cdn.example.com/public-learner.png");
     }
 }

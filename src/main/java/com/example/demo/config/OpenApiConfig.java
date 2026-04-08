@@ -29,6 +29,14 @@ import org.springframework.context.annotation.Configuration;
         @Tag(name = "Lesson Enrollments", description = "Enrollment progress endpoints"),
         @Tag(name = "Lesson Reports", description = "Lesson reporting endpoints for learners and contributors"),
         @Tag(name = "Me", description = "Current-user role resolution endpoint"),
+        @Tag(
+            name = "My Friends",
+            description = "Current-user friendship endpoints. Legacy compatibility aliases under /api/friends remain temporarily supported but are intentionally omitted from this documentation."
+        ),
+        @Tag(
+            name = "My Friend Requests",
+            description = "Current-user friend request endpoints. Legacy compatibility aliases under /api/friend-requests remain temporarily supported but are intentionally omitted from this documentation."
+        ),
         @Tag(name = "Admin Lessons", description = "Lesson moderation endpoints"),
         @Tag(name = "Admin Concepts", description = "Concept management endpoints"),
         @Tag(name = "Admin Dashboard", description = "Admin dashboard summary endpoints"),

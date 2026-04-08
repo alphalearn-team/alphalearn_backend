@@ -9,6 +9,7 @@ public record FriendRequestDTO(
     Long requestId,
     UUID otherUserPublicId,
     String otherUsername,
+    String otherUserProfilePictureUrl,
     FriendRequestStatus status,
     OffsetDateTime createdAt
 ) {}

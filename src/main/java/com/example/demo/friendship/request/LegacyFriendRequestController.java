@@ -2,8 +2,7 @@ package com.example.demo.friendship.request;
 
 import java.util.List;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,49 +25,43 @@ import com.example.demo.learner.Learner;
 
 import lombok.RequiredArgsConstructor;
 
+@Hidden
 @RestController
-@RequestMapping("/api/me/friend-requests")
-@Tag(
-        name = "My Friend Requests",
-        description = "Current-user friend request endpoints. Legacy compatibility aliases under /api/friend-requests remain temporarily supported but are intentionally omitted from this documentation."
-)
+@RequestMapping("/api/friend-requests")
 @RequiredArgsConstructor
-public class FriendRequestController {
+public class LegacyFriendRequestController {
 
     private final FriendRequestService friendRequestService;
-    
+
     @PostMapping
-    @Operation(summary = "Send friend request", description = "Creates a pending friend request from the authenticated learner to the target learner.")
     public FriendRequestDTO sendRequest(
             @RequestBody CreateFriendRequestRequest request,
             Authentication auth
     ) {
-            Learner currentUser = requireLearner(auth);
-            return friendRequestService.sendRequest(currentUser, request == null ? null : request.receiverPublicId());
+        Learner currentUser = requireLearner(auth);
+        return friendRequestService.sendRequest(currentUser, request == null ? null : request.receiverPublicId());
     }
 
     @GetMapping
-    @Operation(summary = "List my friend requests", description = "Returns pending friend requests filtered by direction=INCOMING or direction=OUTGOING.")
     public List<FriendRequestDTO> getRequests(
             @RequestParam String direction,
             Authentication auth
     ) {
-            Learner currentUser = requireLearner(auth);
-            FriendRequestDirection parsedDirection;
-            try {
-                parsedDirection = FriendRequestDirection.fromQueryValue(direction);
-            } catch (IllegalArgumentException ex) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
-            }
-            return switch (parsedDirection) {
-                case INCOMING -> friendRequestService.getPendingRequests(currentUser);
-                case OUTGOING -> friendRequestService.getOutgoingRequests(currentUser);
-            };
+        Learner currentUser = requireLearner(auth);
+        FriendRequestDirection parsedDirection;
+        try {
+            parsedDirection = FriendRequestDirection.fromQueryValue(direction);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+        return switch (parsedDirection) {
+            case INCOMING -> friendRequestService.getPendingRequests(currentUser);
+            case OUTGOING -> friendRequestService.getOutgoingRequests(currentUser);
+        };
     }
 
     @PatchMapping("/{requestId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Respond to friend request", description = "Updates a pending incoming friend request to APPROVED or REJECTED.")
     public void updateRequestStatus(
             @PathVariable Long requestId,
             @RequestBody UpdateFriendRequestStatusRequest request,
@@ -80,7 +73,6 @@ public class FriendRequestController {
 
     @DeleteMapping("/{requestId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Cancel friend request", description = "Cancels a pending outgoing friend request created by the authenticated learner.")
     public void cancelRequest(
             @PathVariable Long requestId,
             Authentication auth

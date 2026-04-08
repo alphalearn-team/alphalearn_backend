@@ -10,7 +10,8 @@ public class LearnerMapper {
     public LearnerPublicDto toPublicDto(Learner learner) {
         return new LearnerPublicDto(
                 learner.getPublicId(),
-                learner.getUsername()
+                learner.getUsername(),
+                learner.getProfilePicture()
         );
     }
 }

@@ -3,8 +3,7 @@ package com.example.demo.friendship.friend;
 import java.util.List;
 import java.util.UUID;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,19 +20,15 @@ import com.example.demo.learner.Learner;
 
 import lombok.RequiredArgsConstructor;
 
+@Hidden
 @RestController
-@RequestMapping("/api/me/friends")
-@Tag(
-        name = "My Friends",
-        description = "Current-user friendship endpoints. Legacy compatibility aliases under /api/friends remain temporarily supported but are intentionally omitted from this documentation."
-)
+@RequestMapping("/api/friends")
 @RequiredArgsConstructor
-public class FriendController {
+public class LegacyFriendController {
 
     private final FriendService friendService;
 
     @GetMapping
-    @Operation(summary = "List my friends", description = "Returns the authenticated learner's current friends.")
     public List<FriendPublicDTO> getFriends(Authentication authentication) {
         Learner learner = requireLearner(authentication);
         return friendService.getFriends(learner);
@@ -41,13 +36,12 @@ public class FriendController {
 
     @DeleteMapping("/{friendPublicId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Remove friend", description = "Deletes the friendship between the authenticated learner and the target learner.")
     public void removeFriend(
             @PathVariable UUID friendPublicId,
             Authentication authentication
     ) {
-            Learner currentLearner = requireLearner(authentication);
-            friendService.removeFriend(currentLearner, friendPublicId);
+        Learner currentLearner = requireLearner(authentication);
+        friendService.removeFriend(currentLearner, friendPublicId);
     }
 
     private Learner requireLearner(Authentication auth) {
@@ -56,5 +50,4 @@ public class FriendController {
         }
         return authUser.learner();
     }
-
 }
