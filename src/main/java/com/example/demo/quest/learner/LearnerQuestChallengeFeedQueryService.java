@@ -102,4 +102,71 @@ public class LearnerQuestChallengeFeedQueryService {
 
         return new FriendQuestChallengeFeedDto(items, resolvedPage, resolvedSize, slice.hasNext());
     }
+
+    @Transactional(readOnly = true)
+    public FriendQuestChallengeFeedDto getTaggedHistory(
+            SupabaseAuthUser user,
+            Integer page,
+            Integer size,
+            List<UUID> conceptPublicIds
+    ) {
+        if (user == null || !user.isLearner() || user.userId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Learner account required");
+        }
+
+        int resolvedPage = page == null ? 0 : page;
+        int resolvedSize = size == null ? DEFAULT_SIZE : size;
+
+        if (resolvedPage < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be greater than or equal to 0");
+        }
+        if (resolvedSize <= 0 || resolvedSize > MAX_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size must be between 1 and 50");
+        }
+
+        Pageable pageable = PageRequest.of(resolvedPage, resolvedSize);
+        boolean hasConcepts = conceptPublicIds != null && !conceptPublicIds.isEmpty();
+
+        Slice<FriendQuestChallengeFeedProjection> slice = hasConcepts
+                ? weeklyQuestChallengeSubmissionRepository.findTaggedChallengeFeedByTaggedLearnerIdAndConceptPublicIds(
+                        user.userId(),
+                        conceptPublicIds,
+                        pageable
+                )
+                : weeklyQuestChallengeSubmissionRepository.findTaggedChallengeFeedByTaggedLearnerId(
+                        user.userId(),
+                        pageable
+                );
+
+        List<UUID> submissionPublicIds = slice.getContent().stream()
+                .map(FriendQuestChallengeFeedProjection::getSubmissionPublicId)
+                .toList();
+
+        final Map<UUID, WeeklyQuestChallengeSubmission> submissionsByPublicId;
+        if (!submissionPublicIds.isEmpty()) {
+            List<WeeklyQuestChallengeSubmission> submissions = weeklyQuestChallengeSubmissionRepository
+                    .findByPublicIdIn(submissionPublicIds);
+            submissionsByPublicId = submissions.stream()
+                    .collect(Collectors.toMap(
+                            WeeklyQuestChallengeSubmission::getPublicId,
+                            s -> s
+                    ));
+        } else {
+            submissionsByPublicId = Map.of();
+        }
+
+        List<FriendQuestChallengeFeedItemDto> items = slice.getContent().stream()
+                .map(projection -> {
+                    WeeklyQuestChallengeSubmission submission = submissionsByPublicId.get(projection.getSubmissionPublicId());
+                    List<QuestChallengeTaggedFriendDto> taggedFriends = submission != null
+                            ? submission.getTaggedFriends().stream()
+                                    .map(questChallengeTaggedFriendDtoMapper::toDto)
+                                    .toList()
+                            : List.of();
+                    return FriendQuestChallengeFeedItemDto.from(projection, taggedFriends);
+                })
+                .toList();
+
+        return new FriendQuestChallengeFeedDto(items, resolvedPage, resolvedSize, slice.hasNext());
+    }
 }

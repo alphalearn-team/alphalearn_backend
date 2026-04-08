@@ -50,6 +50,17 @@ public class MeWeeklyQuestController {
                         @RequestParam(required = false) List<UUID> conceptPublicIds
     ) {
                 return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size, conceptPublicIds);
+        }
+
+        @GetMapping("/tagged/history")
+        @Operation(summary = "Get tagged quest history", description = "Returns quest submissions where the current learner is tagged, sorted by newest uploads with optional concept filtering.")
+        public FriendQuestChallengeFeedDto getTaggedQuestHistory(
+                        @AuthenticationPrincipal SupabaseAuthUser user,
+                        @RequestParam(required = false) Integer page,
+                        @RequestParam(required = false) Integer size,
+                        @RequestParam(required = false) List<UUID> conceptPublicIds
+        ) {
+                return learnerQuestChallengeFeedQueryService.getTaggedHistory(user, page, size, conceptPublicIds);
     }
 
     @GetMapping("/history")

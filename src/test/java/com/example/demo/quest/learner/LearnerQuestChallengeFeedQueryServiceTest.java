@@ -226,6 +226,44 @@ class LearnerQuestChallengeFeedQueryServiceTest {
         assertThat(result.items()).isEmpty();
     }
 
+    @Test
+    void returnsTaggedHistory() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findTaggedChallengeFeedByTaggedLearnerId(
+                learnerId,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getTaggedHistory(user, 0, 20, null);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void returnsTaggedHistoryWithConceptFilter() {
+        UUID learnerId = UUID.randomUUID();
+        SupabaseAuthUser user = learnerUser(learnerId);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID());
+
+        Slice<FriendQuestChallengeFeedProjection> slice = new SliceImpl<>(List.of(), PageRequest.of(0, 20), false);
+        when(weeklyQuestChallengeSubmissionRepository.findTaggedChallengeFeedByTaggedLearnerIdAndConceptPublicIds(
+                learnerId,
+                conceptPublicIds,
+                PageRequest.of(0, 20)
+        )).thenReturn(slice);
+
+        FriendQuestChallengeFeedDto result = service.getTaggedHistory(user, 0, 20, conceptPublicIds);
+
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.items()).isEmpty();
+    }
+
     private SupabaseAuthUser learnerUser(UUID learnerId) {
         Learner learner = new Learner(
                 learnerId,
