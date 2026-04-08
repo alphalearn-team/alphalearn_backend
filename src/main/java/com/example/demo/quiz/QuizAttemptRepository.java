@@ -1,5 +1,6 @@
 package com.example.demo.quiz;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +13,8 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Intege
     boolean existsByLearner_IdAndQuiz_QuizId(UUID learnerId, Integer quizId);
 
     Optional<QuizAttempt> findFirstByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(UUID learnerId, Integer quizId);
+
+    List<QuizAttempt> findByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(UUID learnerId, Integer quizId);
 
     Optional<QuizAttempt> findFirstByLearner_IdAndQuiz_QuizIdOrderByScoreDescAttemptedAtDescAttemptIdDesc(
             UUID learnerId,

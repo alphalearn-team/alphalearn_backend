@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -116,6 +117,23 @@ public class LearnerQuizAttemptService {
                 )
                 .map(attempt -> toResponse(attempt, quiz.getQuestions().size()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No quiz attempt found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuizAttemptResponse> getQuizAttemptHistory(UUID quizPublicId, SupabaseAuthUser user) {
+        Learner learner = requireQuizParticipant(user);
+        Quiz quiz = quizRepository.findByPublicId(quizPublicId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requirePublicLesson(quiz.getLesson());
+        requireNotLessonOwner(quiz.getLesson(), user);
+        requireEnrolled(quiz.getLesson(), user);
+
+        return quizAttemptRepository
+                .findByLearner_IdAndQuiz_QuizIdOrderByAttemptedAtDescAttemptIdDesc(
+                        learner.getId(), quiz.getQuizId())
+                .stream()
+                .map(attempt -> toResponse(attempt, quiz.getQuestions().size()))
+                .toList();
     }
 
     private Learner requireQuizParticipant(SupabaseAuthUser user) {
