@@ -1,9 +1,9 @@
 package com.example.demo.quest.weekly;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -75,86 +75,12 @@ public interface WeeklyQuestChallengeSubmissionRepository extends JpaRepository<
                 where (f.userId1 = :learnerId and f.userId2 = l.id)
                    or (f.userId2 = :learnerId and f.userId1 = l.id)
             )
-              and s.submittedAt >= :submittedFrom
-              and s.submittedAt <= :submittedTo
+              and c.publicId in :conceptPublicIds
             order by s.submittedAt desc, s.id desc
             """)
-    Slice<FriendQuestChallengeFeedProjection> findFriendChallengeFeedByLearnerIdAndSubmittedAtRange(
+    Slice<FriendQuestChallengeFeedProjection> findFriendChallengeFeedByLearnerIdAndConceptPublicIds(
             UUID learnerId,
-            OffsetDateTime submittedFrom,
-            OffsetDateTime submittedTo,
-            Pageable pageable
-    );
-
-    @Query("""
-            select
-                s.publicId as submissionPublicId,
-                l.publicId as learnerPublicId,
-                l.username as learnerUsername,
-                c.publicId as conceptPublicId,
-                c.title as conceptTitle,
-                a.publicId as assignmentPublicId,
-                s.mediaPublicUrl as mediaPublicUrl,
-                s.mediaContentType as mediaContentType,
-                s.originalFilename as originalFilename,
-                s.caption as caption,
-                s.submittedAt as submittedAt
-            from WeeklyQuestChallengeSubmission s
-            join s.learner l
-            join s.weeklyQuestAssignment a
-            join a.week w
-            join a.concept c
-            where l.id <> :learnerId
-              and exists (
-                select 1
-                from Friend f
-                where (f.userId1 = :learnerId and f.userId2 = l.id)
-                   or (f.userId2 = :learnerId and f.userId1 = l.id)
-            )
-              and w.publicId in :weekPublicIds
-            order by s.submittedAt desc, s.id desc
-            """)
-    Slice<FriendQuestChallengeFeedProjection> findFriendChallengeFeedByLearnerIdAndWeekPublicIds(
-            UUID learnerId,
-            List<UUID> weekPublicIds,
-            Pageable pageable
-    );
-
-    @Query("""
-            select
-                s.publicId as submissionPublicId,
-                l.publicId as learnerPublicId,
-                l.username as learnerUsername,
-                c.publicId as conceptPublicId,
-                c.title as conceptTitle,
-                a.publicId as assignmentPublicId,
-                s.mediaPublicUrl as mediaPublicUrl,
-                s.mediaContentType as mediaContentType,
-                s.originalFilename as originalFilename,
-                s.caption as caption,
-                s.submittedAt as submittedAt
-            from WeeklyQuestChallengeSubmission s
-            join s.learner l
-            join s.weeklyQuestAssignment a
-            join a.week w
-            join a.concept c
-            where l.id <> :learnerId
-              and exists (
-                select 1
-                from Friend f
-                where (f.userId1 = :learnerId and f.userId2 = l.id)
-                   or (f.userId2 = :learnerId and f.userId1 = l.id)
-            )
-              and w.publicId in :weekPublicIds
-              and s.submittedAt >= :submittedFrom
-              and s.submittedAt <= :submittedTo
-            order by s.submittedAt desc, s.id desc
-            """)
-    Slice<FriendQuestChallengeFeedProjection> findFriendChallengeFeedByLearnerIdAndWeekPublicIdsAndSubmittedAtRange(
-            UUID learnerId,
-            List<UUID> weekPublicIds,
-            OffsetDateTime submittedFrom,
-            OffsetDateTime submittedTo,
+            List<UUID> conceptPublicIds,
             Pageable pageable
     );
 

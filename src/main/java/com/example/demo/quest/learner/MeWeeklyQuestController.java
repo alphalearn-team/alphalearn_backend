@@ -7,7 +7,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/me/weekly-quests")
@@ -42,29 +41,21 @@ public class MeWeeklyQuestController {
         this.questHistoryQueryService = questHistoryQueryService;
     }
 
-    @GetMapping("/entries")
-    @Operation(summary = "Get quest entries", description = "Returns quest entries by view. Supported view: FEED. Supports optional filtering by week IDs and submitted time range.")
-    public FriendQuestChallengeFeedDto getQuestEntries(
-            @RequestParam String view,
+    @GetMapping("/friends/feed")
+        @Operation(summary = "Get friends quest challenge feed", description = "Returns friends quest challenge feed sorted by newest uploads with optional concept filtering.")
+    public FriendQuestChallengeFeedDto getFriendsQuestFeed(
             @AuthenticationPrincipal SupabaseAuthUser user,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) List<UUID> weekPublicIds,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime submittedTo
+                        @RequestParam(required = false) List<UUID> conceptPublicIds
     ) {
-        String normalized = view == null ? "" : view.trim().toUpperCase();
-        if (!"FEED".equals(normalized)) {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "view must be FEED");
-        }
-        return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size, weekPublicIds, submittedFrom, submittedTo);
+                return learnerQuestChallengeFeedQueryService.getFriendsFeed(user, page, size, conceptPublicIds);
     }
 
     @GetMapping("/history")
     @Operation(summary = "Get my quest history", description = "Returns paginated weekly quest submissions of the authenticated learner. Supports optional filtering by week IDs and submitted time range.")
     public QuestHistoryDto getMyQuestHistory(
             @AuthenticationPrincipal SupabaseAuthUser user,
-            @RequestParam(required = false) UUID friendPublicId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) List<UUID> weekPublicIds,
