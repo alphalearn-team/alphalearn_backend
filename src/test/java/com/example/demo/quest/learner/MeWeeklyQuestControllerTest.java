@@ -325,6 +325,28 @@ class MeWeeklyQuestControllerTest {
     }
 
     @Test
+    void returnsTaggedQuestHistory() throws Exception {
+        FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(List.of(), 0, 20, false);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID());
+
+        when(learnerQuestChallengeFeedQueryService.getTaggedHistory(
+                any(),
+                eq(0),
+                eq(20),
+                eq(conceptPublicIds)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/tagged/history")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(0).toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
     void returnsMyQuestHistory() throws Exception {
         QuestHistoryDto response = new QuestHistoryDto(
                 List.of(new QuestHistoryItemDto(
