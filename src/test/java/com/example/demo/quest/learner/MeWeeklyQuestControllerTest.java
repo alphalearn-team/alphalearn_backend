@@ -244,13 +244,10 @@ class MeWeeklyQuestControllerTest {
                 any(),
                 eq(0),
                 eq(20),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull()
         )).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/entries")
-                        .queryParam("view", "FEED")
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -264,25 +261,22 @@ class MeWeeklyQuestControllerTest {
     }
 
     @Test
-    void returnsFriendsQuestChallengeFeedWithSubmittedAtRange() throws Exception {
+        void returnsFriendsQuestChallengeFeedWithMultipleConceptFilters() throws Exception {
         FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(List.of(), 0, 20, false);
-        OffsetDateTime submittedFrom = OffsetDateTime.parse("2026-03-14T00:00:00Z");
-        OffsetDateTime submittedTo = OffsetDateTime.parse("2026-03-17T23:59:59Z");
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID(), UUID.randomUUID());
 
         when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
                 any(),
                 eq(0),
                 eq(20),
-                org.mockito.ArgumentMatchers.isNull(),
-                eq(submittedFrom),
-                eq(submittedTo)
+                eq(conceptPublicIds)
         )).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/friends/feed")
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
-                        .queryParam("submittedFrom", "2026-03-14T00:00:00Z")
-                        .queryParam("submittedTo", "2026-03-17T23:59:59Z")
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(0).toString())
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(1).toString())
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
@@ -295,8 +289,6 @@ class MeWeeklyQuestControllerTest {
                 any(),
                 eq(-1),
                 eq(20),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull()
         ))
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
@@ -304,11 +296,32 @@ class MeWeeklyQuestControllerTest {
                         "page must be greater than or equal to 0"
                 ));
 
-        mockMvc.perform(get("/api/me/weekly-quests/entries")
-                        .queryParam("view", "FEED")
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
                         .queryParam("page", "-1")
                         .queryParam("size", "20"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsFriendsQuestChallengeFeedWithConceptFilter() throws Exception {
+        FriendQuestChallengeFeedDto response = new FriendQuestChallengeFeedDto(List.of(), 0, 20, false);
+        List<UUID> conceptPublicIds = List.of(UUID.randomUUID());
+
+        when(learnerQuestChallengeFeedQueryService.getFriendsFeed(
+                any(),
+                eq(0),
+                eq(20),
+                eq(conceptPublicIds)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/me/weekly-quests/friends/feed")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .queryParam("conceptPublicIds", conceptPublicIds.get(0).toString())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
     }
 
     @Test
@@ -345,7 +358,7 @@ class MeWeeklyQuestControllerTest {
         ))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/records")
+        mockMvc.perform(get("/api/me/weekly-quests/history")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -369,7 +382,7 @@ class MeWeeklyQuestControllerTest {
                 eq(submittedTo)
         )).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/history")
+        mockMvc.perform(get("/api/me/weekly-quests/history")
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .queryParam("submittedFrom", "2026-03-01T00:00:00Z")
@@ -396,8 +409,7 @@ class MeWeeklyQuestControllerTest {
         ))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quests/records")
-                        .queryParam("friendPublicId", friendPublicId.toString())
+        mockMvc.perform(get("/api/me/weekly-quests/friends/{friendPublicId}/history", friendPublicId)
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -423,7 +435,7 @@ class MeWeeklyQuestControllerTest {
                 eq(submittedTo)
         )).thenReturn(response);
 
-        mockMvc.perform(get("/api/me/weekly-quest/friends/{friendPublicId}/history", friendPublicId)
+        mockMvc.perform(get("/api/me/weekly-quests/friends/{friendPublicId}/history", friendPublicId)
                         .queryParam("page", "0")
                         .queryParam("size", "20")
                         .queryParam("submittedFrom", "2026-03-01T00:00:00Z")
