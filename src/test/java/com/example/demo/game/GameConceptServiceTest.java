@@ -354,13 +354,49 @@ class GameConceptServiceTest {
                 .hasMessageContaining("No imposter game concepts are available");
     }
 
+    @Test
+    void demoModeRestrictsToConfiguredConceptIdsForFullPool() {
+        Concept disallowed = concept("disallowed");
+        ReflectionTestUtils.setField(disallowed, "conceptId", 2);
+        Concept allowed = concept("allowed");
+        ReflectionTestUtils.setField(allowed, "conceptId", 10);
+        when(conceptRepository.findAll()).thenReturn(List.of(disallowed, allowed));
+
+        GameConceptService service = service(true);
+
+        GameAssignedConceptDto result = service.assignNextConcept(new NextGameConceptRequest(List.of()));
+
+        assertThat(result.conceptPublicId()).isEqualTo(allowed.getPublicId());
+        assertThat(result.word()).isEqualTo("allowed");
+    }
+
+    @Test
+    void demoModeRejectsWhenNoConfiguredDemoConceptIdsExist() {
+        Concept first = concept("first");
+        ReflectionTestUtils.setField(first, "conceptId", 2);
+        Concept second = concept("second");
+        ReflectionTestUtils.setField(second, "conceptId", 3);
+        when(conceptRepository.findAll()).thenReturn(List.of(first, second));
+
+        GameConceptService service = service(true);
+
+        assertThatThrownBy(() -> service.assignNextConcept(new NextGameConceptRequest(List.of())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("No imposter game concepts are available");
+    }
+
     private GameConceptService service() {
+        return service(false);
+    }
+
+    private GameConceptService service(boolean demoModeEnabled) {
         return new GameConceptService(
                 conceptRepository,
                 imposterGameLobbyRepository,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
-                imposterWeeklyFeaturedConceptService
+                imposterWeeklyFeaturedConceptService,
+                demoModeEnabled
         );
     }
 

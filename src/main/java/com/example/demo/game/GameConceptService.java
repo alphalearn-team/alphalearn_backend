@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -30,19 +31,22 @@ public class GameConceptService {
     private final GameMonthlyPackRepository imposterMonthlyPackRepository;
     private final GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
     private final GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
+    private final boolean gameDemoModeEnabled;
 
     public GameConceptService(
             ConceptRepository conceptRepository,
             GameLobbyRepository imposterGameLobbyRepository,
             GameMonthlyPackRepository imposterMonthlyPackRepository,
             GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
-            GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService
+            GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
+            @Value("${game.demo.mode:false}") boolean gameDemoModeEnabled
     ) {
         this.conceptRepository = conceptRepository;
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
         this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
+        this.gameDemoModeEnabled = gameDemoModeEnabled;
     }
 
     public GameAssignedConceptDto assignNextConcept(NextGameConceptRequest request) {
@@ -66,7 +70,7 @@ public class GameConceptService {
             }
         }
 
-        List<Concept> availableConcepts = resolveCandidateConcepts(lobby)
+        List<Concept> availableConcepts = GameDemoConceptPolicy.filterConcepts(resolveCandidateConcepts(lobby), gameDemoModeEnabled)
                 .stream()
                 .filter(concept -> !excludedConceptPublicIds.contains(concept.getPublicId()))
                 .toList();
@@ -164,6 +168,7 @@ public class GameConceptService {
         }
 
         return imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept(lobby.getPinnedYearMonth())
+                .filter(concept -> GameDemoConceptPolicy.isAllowed(concept, gameDemoModeEnabled))
                 .filter(concept -> !excludedConceptPublicIds.contains(concept.getPublicId()))
                 .map(concept -> new GameAssignedConceptDto(concept.getPublicId(), concept.getTitle()));
     }

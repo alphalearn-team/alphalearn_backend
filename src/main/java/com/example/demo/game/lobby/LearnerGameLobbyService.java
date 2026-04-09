@@ -116,7 +116,8 @@ public class LearnerGameLobbyService {
             GameLobbyRealtimePublisher realtimePublisher,
             GameLobbyRealtimePresenceTracker realtimePresenceTracker,
             Clock clock,
-            @Value("${imposter.lobby.live-drawing.enabled:false}") boolean liveDrawingEnabled
+            @Value("${imposter.lobby.live-drawing.enabled:false}") boolean liveDrawingEnabled,
+            @Value("${game.demo.mode:false}") boolean gameDemoModeEnabled
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
         this.imposterGameLobbyMemberRepository = imposterGameLobbyMemberRepository;
@@ -167,6 +168,7 @@ public class LearnerGameLobbyService {
                 imposterMonthlyPackConceptRepository,
                 imposterWeeklyFeaturedConceptService,
                 conceptRepository,
+                gameDemoModeEnabled,
                 DEFAULT_CONCEPT_COUNT,
                 DEFAULT_ROUNDS_PER_CONCEPT,
                 DEFAULT_DISCUSSION_TIMER_SECONDS,

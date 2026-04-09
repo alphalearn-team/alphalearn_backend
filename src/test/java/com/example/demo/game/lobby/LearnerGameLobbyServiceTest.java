@@ -109,6 +109,7 @@ class LearnerGameLobbyServiceTest {
                 imposterLobbyRealtimePublisher,
                 imposterLobbyRealtimePresenceTracker,
                 fixedClock,
+                false,
                 false
         );
         lenient().when(imposterGameLobbyRepository.saveAndFlush(any(GameLobby.class))).thenAnswer(invocation -> {
@@ -957,7 +958,8 @@ class LearnerGameLobbyServiceTest {
                 imposterLobbyRealtimePublisher,
                 imposterLobbyRealtimePresenceTracker,
                 fixedClock,
-                true
+                true,
+                false
         );
 
         SupabaseAuthUser drawer = learnerAuthUser();
