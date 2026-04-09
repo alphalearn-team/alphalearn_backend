@@ -15,6 +15,8 @@ import com.example.demo.quest.weekly.enums.SubmissionVisibility;
 
 public interface WeeklyQuestChallengeSubmissionRepository extends JpaRepository<WeeklyQuestChallengeSubmission, Long> {
 
+    boolean existsByWeeklyQuestAssignment_Id(Long weeklyQuestAssignmentId);
+
   @EntityGraph(attributePaths = {"taggedFriends", "taggedFriends.taggedLearner"})
     Optional<WeeklyQuestChallengeSubmission> findByLearner_IdAndWeeklyQuestAssignment_Id(UUID learnerId, Long weeklyQuestAssignmentId);
 
