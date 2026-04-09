@@ -59,6 +59,8 @@ public record PrivateGameLobbyStateDto(
         boolean viewerIsGame,
         String viewerConceptTitle,
         String lastGameGuess,
-        Boolean lastGameGuessCorrect
+        Boolean lastGameGuessCorrect,
+        boolean viewerWasKicked,
+        String viewerRemovedReason
 ) {
 }

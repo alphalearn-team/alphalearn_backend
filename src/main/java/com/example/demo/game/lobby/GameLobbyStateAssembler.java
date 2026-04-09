@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 class GameLobbyStateAssembler {
 
     private final LearnerRepository learnerRepository;
+    private final GameLobbyMemberRepository memberRepository;
     private final GameLobbyRealtimePresenceTracker realtimePresenceTracker;
     private final GameLobbySerializationSupport serializationSupport;
     private final int minActiveMembersToStart;
@@ -39,6 +40,7 @@ class GameLobbyStateAssembler {
 
     GameLobbyStateAssembler(
             LearnerRepository learnerRepository,
+            GameLobbyMemberRepository memberRepository,
             GameLobbyRealtimePresenceTracker realtimePresenceTracker,
             GameLobbySerializationSupport serializationSupport,
             int minActiveMembersToStart,
@@ -49,6 +51,7 @@ class GameLobbyStateAssembler {
             int defaultMaxVotingRounds
     ) {
         this.learnerRepository = learnerRepository;
+        this.memberRepository = memberRepository;
         this.realtimePresenceTracker = realtimePresenceTracker;
         this.serializationSupport = serializationSupport;
         this.minActiveMembersToStart = minActiveMembersToStart;
@@ -122,6 +125,13 @@ class GameLobbyStateAssembler {
                 && activeMembers.stream().anyMatch(member -> member.getLearnerId().equals(viewerLearnerId));
         boolean notStarted = lobby.getStartedAt() == null;
         boolean viewerIsCurrentDrawer = viewerLearnerId != null && viewerLearnerId.equals(lobby.getCurrentDrawerLearnerId());
+        GameLobbyMember viewerMembership = viewerLearnerId == null
+                ? null
+                : memberRepository.findByLobby_IdAndLearnerId(lobby.getId(), viewerLearnerId).orElse(null);
+        boolean viewerWasKicked = viewerMembership != null
+                && viewerMembership.getLeftAt() != null
+                && "KICKED_BY_HOST".equals(viewerMembership.getRemovedReason());
+        String viewerRemovedReason = viewerMembership == null ? null : viewerMembership.getRemovedReason();
         Integer totalTurns = serializationSupport.deserializeDrawerOrder(lobby.getRoundDrawerOrder()).size();
         if (totalTurns == 0 && lobby.getStartedAt() == null) {
             totalTurns = null;
@@ -187,7 +197,9 @@ class GameLobbyStateAssembler {
                 viewerIsGame,
                 viewerConceptTitle,
                 lobby.getLastGameGuess(),
-                lobby.getLastGameGuessCorrect()
+                lobby.getLastGameGuessCorrect(),
+                viewerWasKicked,
+                viewerRemovedReason
         );
     }
 

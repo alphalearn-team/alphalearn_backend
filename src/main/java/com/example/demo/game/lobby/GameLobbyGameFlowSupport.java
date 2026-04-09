@@ -2,6 +2,7 @@ package com.example.demo.game.lobby;
 
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.game.GameDemoConceptPolicy;
 import com.example.demo.game.GameWeeklyFeaturedConceptService;
 import com.example.demo.game.lobby.GameLobby;
 import com.example.demo.game.lobby.GameLobbyMember;
@@ -45,6 +46,7 @@ class GameLobbyGameFlowSupport {
     private final GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
     private final GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
     private final ConceptRepository conceptRepository;
+    private final boolean gameDemoModeEnabled;
 
     private final int defaultConceptCount;
     private final int defaultRoundsPerConcept;
@@ -61,6 +63,7 @@ class GameLobbyGameFlowSupport {
             GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
             GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
             ConceptRepository conceptRepository,
+            boolean gameDemoModeEnabled,
             int defaultConceptCount,
             int defaultRoundsPerConcept,
             int defaultDiscussionTimerSeconds,
@@ -75,6 +78,7 @@ class GameLobbyGameFlowSupport {
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
         this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
         this.conceptRepository = conceptRepository;
+        this.gameDemoModeEnabled = gameDemoModeEnabled;
         this.defaultConceptCount = defaultConceptCount;
         this.defaultRoundsPerConcept = defaultRoundsPerConcept;
         this.defaultDiscussionTimerSeconds = defaultDiscussionTimerSeconds;
@@ -141,7 +145,9 @@ class GameLobbyGameFlowSupport {
             }
 
             var featured = imposterWeeklyFeaturedConceptService.resolveCurrentWeeklyFeaturedConcept(lobby.getPinnedYearMonth());
-            if (featured.isPresent() && !excluded.contains(featured.get().getPublicId())) {
+            if (featured.isPresent()
+                    && GameDemoConceptPolicy.isAllowed(featured.get(), gameDemoModeEnabled)
+                    && !excluded.contains(featured.get().getPublicId())) {
                 return featured.get();
             }
 
@@ -154,6 +160,7 @@ class GameLobbyGameFlowSupport {
             List<Concept> monthlyConcepts = imposterMonthlyPackConceptRepository.findByPack_IdOrderBySlotIndexAsc(pack.getId())
                     .stream()
                     .map(row -> row.getConcept())
+                    .filter(concept -> GameDemoConceptPolicy.isAllowed(concept, gameDemoModeEnabled))
                     .filter(concept -> !excluded.contains(concept.getPublicId()))
                     .toList();
             if (monthlyConcepts.isEmpty()) {
@@ -164,6 +171,7 @@ class GameLobbyGameFlowSupport {
 
         List<Concept> concepts = conceptRepository.findAll()
                 .stream()
+                .filter(concept -> GameDemoConceptPolicy.isAllowed(concept, gameDemoModeEnabled))
                 .filter(concept -> !excluded.contains(concept.getPublicId()))
                 .toList();
         if (concepts.isEmpty()) {

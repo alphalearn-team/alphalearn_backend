@@ -15,6 +15,7 @@ import com.example.demo.game.realtime.GameLobbyRealtimePublisher;
 import com.example.demo.game.monthly.GameMonthlyPack;
 import com.example.demo.game.monthly.repository.GameMonthlyPackConceptRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackRepository;
+import com.example.demo.game.lobby.invite.GameLobbyInviteRepository;
 import com.example.demo.learner.Learner;
 import com.example.demo.learner.LearnerRepository;
 import com.example.demo.game.lobby.dto.CreatePrivateGameLobbyRequest;
@@ -87,6 +88,7 @@ public class LearnerGameLobbyService {
     private final GameLobbyCodeGenerator imposterLobbyCodeGenerator;
     private final GameMonthlyPackRepository imposterMonthlyPackRepository;
     private final GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
+    private final GameLobbyInviteRepository gameLobbyInviteRepository;
     private final GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
     private final ConceptRepository conceptRepository;
     private final LearnerRepository learnerRepository;
@@ -107,19 +109,22 @@ public class LearnerGameLobbyService {
             GameLobbyCodeGenerator imposterLobbyCodeGenerator,
             GameMonthlyPackRepository imposterMonthlyPackRepository,
             GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
+            GameLobbyInviteRepository gameLobbyInviteRepository,
             GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService,
             ConceptRepository conceptRepository,
             LearnerRepository learnerRepository,
             GameLobbyRealtimePublisher realtimePublisher,
             GameLobbyRealtimePresenceTracker realtimePresenceTracker,
             Clock clock,
-            @Value("${imposter.lobby.live-drawing.enabled:false}") boolean liveDrawingEnabled
+            @Value("${imposter.lobby.live-drawing.enabled:false}") boolean liveDrawingEnabled,
+            @Value("${game.demo.mode:false}") boolean gameDemoModeEnabled
     ) {
         this.imposterGameLobbyRepository = imposterGameLobbyRepository;
         this.imposterGameLobbyMemberRepository = imposterGameLobbyMemberRepository;
         this.imposterLobbyCodeGenerator = imposterLobbyCodeGenerator;
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
+        this.gameLobbyInviteRepository = gameLobbyInviteRepository;
         this.imposterWeeklyFeaturedConceptService = imposterWeeklyFeaturedConceptService;
         this.conceptRepository = conceptRepository;
         this.learnerRepository = learnerRepository;
@@ -140,6 +145,7 @@ public class LearnerGameLobbyService {
         this.roundEngine = new GameLobbyRoundEngine(serializationSupport, CONCEPT_RESULT_DURATION_SECONDS);
         this.stateAssembler = new GameLobbyStateAssembler(
                 learnerRepository,
+                imposterGameLobbyMemberRepository,
                 realtimePresenceTracker,
                 serializationSupport,
                 MIN_ACTIVE_MEMBERS_TO_START,
@@ -162,6 +168,7 @@ public class LearnerGameLobbyService {
                 imposterMonthlyPackConceptRepository,
                 imposterWeeklyFeaturedConceptService,
                 conceptRepository,
+                gameDemoModeEnabled,
                 DEFAULT_CONCEPT_COUNT,
                 DEFAULT_ROUNDS_PER_CONCEPT,
                 DEFAULT_DISCUSSION_TIMER_SECONDS,
@@ -175,6 +182,7 @@ public class LearnerGameLobbyService {
                 imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
+                gameLobbyInviteRepository,
                 validationSupport,
                 lifecycleSupport,
                 serializationSupport,
@@ -235,6 +243,15 @@ public class LearnerGameLobbyService {
     @Transactional
     public PrivateGameLobbyStateDto getPrivateLobbyState(SupabaseAuthUser user, UUID lobbyPublicId) {
         return operationsSupport.getPrivateLobbyState(user, lobbyPublicId);
+    }
+
+    @Transactional
+    public PrivateGameLobbyStateDto kickPrivateLobbyMember(
+            SupabaseAuthUser user,
+            UUID lobbyPublicId,
+            UUID memberPublicId
+    ) {
+        return operationsSupport.kickPrivateLobbyMember(user, lobbyPublicId, memberPublicId);
     }
 
     @Transactional

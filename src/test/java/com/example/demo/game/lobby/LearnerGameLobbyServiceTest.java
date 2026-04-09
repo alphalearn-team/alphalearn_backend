@@ -24,6 +24,7 @@ import com.example.demo.game.lobby.GameLobbyCodeGenerator;
 import com.example.demo.game.lobby.GameLobbyConceptPoolMode;
 import com.example.demo.game.monthly.GameMonthlyPack;
 import com.example.demo.game.monthly.GameMonthlyPackConcept;
+import com.example.demo.game.lobby.invite.GameLobbyInviteRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackConceptRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackRepository;
 import com.example.demo.game.realtime.GameLobbyRealtimePublisher;
@@ -73,6 +74,9 @@ class LearnerGameLobbyServiceTest {
     private GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
 
     @Mock
+    private GameLobbyInviteRepository gameLobbyInviteRepository;
+
+    @Mock
     private GameWeeklyFeaturedConceptService imposterWeeklyFeaturedConceptService;
 
     @Mock
@@ -98,12 +102,14 @@ class LearnerGameLobbyServiceTest {
                 imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
+                gameLobbyInviteRepository,
                 imposterWeeklyFeaturedConceptService,
                 conceptRepository,
                 learnerRepository,
                 imposterLobbyRealtimePublisher,
                 imposterLobbyRealtimePresenceTracker,
                 fixedClock,
+                false,
                 false
         );
         lenient().when(imposterGameLobbyRepository.saveAndFlush(any(GameLobby.class))).thenAnswer(invocation -> {
@@ -298,6 +304,8 @@ class LearnerGameLobbyServiceTest {
         GameLobby lobby = lobby("ABCD2345");
         GameLobbyMember historical = existingMember(lobby, user.userId(), "2026-04-01T12:00:00Z");
         historical.setLeftAt(OffsetDateTime.parse("2026-04-01T13:00:00Z"));
+        historical.setRemovedByLearnerId(UUID.randomUUID());
+        historical.setRemovedReason("KICKED_BY_HOST");
         when(imposterGameLobbyRepository.findByLobbyCodeForUpdate("ABCD2345")).thenReturn(Optional.of(lobby));
         when(imposterGameLobbyMemberRepository.findByLobby_IdAndLearnerIdAndLeftAtIsNull(11L, user.userId()))
                 .thenReturn(Optional.empty());
@@ -312,6 +320,8 @@ class LearnerGameLobbyServiceTest {
         assertThat(result.alreadyMember()).isFalse();
         assertThat(result.joinedAt()).isEqualTo(OffsetDateTime.parse("2026-04-02T00:00:00Z"));
         assertThat(historical.getLeftAt()).isNull();
+        assertThat(historical.getRemovedByLearnerId()).isNull();
+        assertThat(historical.getRemovedReason()).isNull();
         verify(imposterGameLobbyMemberRepository).saveAndFlush(historical);
     }
 
@@ -941,13 +951,15 @@ class LearnerGameLobbyServiceTest {
                 imposterLobbyCodeGenerator,
                 imposterMonthlyPackRepository,
                 imposterMonthlyPackConceptRepository,
+                gameLobbyInviteRepository,
                 imposterWeeklyFeaturedConceptService,
                 conceptRepository,
                 learnerRepository,
                 imposterLobbyRealtimePublisher,
                 imposterLobbyRealtimePresenceTracker,
                 fixedClock,
-                true
+                true,
+                false
         );
 
         SupabaseAuthUser drawer = learnerAuthUser();
