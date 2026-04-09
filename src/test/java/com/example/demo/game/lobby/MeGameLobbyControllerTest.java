@@ -14,6 +14,7 @@ import com.example.demo.game.lobby.GameLobbyPhase;
 import com.example.demo.game.lobby.dto.CreatePrivateGameLobbyRequest;
 import com.example.demo.game.lobby.dto.JoinPrivateGameLobbyRequest;
 import com.example.demo.game.lobby.dto.JoinedPrivateGameLobbyDto;
+import com.example.demo.game.lobby.dto.KickPrivateGameLobbyMemberRequest;
 import com.example.demo.game.lobby.dto.LeavePrivateGameLobbyResponse;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyDto;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyLeaveResult;
@@ -179,6 +180,23 @@ class MeGameLobbyControllerTest {
     }
 
     @Test
+    void kickPrivateLobbyMemberReturnsUpdatedState() throws Exception {
+        UUID lobbyPublicId = UUID.randomUUID();
+        UUID memberPublicId = UUID.randomUUID();
+        KickPrivateGameLobbyMemberRequest request = new KickPrivateGameLobbyMemberRequest(memberPublicId);
+        PrivateGameLobbyStateDto state = stateDto(lobbyPublicId, null, 2, true, false);
+
+        when(learnerGameLobbyService.kickPrivateLobbyMember(any(), eq(lobbyPublicId), eq(memberPublicId))).thenReturn(state);
+
+        mockMvc.perform(patch("/api/me/game-lobbies/private-lobbies/{lobbyPublicId}/members", lobbyPublicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicId").value(lobbyPublicId.toString()))
+                .andExpect(jsonPath("$.activeMemberCount").value(2));
+    }
+
+    @Test
     void joinPrivateLobbyReturnsBadRequestWhenServiceRejects() throws Exception {
         JoinPrivateGameLobbyRequest request = new JoinPrivateGameLobbyRequest("  ");
 
@@ -264,6 +282,8 @@ class MeGameLobbyControllerTest {
                 false,
                 null,
                 null,
+                null,
+                false,
                 null
         );
     }

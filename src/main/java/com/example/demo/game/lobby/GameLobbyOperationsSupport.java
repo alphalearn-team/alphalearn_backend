@@ -8,6 +8,9 @@ import com.example.demo.game.lobby.GameLobbyRepository;
 import com.example.demo.game.lobby.GameLobbyCodeGenerator;
 import com.example.demo.game.lobby.GameLobbyConceptPoolMode;
 import com.example.demo.game.lobby.GameLobbyPhase;
+import com.example.demo.game.lobby.invite.GameLobbyInvite;
+import com.example.demo.game.lobby.invite.GameLobbyInviteRepository;
+import com.example.demo.game.lobby.invite.GameLobbyInviteStatus;
 import com.example.demo.game.monthly.GameMonthlyPack;
 import com.example.demo.game.monthly.repository.GameMonthlyPackConceptRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackRepository;
@@ -40,12 +43,14 @@ import org.springframework.web.server.ResponseStatusException;
 class GameLobbyOperationsSupport {
 
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final String MEMBER_REMOVED_REASON_KICKED_BY_HOST = "KICKED_BY_HOST";
 
     private final GameLobbyRepository lobbyRepository;
     private final GameLobbyMemberRepository memberRepository;
     private final GameLobbyCodeGenerator codeGenerator;
     private final GameMonthlyPackRepository monthlyPackRepository;
     private final GameMonthlyPackConceptRepository monthlyPackConceptRepository;
+    private final GameLobbyInviteRepository inviteRepository;
     private final GameLobbyValidationSupport validationSupport;
     private final GameLobbyLifecycleSupport lifecycleSupport;
     private final GameLobbySerializationSupport serializationSupport;
@@ -76,6 +81,7 @@ class GameLobbyOperationsSupport {
             GameLobbyCodeGenerator codeGenerator,
             GameMonthlyPackRepository monthlyPackRepository,
             GameMonthlyPackConceptRepository monthlyPackConceptRepository,
+            GameLobbyInviteRepository inviteRepository,
             GameLobbyValidationSupport validationSupport,
             GameLobbyLifecycleSupport lifecycleSupport,
             GameLobbySerializationSupport serializationSupport,
@@ -104,6 +110,7 @@ class GameLobbyOperationsSupport {
         this.codeGenerator = codeGenerator;
         this.monthlyPackRepository = monthlyPackRepository;
         this.monthlyPackConceptRepository = monthlyPackConceptRepository;
+        this.inviteRepository = inviteRepository;
         this.validationSupport = validationSupport;
         this.lifecycleSupport = lifecycleSupport;
         this.serializationSupport = serializationSupport;
@@ -190,6 +197,8 @@ class GameLobbyOperationsSupport {
         if (historicalMember != null) {
             historicalMember.setJoinedAt(OffsetDateTime.now(clock));
             historicalMember.setLeftAt(null);
+            historicalMember.setRemovedByLearnerId(null);
+            historicalMember.setRemovedReason(null);
             GameLobbyMember rejoinedMember = memberRepository.saveAndFlush(historicalMember);
             lifecycleSupport.incrementStateVersion(lobby);
             GameLobby savedLobby = lobbyRepository.saveAndFlush(lobby);
@@ -364,6 +373,65 @@ class GameLobbyOperationsSupport {
             return stateAssembler.buildLobbyState(savedLobby, user.userId(), activeMembers);
         }
         return stateAssembler.buildLobbyState(lobby, user.userId(), activeMembers);
+    }
+
+    PrivateGameLobbyStateDto kickPrivateLobbyMember(
+            SupabaseAuthUser user,
+            UUID lobbyPublicId,
+            UUID memberPublicId
+    ) {
+        validationSupport.requireLearner(user);
+        if (memberPublicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memberPublicId is required");
+        }
+
+        GameLobby lobby = validationSupport.resolveLobbyByPublicId(lobbyPublicId, true);
+        validationSupport.ensureViewerIsMember(lobby, user.userId());
+
+        if (!user.userId().equals(lobby.getHostLearnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only lobby host can kick members");
+        }
+        if (lobby.getStartedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot kick members after lobby has started");
+        }
+
+        List<GameLobbyMember> activeMembers = memberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        Map<UUID, Learner> learnersById = stateAssembler.loadLearnersByIdForState(activeMembers, lobby);
+
+        UUID targetLearnerId = learnersById.values().stream()
+                .filter(learner -> memberPublicId.equals(learner.getPublicId()))
+                .map(Learner::getId)
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lobby member not found"));
+
+        if (targetLearnerId.equals(user.userId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Host cannot kick self");
+        }
+
+        GameLobbyMember targetMember = memberRepository
+                .findByLobby_IdAndLearnerIdAndLeftAtIsNull(lobby.getId(), targetLearnerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Target learner is not an active lobby member"));
+
+        targetMember.setLeftAt(OffsetDateTime.now(clock));
+        targetMember.setRemovedByLearnerId(user.userId());
+        targetMember.setRemovedReason(MEMBER_REMOVED_REASON_KICKED_BY_HOST);
+        memberRepository.saveAndFlush(targetMember);
+
+        GameLobbyInvite pendingInvite = inviteRepository
+                .findByLobby_IdAndReceiverLearnerIdAndStatus(lobby.getId(), targetLearnerId, GameLobbyInviteStatus.PENDING)
+                .orElse(null);
+        if (pendingInvite != null) {
+            pendingInvite.setStatus(GameLobbyInviteStatus.CANCELED);
+            pendingInvite.setRespondedAt(OffsetDateTime.now(clock));
+            inviteRepository.save(pendingInvite);
+        }
+
+        presenceTracker.clearLobbyMembership(lobbyPublicId, targetLearnerId);
+        lifecycleSupport.incrementStateVersion(lobby);
+        GameLobby savedLobby = lobbyRepository.saveAndFlush(lobby);
+        List<GameLobbyMember> remainingActiveMembers = memberRepository.findByLobby_IdAndLeftAtIsNullOrderByJoinedAtAsc(lobby.getId());
+        realtimeSupport.publishRealtimeState(savedLobby, "KICK_MEMBER", remainingActiveMembers);
+        return stateAssembler.buildLobbyState(savedLobby, user.userId(), remainingActiveMembers);
     }
 
     PrivateGameLobbyStateDto upsertDrawingSnapshot(

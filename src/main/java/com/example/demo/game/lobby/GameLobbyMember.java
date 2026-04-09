@@ -39,4 +39,10 @@ public class GameLobbyMember {
 
     @Column(name = "left_at")
     private OffsetDateTime leftAt;
+
+    @Column(name = "removed_by_learner_id", columnDefinition = "uuid")
+    private UUID removedByLearnerId;
+
+    @Column(name = "removed_reason", length = 64)
+    private String removedReason;
 }

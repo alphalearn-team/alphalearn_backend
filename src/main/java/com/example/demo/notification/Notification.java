@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,6 +37,13 @@ public class Notification {
     @Column(nullable = false)
     private String message;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 64)
+    private NotificationType type = NotificationType.GENERIC;
+
+    @Column(name = "metadata_json", columnDefinition = "text")
+    private String metadataJson;
+
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
 
@@ -42,8 +51,14 @@ public class Notification {
     private OffsetDateTime createdAt;
 
     public Notification(UUID learnerId, String message) {
+        this(learnerId, message, NotificationType.GENERIC, null);
+    }
+
+    public Notification(UUID learnerId, String message, NotificationType type, String metadataJson) {
         this.learnerId = learnerId;
         this.message = message;
+        this.type = type == null ? NotificationType.GENERIC : type;
+        this.metadataJson = metadataJson;
         this.isRead = false;
         this.createdAt = OffsetDateTime.now();
     }

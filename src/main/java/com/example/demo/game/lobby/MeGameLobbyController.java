@@ -5,6 +5,7 @@ import com.example.demo.game.lobby.dto.CreatePrivateGameLobbyRequest;
 import com.example.demo.game.lobby.dto.GameLobbyTransitionActionRequest;
 import com.example.demo.game.lobby.dto.JoinPrivateGameLobbyRequest;
 import com.example.demo.game.lobby.dto.JoinedPrivateGameLobbyDto;
+import com.example.demo.game.lobby.dto.KickPrivateGameLobbyMemberRequest;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyDto;
 import com.example.demo.game.lobby.dto.PrivateGameLobbyStateDto;
 import com.example.demo.game.lobby.dto.UpdatePrivateGameLobbySettingsRequest;
@@ -85,5 +86,19 @@ public class MeGameLobbyController {
             @PathVariable UUID lobbyPublicId
     ) {
         return learnerGameLobbyService.getPrivateLobbyState(user, lobbyPublicId);
+    }
+
+    @PatchMapping("/private-lobbies/{lobbyPublicId}/members")
+    @Operation(summary = "Kick member from private imposter lobby", description = "Host removes an active member before the match starts")
+    public PrivateGameLobbyStateDto kickPrivateLobbyMember(
+            @AuthenticationPrincipal SupabaseAuthUser user,
+            @PathVariable UUID lobbyPublicId,
+            @RequestBody KickPrivateGameLobbyMemberRequest request
+    ) {
+        return learnerGameLobbyService.kickPrivateLobbyMember(
+                user,
+                lobbyPublicId,
+                request == null ? null : request.memberPublicId()
+        );
     }
 }
