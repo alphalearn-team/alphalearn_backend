@@ -11,6 +11,16 @@ import com.example.demo.game.monthly.GameMonthlyPackWeeklyFeature;
 import com.example.demo.game.monthly.repository.GameMonthlyPackConceptRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackWeeklyFeatureRepository;
+import com.example.demo.game.GameWeeklyFeaturedConceptService;
+import com.example.demo.quest.weekly.WeeklyQuestAssignment;
+import com.example.demo.quest.weekly.WeeklyQuestAssignmentRepository;
+import com.example.demo.quest.weekly.WeeklyQuestCalendarService;
+import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmissionRepository;
+import com.example.demo.quest.weekly.WeeklyQuestWeek;
+import com.example.demo.quest.weekly.WeeklyQuestWeekRepository;
+import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentSourceType;
+import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentStatus;
+import com.example.demo.quest.weekly.enums.WeeklyQuestWeekStatus;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
@@ -23,6 +33,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +43,18 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AdminGameMonthlyPackService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminGameMonthlyPackService.class);
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final GameMonthlyPackRepository imposterMonthlyPackRepository;
     private final GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository;
     private final GameMonthlyPackWeeklyFeatureRepository imposterMonthlyPackWeeklyFeatureRepository;
     private final ConceptRepository conceptRepository;
+    private final WeeklyQuestWeekRepository weeklyQuestWeekRepository;
+    private final WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
+    private final WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository;
+    private final WeeklyQuestCalendarService weeklyQuestCalendarService;
+    private final GameWeeklyFeaturedConceptService gameWeeklyFeaturedConceptService;
     private final Clock clock;
 
     public AdminGameMonthlyPackService(
@@ -44,12 +62,22 @@ public class AdminGameMonthlyPackService {
             GameMonthlyPackConceptRepository imposterMonthlyPackConceptRepository,
             GameMonthlyPackWeeklyFeatureRepository imposterMonthlyPackWeeklyFeatureRepository,
             ConceptRepository conceptRepository,
+            WeeklyQuestWeekRepository weeklyQuestWeekRepository,
+            WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository,
+            WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository,
+            WeeklyQuestCalendarService weeklyQuestCalendarService,
+            GameWeeklyFeaturedConceptService gameWeeklyFeaturedConceptService,
             Clock clock
     ) {
         this.imposterMonthlyPackRepository = imposterMonthlyPackRepository;
         this.imposterMonthlyPackConceptRepository = imposterMonthlyPackConceptRepository;
         this.imposterMonthlyPackWeeklyFeatureRepository = imposterMonthlyPackWeeklyFeatureRepository;
         this.conceptRepository = conceptRepository;
+        this.weeklyQuestWeekRepository = weeklyQuestWeekRepository;
+        this.weeklyQuestAssignmentRepository = weeklyQuestAssignmentRepository;
+        this.weeklyQuestChallengeSubmissionRepository = weeklyQuestChallengeSubmissionRepository;
+        this.weeklyQuestCalendarService = weeklyQuestCalendarService;
+        this.gameWeeklyFeaturedConceptService = gameWeeklyFeaturedConceptService;
         this.clock = clock;
     }
 
@@ -142,6 +170,12 @@ public class AdminGameMonthlyPackService {
                 })
                 .toList();
         imposterMonthlyPackWeeklyFeatureRepository.saveAll(weeklyFeatureRows);
+        syncCurrentWeekFallbackAssignmentIfNeeded(
+                normalizedYearMonth,
+                weeklyFeaturedConceptPublicIds,
+                conceptByPublicId,
+                OffsetDateTime.now(clock)
+        );
 
         List<AdminGameMonthlyPackConceptDto> conceptDtos = conceptRows.stream()
                 .map(entry -> new AdminGameMonthlyPackConceptDto(
@@ -227,5 +261,59 @@ public class AdminGameMonthlyPackService {
         }
 
         return List.copyOf(ids);
+    }
+
+    private void syncCurrentWeekFallbackAssignmentIfNeeded(
+            String yearMonth,
+            List<UUID> weeklyFeaturedConceptPublicIds,
+            Map<UUID, Concept> conceptByPublicId,
+            OffsetDateTime now
+    ) {
+        String currentYearMonth = YearMonth.now(clock).format(YEAR_MONTH_FORMATTER);
+        if (!currentYearMonth.equals(yearMonth)) {
+            return;
+        }
+
+        short weekSlot = gameWeeklyFeaturedConceptService.currentWeekSlotInMonth();
+        if (weekSlot < 1 || weekSlot > 4) {
+            return;
+        }
+
+        UUID featuredConceptPublicId = weeklyFeaturedConceptPublicIds.get(weekSlot - 1);
+        Concept featuredConcept = conceptByPublicId.get(featuredConceptPublicId);
+        if (featuredConcept == null) {
+            return;
+        }
+
+        OffsetDateTime currentWeekStartAt = weeklyQuestCalendarService.currentWeekStartAt();
+        WeeklyQuestWeek currentWeek = weeklyQuestWeekRepository.findByWeekStartAt(currentWeekStartAt).orElse(null);
+        if (currentWeek == null || currentWeek.getStatus() == WeeklyQuestWeekStatus.COMPLETED) {
+            return;
+        }
+
+        WeeklyQuestAssignment assignment = weeklyQuestAssignmentRepository
+                .findByWeek_IdAndOfficialTrue(currentWeek.getId())
+                .orElse(null);
+        if (assignment == null || assignment.getSourceType() != WeeklyQuestAssignmentSourceType.FALLBACK) {
+            return;
+        }
+
+        if (assignment.getStatus() == WeeklyQuestAssignmentStatus.RETIRED
+                || assignment.getConcept().getPublicId().equals(featuredConceptPublicId)) {
+            return;
+        }
+
+        if (weeklyQuestChallengeSubmissionRepository.existsByWeeklyQuestAssignment_Id(assignment.getId())) {
+            log.warn(
+                    "Skipped syncing current weekly quest assignment because submissions already exist. weekId={}, assignmentId={}",
+                    currentWeek.getId(),
+                    assignment.getId()
+            );
+            return;
+        }
+
+        assignment.setConcept(featuredConcept);
+        assignment.setUpdatedAt(now);
+        weeklyQuestAssignmentRepository.save(assignment);
     }
 }

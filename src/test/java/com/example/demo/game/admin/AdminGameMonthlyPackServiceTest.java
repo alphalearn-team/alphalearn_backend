@@ -3,20 +3,32 @@ package com.example.demo.game.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.example.demo.game.admin.dto.AdminGameMonthlyPackDto;
 import com.example.demo.game.admin.dto.UpsertAdminGameMonthlyPackRequest;
 import com.example.demo.concept.Concept;
 import com.example.demo.concept.ConceptRepository;
+import com.example.demo.game.GameWeeklyFeaturedConceptService;
 import com.example.demo.game.monthly.GameMonthlyPack;
 import com.example.demo.game.monthly.GameMonthlyPackConcept;
 import com.example.demo.game.monthly.GameMonthlyPackWeeklyFeature;
 import com.example.demo.game.monthly.repository.GameMonthlyPackConceptRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackRepository;
 import com.example.demo.game.monthly.repository.GameMonthlyPackWeeklyFeatureRepository;
+import com.example.demo.quest.weekly.WeeklyQuestAssignment;
+import com.example.demo.quest.weekly.WeeklyQuestAssignmentRepository;
+import com.example.demo.quest.weekly.WeeklyQuestCalendarService;
+import com.example.demo.quest.weekly.WeeklyQuestChallengeSubmissionRepository;
+import com.example.demo.quest.weekly.WeeklyQuestWeek;
+import com.example.demo.quest.weekly.WeeklyQuestWeekRepository;
+import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentSourceType;
+import com.example.demo.quest.weekly.enums.WeeklyQuestAssignmentStatus;
+import com.example.demo.quest.weekly.enums.WeeklyQuestWeekStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -52,6 +64,21 @@ class AdminGameMonthlyPackServiceTest {
     @Mock
     private ConceptRepository conceptRepository;
 
+    @Mock
+    private WeeklyQuestWeekRepository weeklyQuestWeekRepository;
+
+    @Mock
+    private WeeklyQuestAssignmentRepository weeklyQuestAssignmentRepository;
+
+    @Mock
+    private WeeklyQuestChallengeSubmissionRepository weeklyQuestChallengeSubmissionRepository;
+
+    @Mock
+    private WeeklyQuestCalendarService weeklyQuestCalendarService;
+
+    @Mock
+    private GameWeeklyFeaturedConceptService gameWeeklyFeaturedConceptService;
+
     private AdminGameMonthlyPackService service;
 
     @BeforeEach
@@ -62,8 +89,17 @@ class AdminGameMonthlyPackServiceTest {
                 imposterMonthlyPackConceptRepository,
                 imposterMonthlyPackWeeklyFeatureRepository,
                 conceptRepository,
+                weeklyQuestWeekRepository,
+                weeklyQuestAssignmentRepository,
+                weeklyQuestChallengeSubmissionRepository,
+                weeklyQuestCalendarService,
+                gameWeeklyFeaturedConceptService,
                 fixedClock
         );
+        lenient().when(gameWeeklyFeaturedConceptService.currentWeekSlotInMonth()).thenReturn((short) 1);
+        lenient().when(weeklyQuestCalendarService.currentWeekStartAt())
+                .thenReturn(OffsetDateTime.parse("2026-03-29T00:00:00+08:00"));
+        lenient().when(weeklyQuestWeekRepository.findByWeekStartAt(any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -287,6 +323,78 @@ class AdminGameMonthlyPackServiceTest {
         AdminGameMonthlyPackDto result = service.getCurrentMonthlyPack();
 
         assertThat(result.yearMonth()).isEqualTo("2026-04");
+    }
+
+    @Test
+    void upsertSyncsCurrentWeekFallbackAssignmentWhenNoSubmissions() {
+        List<UUID> conceptIds = randomIds(20);
+        List<UUID> featuredIds = List.of(conceptIds.get(5), conceptIds.get(6), conceptIds.get(7), conceptIds.get(8));
+
+        List<Concept> resolvedConcepts = conceptIds.stream()
+                .map(this::conceptWithPublicId)
+                .toList();
+        when(conceptRepository.findAllByPublicIdIn(conceptIds)).thenReturn(resolvedConcepts);
+
+        GameMonthlyPack existingPack = pack(300L, "2026-04");
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(existingPack));
+
+        WeeklyQuestWeek currentWeek = new WeeklyQuestWeek();
+        ReflectionTestUtils.setField(currentWeek, "id", 77L);
+        currentWeek.setStatus(WeeklyQuestWeekStatus.ACTIVE);
+        when(weeklyQuestWeekRepository.findByWeekStartAt(OffsetDateTime.parse("2026-03-29T00:00:00+08:00")))
+                .thenReturn(Optional.of(currentWeek));
+
+        WeeklyQuestAssignment assignment = new WeeklyQuestAssignment();
+        ReflectionTestUtils.setField(assignment, "id", 88L);
+        assignment.setWeek(currentWeek);
+        assignment.setSourceType(WeeklyQuestAssignmentSourceType.FALLBACK);
+        assignment.setStatus(WeeklyQuestAssignmentStatus.ACTIVE);
+        assignment.setConcept(conceptWithPublicId(conceptIds.get(0)));
+        assignment.setCreatedAt(OffsetDateTime.parse("2026-03-29T00:00:00Z"));
+        assignment.setUpdatedAt(OffsetDateTime.parse("2026-03-29T00:00:00Z"));
+        when(weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(77L)).thenReturn(Optional.of(assignment));
+        when(weeklyQuestChallengeSubmissionRepository.existsByWeeklyQuestAssignment_Id(88L)).thenReturn(false);
+
+        service.upsertMonthlyPack("2026-04", new UpsertAdminGameMonthlyPackRequest(conceptIds, featuredIds));
+
+        assertThat(assignment.getConcept().getPublicId()).isEqualTo(featuredIds.get(0));
+        verify(weeklyQuestAssignmentRepository).save(assignment);
+    }
+
+    @Test
+    void upsertDoesNotSyncWhenCurrentFallbackAssignmentHasSubmissions() {
+        List<UUID> conceptIds = randomIds(20);
+        List<UUID> featuredIds = List.of(conceptIds.get(5), conceptIds.get(6), conceptIds.get(7), conceptIds.get(8));
+
+        List<Concept> resolvedConcepts = conceptIds.stream()
+                .map(this::conceptWithPublicId)
+                .toList();
+        when(conceptRepository.findAllByPublicIdIn(conceptIds)).thenReturn(resolvedConcepts);
+
+        GameMonthlyPack existingPack = pack(300L, "2026-04");
+        when(imposterMonthlyPackRepository.findByYearMonth("2026-04")).thenReturn(Optional.of(existingPack));
+
+        WeeklyQuestWeek currentWeek = new WeeklyQuestWeek();
+        ReflectionTestUtils.setField(currentWeek, "id", 77L);
+        currentWeek.setStatus(WeeklyQuestWeekStatus.ACTIVE);
+        when(weeklyQuestWeekRepository.findByWeekStartAt(OffsetDateTime.parse("2026-03-29T00:00:00+08:00")))
+                .thenReturn(Optional.of(currentWeek));
+
+        WeeklyQuestAssignment assignment = new WeeklyQuestAssignment();
+        ReflectionTestUtils.setField(assignment, "id", 88L);
+        assignment.setWeek(currentWeek);
+        assignment.setSourceType(WeeklyQuestAssignmentSourceType.FALLBACK);
+        assignment.setStatus(WeeklyQuestAssignmentStatus.ACTIVE);
+        assignment.setConcept(conceptWithPublicId(conceptIds.get(0)));
+        assignment.setCreatedAt(OffsetDateTime.parse("2026-03-29T00:00:00Z"));
+        assignment.setUpdatedAt(OffsetDateTime.parse("2026-03-29T00:00:00Z"));
+        when(weeklyQuestAssignmentRepository.findByWeek_IdAndOfficialTrue(77L)).thenReturn(Optional.of(assignment));
+        when(weeklyQuestChallengeSubmissionRepository.existsByWeeklyQuestAssignment_Id(88L)).thenReturn(true);
+
+        service.upsertMonthlyPack("2026-04", new UpsertAdminGameMonthlyPackRequest(conceptIds, featuredIds));
+
+        assertThat(assignment.getConcept().getPublicId()).isEqualTo(conceptIds.get(0));
+        verify(weeklyQuestAssignmentRepository, times(0)).save(assignment);
     }
 
     private List<UUID> randomIds(int count) {
